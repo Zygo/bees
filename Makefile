@@ -1,4 +1,4 @@
-default install all: lib src test
+default install all: lib src test README.html
 
 clean:
 	git clean -dfx
@@ -13,3 +13,7 @@ src: lib
 
 test: lib src
 	$(MAKE) -C test
+
+README.html: README.md
+	markdown README.md > README.html.new
+	mv -f README.html.new README.html

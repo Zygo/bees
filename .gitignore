@@ -3,6 +3,7 @@
 *.new
 *.so*
 Doxyfile
+README.html
 depends.mk
 doxygen_*
 html/
