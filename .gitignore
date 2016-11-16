@@ -1,0 +1,11 @@
+*.[ao]
+*.bak
+*.new
+*.so*
+Doxyfile
+depends.mk
+doxygen_*
+html/
+latex/
+make.log
+make.log.new
