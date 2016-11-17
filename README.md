@@ -7,19 +7,18 @@ About Bees
 ----------
 
 Bees is a daemon designed to run continuously on live file servers.
-Bees consumes entire filesystems and deduplicates in a single pass, using
-minimal RAM to store data.  Bees maintains persistent state so it can be
-interrupted and resumed, whether by planned upgrades or unplanned crashes.
-Bees makes continuous incremental progress instead of using separate
-scan and dedup phases.  Bees uses the Linux kernel's `dedupe_file_range`
-system call to ensure data is handled safely even if other applications
-concurrently modify it.
+Bees scans and deduplicates whole filesystems in a single pass instead
+of separate scan and dedup phases.  RAM usage does _not_ depend on
+unique data size or the number of input files.  Hash tables and scan
+progress are stored persistently so the daemon can resume after a reboot.
+Bees uses the Linux kernel's `dedupe_file_range` feature to ensure data
+is handled safely even if other applications concurrently modify it.
 
 Bees is intentionally btrfs-specific for performance and capability.
-Bees uses the btrfs `SEARCH_V2` ioctl to scan for new data 
-without the overhead of repeatedly walking filesystem trees with the
-POSIX API.  Bees uses `LOGICAL_INO` and `INO_PATHS` to leverage btrfs's
-existing metadata instead of building its own redundant data structures.
+Bees uses the btrfs `SEARCH_V2` ioctl to scan for new data without the
+overhead of repeatedly walking filesystem trees with the POSIX API.
+Bees uses `LOGICAL_INO` and `INO_PATHS` to leverage btrfs's existing
+metadata instead of building its own redundant data structures.
 Bees can cope with Btrfs filesystem compression.  Bees can reassemble
 Btrfs extents to deduplicate extents that contain a mix of duplicate
 and unique data blocks.
@@ -37,7 +36,8 @@ using a weighted sampling algorithm.  This allows Bees to adapt itself
 to its filesystem size without forcing admins to do math at install time.
 At the same time, the duplicate block alignment constraint can be as low
 as 4K, allowing efficient deduplication of files with narrowly-aligned
-duplicate block offsets (e.g. compiled binaries and VM/disk images).
+duplicate block offsets (e.g. compiled binaries and VM/disk images)
+even if the effective block size is much larger.
 
 The Bees hash table is loaded into RAM at startup (using hugepages if
 available), mlocked, and synced to persistent storage by trickle-writing
@@ -78,6 +78,12 @@ and some metadata bits).  Each entry represents a minimum of 4K on disk.
         1TB                16MB               1024K
        64TB                 1GB               1024K
 
+It is possible to resize the hash table by changing the size of
+`beeshash.dat` (e.g. with `truncate`) and restarting `bees`.  This
+does not preserve all the existing hash table entries, but it does
+preserve more than zero of them--especially if the old and new sizes
+are a power-of-two multiple of each other.
+
 Things You Might Expect That Bees Doesn't Have
 ----------------------------------------------
 
@@ -112,6 +118,16 @@ FS trees.
 this was removed because it made Bees too aggressive to coexist with
 other applications on the same machine.  It also hit the *slow backrefs*
 on N CPU cores instead of just one.
+
+* Block reads are currently more allocation- and CPU-intensive than they
+should be, especially for filesystems on SSD where the IO overhead is
+much smaller.  This is a problem for power-constrained environments
+(e.g. laptops with slow CPU).
+
+* Bees can currently fragment extents when required to remove duplicate
+blocks, but has no defragmentation capability yet.  When possible, Bees
+will attempt to work with existing extent boundaries, but it will not
+aggregate blocks together from multiple extents to create larger ones.
 
 Good Btrfs Feature Interactions
 -------------------------------
@@ -175,7 +191,7 @@ Other Caveats
   unallocated space (see `btrfs fi df`) on the filesystem before running
   Bees for the first time.  Use
 
-	btrfs balance start -dusage=100,limit=1 /your/filesystem
+        btrfs balance start -dusage=100,limit=1 /your/filesystem
 
   If possible, raise the `limit` parameter to the current size of metadata
   usage (from `btrfs fi df`) plus 1.
@@ -295,14 +311,14 @@ Setup
 
 Create a directory for bees state files:
 
-	export BEESHOME=/some/path
-	mkdir -p "$BEESHOME"
+        export BEESHOME=/some/path
+        mkdir -p "$BEESHOME"
 
 Create an empty hash table (your choice of size, but it must be a multiple
 of 16M).  This example creates a 1GB hash table:
 
-	truncate -s 1g "$BEESHOME/beeshash.dat"
-	chmod 700 "$BEESHOME/beeshash.dat"
+        truncate -s 1g "$BEESHOME/beeshash.dat"
+        chmod 700 "$BEESHOME/beeshash.dat"
 
 Configuration
 -------------
@@ -324,11 +340,11 @@ Running
 
 We created this directory in the previous section:
 
-	export BEESHOME=/some/path
+        export BEESHOME=/some/path
 
 Use a tmpfs for BEESSTATUS, it updates once per second:
 
-	export BEESSTATUS=/run/bees.status
+        export BEESSTATUS=/run/bees.status
 
 bees can only process the root subvol of a btrfs (seriously--if the
 argument is not the root subvol directory, Bees will just throw an
@@ -336,20 +352,20 @@ exception and stop).
 
 Use a bind mount, and let only bees access it:
 
-	mount -osubvol=/ /dev/<your-filesystem> /var/lib/bees/root
+        mount -osubvol=/ /dev/<your-filesystem> /var/lib/bees/root
 
 Reduce CPU and IO priority to be kinder to other applications
 sharing this host (or raise them for more aggressive disk space
-recovery).  If you use cgroups, put bees in its own cgroup, then reduce
+recovery).  If you use cgroups, put `bees` in its own cgroup, then reduce
 the `blkio.weight` and `cpu.shares` parameters.  You can also use
-`schedtool` and `ionice in the shell script that launches bees:
+`schedtool` and `ionice` in the shell script that launches `bees`:
 
-	schedtool -D -n20 $$
-	ionice -c3 -p $$
+        schedtool -D -n20 $$
+        ionice -c3 -p $$
 
 Let the bees fly:
 
-	bees /var/lib/bees/root >> /var/log/bees.log 2>&1
+        bees /var/lib/bees/root >> /var/log/bees.log 2>&1
 
 You'll probably want to arrange for /var/log/bees.log to be rotated
 periodically.  You may also want to set umask to 077 to prevent disclosure
@@ -363,7 +379,7 @@ Email bug reports and patches to Zygo Blaxell <bees@furryterror.org>.
 
 You can also use Github:
 
-	https://github.com/Zygo/bees
+        https://github.com/Zygo/bees
 
 
 
