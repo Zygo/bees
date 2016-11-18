@@ -1,5 +1,6 @@
 PROGRAMS = \
 	../bin/bees \
+	../bin/fanotify-watch \
 	../bin/fiemap \
 	../bin/fiewalk \
 
