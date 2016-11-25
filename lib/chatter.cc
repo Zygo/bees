@@ -15,7 +15,7 @@
 namespace crucible {
 	using namespace std;
 
-	static auto_ptr<set<string>> chatter_names;
+	static shared_ptr<set<string>> chatter_names;
 	static const char *SPACETAB = " \t";
 
 	static

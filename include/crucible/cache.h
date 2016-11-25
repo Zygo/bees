@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <tuple>
+#include <vector>
 
 namespace crucible {
 	using namespace std;

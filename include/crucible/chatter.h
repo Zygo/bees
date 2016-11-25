@@ -86,16 +86,6 @@ namespace crucible {
 		}
 	};
 
-	template <>
-	struct ChatterTraits<ostream &> {
-		Chatter &
-		operator()(Chatter &c, ostream & arg)
-		{
-			c.get_os() << arg;
-			return c;
-		}
-	};
-
 	class ChatterBox {
 		string m_file;
 		int m_line;
