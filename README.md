@@ -1,30 +1,52 @@
 BEES
 ====
 
-Best-Effort Extent-Same, a btrfs deduplication daemon.
+Best-Effort Extent-Same, a btrfs dedup agent.
 
 About Bees
 ----------
 
-Bees is a daemon designed to run continuously on live file servers.
-Bees scans and deduplicates whole filesystems in a single pass instead
-of separate scan and dedup phases.  RAM usage does _not_ depend on
-unique data size or the number of input files.  Hash tables and scan
-progress are stored persistently so the daemon can resume after a reboot.
-Bees uses the Linux kernel's `dedupe_file_range` feature to ensure data
-is handled safely even if other applications concurrently modify it.
+Bees is a block-oriented userspace dedup agent designed to avoid
+scalability problems on large filesystems.
 
-Bees is intentionally btrfs-specific for performance and capability.
-Bees uses the btrfs `SEARCH_V2` ioctl to scan for new data without the
-overhead of repeatedly walking filesystem trees with the POSIX API.
-Bees uses `LOGICAL_INO` and `INO_PATHS` to leverage btrfs's existing
-metadata instead of building its own redundant data structures.
-Bees can cope with Btrfs filesystem compression.  Bees can reassemble
-Btrfs extents to deduplicate extents that contain a mix of duplicate
-and unique data blocks.
+Bees is designed to degrade gracefully when underprovisioned with RAM.
+Bees does not use more RAM or storage as filesystem data size increases.
+The dedup hash table size is fixed at creation time and does not change.
+The effective dedup block size is dynamic and adjusts automatically to
+fit the hash table into the configured RAM limit.  Hash table overflow
+is not implemented to eliminate the IO overhead of hash table overflow.
+Hash table entries are only 16 bytes per dedup block to keep the average
+dedup block size small.
 
-Bees includes a number of workarounds for Btrfs kernel bugs to (try to)
-avoid ruining your day.  You're welcome.
+Bees does not require alignment between dedup blocks or extent boundaries
+(i.e. it can handle any multiple-of-4K offset between dup block pairs).
+Bees rearranges blocks into shared and unique extents if required to
+work within current btrfs kernel dedup limitations.
+
+Bees can dedup any combination of compressed and uncompressed extents.
+
+Bees operates in a single pass which removes duplicate extents immediately
+during scan.  There are no separate scanning and dedup phases.
+
+Bees uses only data-safe btrfs kernel operations, so it can dedup live
+data (e.g. build servers, sqlite databases, VM disk images).  It does
+not modify file attributes or timestamps.
+
+Bees does not store any information about filesystem structure, so it is
+not affected by the number or size of files (except to the extent that
+these cause performance problems for btrfs in general).  It retrieves such
+information on demand through btrfs SEARCH_V2 and LOGICAL_INO ioctls.
+This eliminates the storage required to maintain the equivalents of
+these functions in userspace.  It's also why bees has no XFS support.
+
+Bees is a daemon designed to run continuously and maintain its state
+across crahes and reboots.  Bees uses checkpoints for persistence to
+eliminate the IO overhead of a transactional data store.  On restart,
+bees will dedup any data that was added to the filesystem since the
+last checkpoint.
+
+Bees is used to dedup filesystems ranging in size from 16GB to 35TB, with
+hash tables ranging in size from 128MB to 11GB.
 
 How Bees Works
 --------------
@@ -270,9 +292,10 @@ Not really a bug, but a gotcha nonetheless:
 Requirements
 ------------
 
-* C++11 compiler (tested with GCC 4.9)
+* C++11 compiler (tested with GCC 4.9 and 6.2.0)
 
-  Sorry.  I really like closures.
+  Sorry.  I really like closures and shared_ptr, so support
+  for earlier compiler versions is unlikely.
 
 * btrfs-progs (tested with 4.1..4.7)
 
