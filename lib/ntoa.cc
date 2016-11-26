@@ -7,7 +7,7 @@
 namespace crucible {
 	using namespace std;
 
-	string bits_ntoa(unsigned long n, const bits_ntoa_table *table)
+	string bits_ntoa(unsigned long long n, const bits_ntoa_table *table)
 	{
 		string out;
 		while (n && table->a) {

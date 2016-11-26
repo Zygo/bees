@@ -171,7 +171,7 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchKey &key);
 
 	string btrfs_search_type_ntoa(unsigned type);
-	string btrfs_search_objectid_ntoa(unsigned objectid);
+	string btrfs_search_objectid_ntoa(uint64_t objectid);
 
 	uint64_t btrfs_get_root_id(int fd);
 	uint64_t btrfs_get_root_transid(int fd);

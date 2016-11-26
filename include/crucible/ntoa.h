@@ -7,12 +7,12 @@ namespace crucible {
 	using namespace std;
 
 	struct bits_ntoa_table {
-		unsigned long n;
-		unsigned long mask;
+		unsigned long long n;
+		unsigned long long mask;
 		const char *a;
 	};
 
-	string bits_ntoa(unsigned long n, const bits_ntoa_table *a);
+	string bits_ntoa(unsigned long long n, const bits_ntoa_table *a);
 
 };
 

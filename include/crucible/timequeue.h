@@ -23,7 +23,7 @@ namespace crucible {
 	private:
 		struct Item {
 			Timestamp m_time;
-			unsigned m_id;
+			unsigned long m_id;
 			Task m_task;
 
 			bool operator<(const Item &that) const {

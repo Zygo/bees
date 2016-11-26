@@ -834,7 +834,7 @@ namespace crucible {
 	}
 
 	string
-	btrfs_search_objectid_ntoa(unsigned objectid)
+	btrfs_search_objectid_ntoa(uint64_t objectid)
 	{
 		static const bits_ntoa_table table[] = {
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_ROOT_TREE_OBJECTID),
