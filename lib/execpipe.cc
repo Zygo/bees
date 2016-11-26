@@ -72,14 +72,10 @@ namespace crucible {
 			catch_all([&]() {
 				parent_fd->close();
 				import_fd_fn(child_fd);
-				// system("ls -l /proc/$$/fd/ >&2");
 
 				rv = f();
 			});
 			_exit(rv);
-			cerr << "PID " << getpid() << " TID " << gettid() << "STILL ALIVE" << endl;
-			system("ls -l /proc/$$/task/ >&2");
-			exit(EXIT_FAILURE);
 		}
 	}
 
