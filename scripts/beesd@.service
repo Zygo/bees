@@ -1,0 +1,14 @@
+[Unit]
+Description=Bees - Best-Effort Extent-Same, a btrfs deduplicator daemon: %i
+After=local-fs.target
+
+[Service]
+ExecStart=/usr/bin/beesd %i
+Nice=19
+IOSchedulingClass=idle
+CPUAccounting=true
+MemoryAccounting=true
+# CPUQuota=95%
+
+[Install]
+WantedBy=local-fs.target
