@@ -43,6 +43,12 @@ case "$UUID" in
     ;;
 esac
 
+WORK_DIR="${WORK_DIR:-/run/bees/}"
+MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
+BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
+BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
+DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
+
 INFO "Check: BTRFS UUID exists"
 if [ ! -d "/sys/fs/btrfs/$UUID" ]; then
     ERRO "Can't find BTRFS UUID: $UUID"

@@ -7,10 +7,10 @@ UUID=5d3c0ad5-bedf-463d-8235-b4d4f6f99476
 
 ## System Vars
 # Change carefully
-WORK_DIR=/run/bees/
-MNT_DIR="$WORK_DIR/mnt/$UUID"
-BEESHOME="$MNT_DIR/.beeshome"
-BEESSTATUS="$WORK_DIR/$UUID.status"
+# WORK_DIR=/run/bees/
+# MNT_DIR="$WORK_DIR/mnt/$UUID"
+# BEESHOME="$MNT_DIR/.beeshome"
+# BEESSTATUS="$WORK_DIR/$UUID.status"
 
 ## Bees DB size
 # Hash Table Sizing
@@ -25,4 +25,4 @@ BEESSTATUS="$WORK_DIR/$UUID.status"
 #    64TB                 1GB               1024K
 #
 # Size MUST be power of 16M
-DB_SIZE=$((64*$AL16M)) # 1G in bytes
+# DB_SIZE=$((64*$AL16M)) # 1G in bytes
