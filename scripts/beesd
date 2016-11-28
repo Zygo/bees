@@ -4,6 +4,7 @@
 ## Helpful functions
 INFO(){ echo "INFO:" "$@"; }
 ERRO(){ echo "ERROR:" "$@"; exit 1; }
+YN(){ [[ "$1" =~ (1|Y|y) ]]; }
 
 ## Global vars
 export BEESHOME BEESSTATUS
@@ -48,6 +49,7 @@ MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
+LOG_SHORT_PATH="${LOG_SHORT_PATH:-N}"
 
 INFO "Check: BTRFS UUID exists"
 if [ ! -d "/sys/fs/btrfs/$UUID" ]; then
@@ -95,5 +97,10 @@ fi
     chmod 700 "$DB_PATH"
 }
 
-bees $MNT_DIR
+if YN "$LOG_SHORT_PATH"; then
+    cd "$MNT_DIR" || exit 1
+    bees .
+else
+    bees "$MNT_DIR"
+fi
 exit 0

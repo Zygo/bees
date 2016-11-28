@@ -12,6 +12,9 @@ UUID=5d3c0ad5-bedf-463d-8235-b4d4f6f99476
 # BEESHOME="$MNT_DIR/.beeshome"
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
+## Make path shorter in logs
+# LOG_SHORT_PATH=N
+
 ## Bees DB size
 # Hash Table Sizing
 # sHash table entries are 16 bytes each
