@@ -136,6 +136,8 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 	} \
 } while (0)
 
+#define BEESLOGNOTE(x) BEESLOG(x); BEESNOTE(x)
+
 #define BEESCOUNT(stat) do { \
 	BeesStats::s_global.add_count(#stat); \
 } while (0)
