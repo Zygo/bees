@@ -100,11 +100,9 @@ and some metadata bits).  Each entry represents a minimum of 4K on disk.
         1TB                16MB               1024K
        64TB                 1GB               1024K
 
-It is possible to resize the hash table by changing the size of
-`beeshash.dat` (e.g. with `truncate`) and restarting `bees`.  This
-does not preserve all the existing hash table entries, but it does
-preserve more than zero of them--especially if the old and new sizes
-are a power-of-two multiple of each other.
+To change the size of the hash table, use 'truncate' to change the hash
+table size, delete `beescrawl.dat` so that bees will start over with a
+fresh full-filesystem rescan, and restart `bees'.
 
 Things You Might Expect That Bees Doesn't Have
 ----------------------------------------------
@@ -150,6 +148,9 @@ much smaller.  This is a problem for power-constrained environments
 blocks, but has no defragmentation capability yet.  When possible, Bees
 will attempt to work with existing extent boundaries, but it will not
 aggregate blocks together from multiple extents to create larger ones.
+
+* It is possible to resize the hash table without starting over with
+a new full-filesystem scan; however, this has not been implemented yet.
 
 Good Btrfs Feature Interactions
 -------------------------------
@@ -265,7 +266,7 @@ Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
   precisely the specified range of offending fragmented blocks.
 
 * When writing BeesStringFile, a crash can cause the directory entry
-  `beescrawl.UUID.dat.tmp` to exist without a corresponding inode.
+  `beescrawl.dat.tmp` to exist without a corresponding inode.
   This directory entry cannot be renamed or removed; however, it does
   not prevent the creation of a second directory entry with the same
   name that functions normally, so it doesn't prevent Bees operation.
@@ -273,7 +274,8 @@ Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
   The orphan directory entry can be removed by deleting its subvol,
   so place BEESHOME on a separate subvol so you can delete these orphan
   directory entries when they occur (or use btrfs zero-log before mounting
-  the filesystem after a crash).
+  the filesystem after a crash).  Alternatively, place BEESHOME on a
+  non-btrfs filesystem.
 
 * If the fsync() BeesTempFile::make_copy is removed, the filesystem
   hangs within a few hours, requiring a reboot to recover.
@@ -343,17 +345,49 @@ of 16M).  This example creates a 1GB hash table:
         truncate -s 1g "$BEESHOME/beeshash.dat"
         chmod 700 "$BEESHOME/beeshash.dat"
 
+bees can only process the root subvol of a btrfs (seriously--if the
+argument is not the root subvol directory, Bees will just throw an
+exception and stop).
+
+Use a bind mount, and let only bees access it:
+
+	UUID=3399e413-695a-4b0b-9384-1b0ef8f6c4cd
+	mkdir -p /var/lib/bees/$UUID
+	mount /dev/disk/by-uuid/$UUID /var/lib/bees/$UUID -osubvol=/
+
+If you don't set BEESHOME, the path ".beeshome" will be used relative
+to the root subvol of the filesystem.  For example:
+
+	btrfs sub create /var/lib/bees/$UUID/.beeshome
+	truncate -s 1g /var/lib/bees/$UUID/.beeshome/beeshash.dat
+	chmod 700 /var/lib/bees/$UUID/.beeshome/beeshash.dat
+
+You can use any relative path in BEESHOME.  The path will be taken
+relative to the root of the deduped filesystem (in other words it can
+be the name of a subvol):
+
+	export BEESHOME=@my-beeshome
+	btrfs sub create /var/lib/bees/$UUID/$BEESHOME
+	truncate -s 1g /var/lib/bees/$UUID/$BEESHOME/beeshash.dat
+	chmod 700 /var/lib/bees/$UUID/$BEESHOME/beeshash.dat
+
 Configuration
 -------------
 
 The only runtime configurable options are environment variables:
 
 * BEESHOME: Directory containing Bees state files:
- * beeshash.dat         | persistent hash table (must be a multiple of 16M)
- * beescrawl.`UUID`.dat | state of SEARCH_V2 crawlers
- * beesstats.txt        | statistics and performance counters
-* BEESSTATS: File containing a snapshot of current Bees state (performance
-  counters and current status of each thread).
+ * beeshash.dat  | persistent hash table.  Must be a multiple of 16M.
+                   This contains 16-byte records:  8 bytes for CRC64,
+                   8 bytes for physical address and some metadata bits.
+ * beescrawl.dat | state of SEARCH_V2 crawlers.  ASCII text.
+ * beesstats.txt | statistics and performance counters.  ASCII text.
+* BEESSTATUS: File containing a snapshot of current Bees state:  performance
+  counters and current status of each thread.  The file is meant to be
+  human readable, but understanding it probably requires reading the source.
+  You can watch bees run in realtime with a command like:
+
+	watch -n1 cat $BEESSTATUS
 
 Other options (e.g. interval between filesystem crawls) can be configured
 in src/bees.h.
@@ -361,38 +395,26 @@ in src/bees.h.
 Running
 -------
 
-We created this directory in the previous section:
-
-        export BEESHOME=/some/path
-
-Use a tmpfs for BEESSTATUS, it updates once per second:
-
-        export BEESSTATUS=/run/bees.status
-
-bees can only process the root subvol of a btrfs (seriously--if the
-argument is not the root subvol directory, Bees will just throw an
-exception and stop).
-
-Use a bind mount, and let only bees access it:
-
-        mount -osubvol=/ /dev/<your-filesystem> /var/lib/bees/root
-
-Reduce CPU and IO priority to be kinder to other applications
-sharing this host (or raise them for more aggressive disk space
-recovery).  If you use cgroups, put `bees` in its own cgroup, then reduce
-the `blkio.weight` and `cpu.shares` parameters.  You can also use
-`schedtool` and `ionice` in the shell script that launches `bees`:
+Reduce CPU and IO priority to be kinder to other applications sharing
+this host (or raise them for more aggressive disk space recovery).  If you
+use cgroups, put `bees` in its own cgroup, then reduce the `blkio.weight`
+and `cpu.shares` parameters.  You can also use `schedtool` and `ionice`
+in the shell script that launches `bees`:
 
         schedtool -D -n20 $$
         ionice -c3 -p $$
 
 Let the bees fly:
 
-        bees /var/lib/bees/root >> /var/log/bees.log 2>&1
+	for fs in /var/lib/bees/*-*-*-*-*/; do
+		bees "$fs" >> "$fs/.beeshome/bees.log" 2>&1 &
+	done
 
 You'll probably want to arrange for /var/log/bees.log to be rotated
 periodically.  You may also want to set umask to 077 to prevent disclosure
 of information about the contents of the filesystem through the log file.
+
+There are also some shell wrappers in the `scripts/` directory.
 
 
 Bug Reports and Contributions
