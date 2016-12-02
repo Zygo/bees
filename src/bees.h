@@ -719,7 +719,7 @@ public:
 	void set_root_path(string path);
 
 	Fd root_fd() const { return m_root_fd; }
-	Fd home_fd() const { return m_home_fd; }
+	Fd home_fd();
 	string root_path() const { return m_root_path; }
 	string root_uuid() const { return m_root_uuid; }
 

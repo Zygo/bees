@@ -229,12 +229,23 @@ BeesContext::show_progress()
 	}
 }
 
+Fd
+BeesContext::home_fd()
+{
+	const char *base_dir = getenv("BEESHOME");
+	if (!base_dir) {
+		base_dir = ".beeshome";
+	}
+	m_home_fd = openat(root_fd(), base_dir, FLAGS_OPEN_DIR);
+	if (!m_home_fd) {
+		THROW_ERRNO("openat: " << name_fd(root_fd()) << " / " << base_dir);
+	}
+	return m_home_fd;
+}
+
 BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 	m_parent_ctx(parent)
 {
-	auto base_dir = getenv_or_die("BEESHOME");
-	BEESLOG("BEESHOME = " << base_dir);
-	m_home_fd = open_or_die(base_dir, FLAGS_OPEN_DIR);
 	if (m_parent_ctx) {
 		m_hash_table = m_parent_ctx->hash_table();
 		m_hash_table->set_shared(true);
