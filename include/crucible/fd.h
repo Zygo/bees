@@ -70,9 +70,10 @@ namespace crucible {
 	string mmap_flags_ntoa(int flags);
 
 	// Unlink, rename
-	void unlink_or_die(const string &file);
 	void rename_or_die(const string &from, const string &to);
 	void renameat_or_die(int fromfd, const string &frompath, int tofd, const string &topath);
+
+	void ftruncate_or_die(int fd, off_t size);
 
 	// Read or write structs:
 	// There is a template specialization to read or write strings

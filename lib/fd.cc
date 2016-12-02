@@ -230,6 +230,14 @@ namespace crucible {
 		}
 	}
 
+	void
+	ftruncate_or_die(int fd, off_t size)
+	{
+		if (::ftruncate(fd, size)) {
+			THROW_ERRNO("ftruncate: " << name_fd(fd) << " size " << size);
+		}
+	}
+
 	string
 	socket_domain_ntoa(int domain)
 	{
