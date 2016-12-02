@@ -247,8 +247,6 @@ BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 	m_parent_ctx(parent)
 {
 	if (m_parent_ctx) {
-		m_hash_table = m_parent_ctx->hash_table();
-		m_hash_table->set_shared(true);
 		m_fd_cache = m_parent_ctx->fd_cache();
 	}
 }

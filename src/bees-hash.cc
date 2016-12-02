@@ -101,8 +101,6 @@ BeesHashTable::get_extent_range(HashType hash)
 void
 BeesHashTable::flush_dirty_extents()
 {
-	if (using_shared_map()) return;
-
 	THROW_CHECK1(runtime_error, m_buckets, m_buckets > 0);
 
 	unique_lock<mutex> lock(m_extent_mutex);
@@ -124,16 +122,12 @@ BeesHashTable::flush_dirty_extents()
 			uint8_t *dirty_extent_end = m_extent_ptr[extent_number + 1].p_byte;
 			THROW_CHECK1(out_of_range, dirty_extent,     dirty_extent     >= m_byte_ptr);
 			THROW_CHECK1(out_of_range, dirty_extent_end, dirty_extent_end <= m_byte_ptr_end);
-			if (using_shared_map()) {
-				BEESTOOLONG("flush extent " << extent_number);
-				copy(dirty_extent, dirty_extent_end, dirty_extent);
-			} else {
-				BEESTOOLONG("pwrite(fd " << m_fd << " '" << name_fd(m_fd)<< "', length " << to_hex(dirty_extent_end - dirty_extent) << ", offset " << to_hex(dirty_extent - m_byte_ptr) << ")");
-				// Page locks slow us down more than copying the data does
-				vector<uint8_t> extent_copy(dirty_extent, dirty_extent_end);
-				pwrite_or_die(m_fd, extent_copy, dirty_extent - m_byte_ptr);
-				BEESCOUNT(hash_extent_out);
-			}
+			THROW_CHECK2(out_of_range, dirty_extent_end, dirty_extent, dirty_extent_end - dirty_extent == BLOCK_SIZE_HASHTAB_EXTENT);
+			BEESTOOLONG("pwrite(fd " << m_fd << " '" << name_fd(m_fd)<< "', length " << to_hex(dirty_extent_end - dirty_extent) << ", offset " << to_hex(dirty_extent - m_byte_ptr) << ")");
+			// Page locks slow us down more than copying the data does
+			vector<uint8_t> extent_copy(dirty_extent, dirty_extent_end);
+			pwrite_or_die(m_fd, extent_copy, dirty_extent - m_byte_ptr);
+			BEESCOUNT(hash_extent_out);
 		});
 		BEESNOTE("flush rate limited at extent #" << extent_number << " (" << extent_counter << " of " << dirty_extent_copy.size() << ")");
 		m_flush_rate_limit.sleep_for(BLOCK_SIZE_HASHTAB_EXTENT);
@@ -143,7 +137,6 @@ BeesHashTable::flush_dirty_extents()
 void
 BeesHashTable::set_extent_dirty(HashType hash)
 {
-	if (using_shared_map()) return;
 	THROW_CHECK1(runtime_error, m_buckets, m_buckets > 0);
 	auto pr = get_extent_range(hash);
 	uint64_t extent_number = reinterpret_cast<Extent *>(pr.first) - m_extent_ptr;
@@ -156,10 +149,8 @@ BeesHashTable::set_extent_dirty(HashType hash)
 void
 BeesHashTable::writeback_loop()
 {
-	if (!using_shared_map()) {
-		while (1) {
-			flush_dirty_extents();
-		}
+	while (true) {
+		flush_dirty_extents();
 	}
 }
 
@@ -310,7 +301,6 @@ void
 BeesHashTable::fetch_missing_extent(HashType hash)
 {
 	BEESTOOLONG("fetch_missing_extent for hash " << to_hex(hash));
-	if (using_shared_map()) return;
 	THROW_CHECK1(runtime_error, m_buckets, m_buckets > 0);
 	auto pr = get_extent_range(hash);
 	uint64_t extent_number = reinterpret_cast<Extent *>(pr.first) - m_extent_ptr;
@@ -396,7 +386,6 @@ BeesHashTable::find_cell(HashType hash)
 void
 BeesHashTable::erase_hash_addr(HashType hash, AddrType addr)
 {
-	// if (m_shared) return;
 	fetch_missing_extent(hash);
 	BEESTOOLONG("erase hash " << to_hex(hash) << " addr " << addr);
 	unique_lock<mutex> lock(m_bucket_mutex);
@@ -574,12 +563,6 @@ BeesHashTable::try_mmap_flags(int flags)
 }
 
 void
-BeesHashTable::set_shared(bool shared)
-{
-	m_shared = shared;
-}
-
-void
 BeesHashTable::open_file()
 {
 	// OK open hash table
@@ -625,12 +608,6 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	// Sanity checks to protect the implementation from its weaknesses
 	THROW_CHECK2(invalid_argument, BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_EXTENT, (BLOCK_SIZE_HASHTAB_EXTENT % BLOCK_SIZE_HASHTAB_BUCKET) == 0);
 
-	// Does the union work?
-	THROW_CHECK2(runtime_error, m_void_ptr, m_cell_ptr, m_void_ptr == m_cell_ptr);
-	THROW_CHECK2(runtime_error, m_void_ptr, m_byte_ptr, m_void_ptr == m_byte_ptr);
-	THROW_CHECK2(runtime_error, m_void_ptr, m_bucket_ptr, m_void_ptr == m_bucket_ptr);
-	THROW_CHECK2(runtime_error, m_void_ptr, m_extent_ptr, m_void_ptr == m_extent_ptr);
-
 	// There's more than one union
 	THROW_CHECK2(runtime_error, sizeof(Bucket), BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_BUCKET == sizeof(Bucket));
 	THROW_CHECK2(runtime_error, sizeof(Bucket::p_byte), BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_BUCKET == sizeof(Bucket::p_byte));
@@ -655,27 +632,28 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 
 	BEESLOG("\tflush rate limit " << BEES_FLUSH_RATE);
 
-	if (using_shared_map()) {
-		try_mmap_flags(MAP_SHARED);
-	} else {
-		try_mmap_flags(MAP_PRIVATE | MAP_ANONYMOUS);
-	}
+	// Try to mmap that much memory
+	try_mmap_flags(MAP_PRIVATE | MAP_ANONYMOUS);
 
 	if (!m_cell_ptr) {
 		THROW_ERRNO("unable to mmap " << filename);
 	}
 
-	if (!using_shared_map()) {
-		// madvise fails if MAP_SHARED
-		if (using_any_madvise()) {
-			// DONTFORK because we sometimes do fork,
-			// but the child doesn't touch any of the many, many pages
-			BEESTOOLONG("madvise(MADV_HUGEPAGE | MADV_DONTFORK)");
-			DIE_IF_NON_ZERO(madvise(m_byte_ptr, m_size, MADV_HUGEPAGE | MADV_DONTFORK));
-		}
-		for (uint64_t i = 0; i < m_size / sizeof(Extent); ++i) {
-			m_buckets_missing.insert(i);
-		}
+	// Do unions work the way we think (and rely on)?
+	THROW_CHECK2(runtime_error, m_void_ptr, m_cell_ptr, m_void_ptr == m_cell_ptr);
+	THROW_CHECK2(runtime_error, m_void_ptr, m_byte_ptr, m_void_ptr == m_byte_ptr);
+	THROW_CHECK2(runtime_error, m_void_ptr, m_bucket_ptr, m_void_ptr == m_bucket_ptr);
+	THROW_CHECK2(runtime_error, m_void_ptr, m_extent_ptr, m_void_ptr == m_extent_ptr);
+
+	// madvise fails if MAP_SHARED
+	if (using_any_madvise()) {
+		// DONTFORK because fork won't end well
+		BEESTOOLONG("madvise(MADV_HUGEPAGE | MADV_DONTFORK)");
+		DIE_IF_NON_ZERO(madvise(m_byte_ptr, m_size, MADV_HUGEPAGE | MADV_DONTFORK));
+	}
+
+	for (uint64_t i = 0; i < m_size / sizeof(Extent); ++i) {
+		m_buckets_missing.insert(i);
 	}
 
 	m_writeback_thread.exec([&]() {

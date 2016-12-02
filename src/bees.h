@@ -419,8 +419,6 @@ public:
 	void		erase_hash_addr(HashType hash, AddrType addr);
 	bool		push_front_hash_addr(HashType hash, AddrType addr);
 
-	void		set_shared(bool shared);
-
 private:
 	string		m_filename;
 	Fd		m_fd;
@@ -456,8 +454,6 @@ private:
 
 	LockSet<uint64_t> 	m_extent_lock_set;
 
-	DefaultBool		m_shared;
-
 	void open_file();
 	void writeback_loop();
 	void prefetch_loop();
@@ -468,8 +464,6 @@ private:
 	void set_extent_dirty(HashType hash);
 	void flush_dirty_extents();
 	bool is_toxic_hash(HashType h) const;
-
-	bool using_shared_map() const { return false; }
 
 	BeesHashTable(const BeesHashTable &) = delete;
 	BeesHashTable &operator=(const BeesHashTable &) = delete;
