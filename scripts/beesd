@@ -1,0 +1,106 @@
+#!/bin/bash
+# /usr/bin/beesd
+
+## Helpful functions
+INFO(){ echo "INFO:" "$@"; }
+ERRO(){ echo "ERROR:" "$@"; exit 1; }
+YN(){ [[ "$1" =~ (1|Y|y) ]]; }
+
+## Global vars
+export BEESHOME BEESSTATUS
+export WORK_DIR CONFIG_DIR
+export CONFIG_FILE
+export UUID AL16M
+
+readonly AL16M="$((16*1024*1024))"
+readonly CONFIG_DIR=/etc/bees/
+
+## Pre checks
+{
+    [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
+    [ "$UID" == "0" ] || ERRO "Must be runned as root"
+}
+
+command -v bees &> /dev/null || ERRO "Missing 'bees' command"
+
+## Parse args
+UUID="$1"
+case "$UUID" in
+    *-*-*-*-*)
+        FILE_CONFIG=""
+        for file in "$CONFIG_DIR"/*.conf; do
+            [ ! -f "$file" ] && continue
+            if grep -q "$UUID" "$file"; then
+                INFO "Find $UUID in $file, use as conf"
+                FILE_CONFIG="$file"
+            fi
+        done
+        [ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
+        source "$FILE_CONFIG"
+    ;;
+    *)
+        echo "beesd <btrfs_uuid>"
+        exit 1
+    ;;
+esac
+
+WORK_DIR="${WORK_DIR:-/run/bees/}"
+MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
+BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
+BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
+DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
+LOG_SHORT_PATH="${LOG_SHORT_PATH:-N}"
+
+INFO "Check: BTRFS UUID exists"
+if [ ! -d "/sys/fs/btrfs/$UUID" ]; then
+    ERRO "Can't find BTRFS UUID: $UUID"
+fi
+
+INFO "Check: Disk exists"
+if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
+    ERRO "Missing disk: /dev/disk/by-uuid/$UUID"
+fi
+
+INFO "WORK DIR: $WORK_DIR"
+mkdir -p "$WORK_DIR" || exit 1
+
+INFO "MOUNT DIR: $MNT_DIR"
+mkdir -p "$MNT_DIR" || exit 1
+
+umount_w(){ mountpoint -q "$1" && umount -l "$1"; }
+force_umount(){ umount_w "$MNT_DIR"; }
+trap force_umount SIGINT SIGTERM EXIT
+
+mount -osubvolid=5 /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
+
+if [ ! -d "$BEESHOME" ]; then
+    INFO "Create subvol $BEESHOME for store bees data"
+    btrfs sub cre "$BEESHOME"
+else
+    btrfs sub show "$BEESHOME" &> /dev/null || ERRO "$BEESHOME MUST BE A SUBVOL!"
+fi
+
+# Check DB size
+{
+    DB_PATH="$BEESHOME/beeshash.dat"
+    touch "$DB_PATH"
+    OLD_SIZE="$(du -b "$DB_PATH" | sed 's/\t/ /g' | cut -d' ' -f1)"
+    NEW_SIZE="$DB_SIZE"
+    if (( "$NEW_SIZE"%AL16M > 0 )); then
+        ERRO "DB_SIZE Must be multiple of 16M"
+    fi
+    if (( "$OLD_SIZE" != "$NEW_SIZE" )); then
+        INFO "Resize db: $OLD_SIZE -> $NEW_SIZE"
+        [ -f "$BEESHOME/beescrawl.$UUID.dat" ] && rm "$BEESHOME/beescrawl.$UUID.dat"
+        truncate -s $NEW_SIZE $DB_PATH
+    fi
+    chmod 700 "$DB_PATH"
+}
+
+if YN "$LOG_SHORT_PATH"; then
+    cd "$MNT_DIR" || exit 1
+    bees .
+else
+    bees "$MNT_DIR"
+fi
+exit 0

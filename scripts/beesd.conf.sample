@@ -1,0 +1,31 @@
+## Config for Bees: /etc/bees/beesd.conf.sample
+## https://github.com/Zygo/bees
+## It's a default values, change it, if needed
+
+# Which FS will be used
+UUID=5d3c0ad5-bedf-463d-8235-b4d4f6f99476
+
+## System Vars
+# Change carefully
+# WORK_DIR=/run/bees/
+# MNT_DIR="$WORK_DIR/mnt/$UUID"
+# BEESHOME="$MNT_DIR/.beeshome"
+# BEESSTATUS="$WORK_DIR/$UUID.status"
+
+## Make path shorter in logs
+# LOG_SHORT_PATH=N
+
+## Bees DB size
+# Hash Table Sizing
+# sHash table entries are 16 bytes each
+# (64-bit hash, 52-bit block number, and some metadata bits)
+# Each entry represents a minimum of 4K on disk.
+# unique data size    hash table size    average dedup block size
+#     1TB                 4GB                  4K
+#     1TB                 1GB                 16K
+#     1TB               256MB                 64K
+#     1TB                16MB               1024K
+#    64TB                 1GB               1024K
+#
+# Size MUST be power of 16M
+# DB_SIZE=$((64*$AL16M)) # 1G in bytes
