@@ -579,7 +579,37 @@ BeesHashTable::set_shared(bool shared)
 	m_shared = shared;
 }
 
-BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename) :
+void
+BeesHashTable::open_file()
+{
+	// OK open hash table
+	BEESNOTE("opening hash table '" << m_filename << "' target size " << m_size << " (" << pretty(m_size) << ")");
+
+	// Try to open existing hash table
+	Fd new_fd = openat(m_ctx->home_fd(), m_filename.c_str(), FLAGS_OPEN_FILE_RW, 0700);
+
+	// If that doesn't work, try to make a new one
+	if (!new_fd) {
+		string tmp_filename = m_filename + ".tmp";
+		BEESLOGNOTE("creating new hash table '" << tmp_filename << "'");
+		unlinkat(m_ctx->home_fd(), tmp_filename.c_str(), 0);
+		new_fd = openat_or_die(m_ctx->home_fd(), tmp_filename, FLAGS_CREATE_FILE, 0700);
+		BEESLOGNOTE("truncating new hash table '" << tmp_filename << "' size " << m_size << " (" << pretty(m_size) << ")");
+		ftruncate_or_die(new_fd, m_size);
+		BEESLOGNOTE("truncating new hash table '" << tmp_filename << "' -> '" << m_filename << "'");
+		renameat_or_die(m_ctx->home_fd(), tmp_filename, m_ctx->home_fd(), m_filename);
+	}
+
+	Stat st(new_fd);
+	off_t new_size = st.st_size;
+
+	THROW_CHECK1(invalid_argument, new_size, new_size > 0);
+	THROW_CHECK1(invalid_argument, new_size, (new_size % BLOCK_SIZE_HASHTAB_EXTENT) == 0);
+	m_size = new_size;
+	m_fd = new_fd;
+}
+
+BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t size) :
 	m_ctx(ctx),
 	m_size(0),
 	m_void_ptr(nullptr),
@@ -592,16 +622,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename) :
 	m_prefetch_rate_limit(BEES_FLUSH_RATE),
 	m_stats_file(m_ctx->home_fd(), "beesstats.txt")
 {
-	BEESNOTE("opening hash table " << filename);
-
-	m_fd = openat_or_die(m_ctx->home_fd(), filename, FLAGS_OPEN_FILE_RW, 0700);
-	Stat st(m_fd);
-	m_size = st.st_size;
-
-	BEESTRACE("hash table size " << m_size);
-	BEESTRACE("hash table bucket size " << BLOCK_SIZE_HASHTAB_BUCKET);
-	BEESTRACE("hash table extent size " << BLOCK_SIZE_HASHTAB_EXTENT);
-
+	// Sanity checks to protect the implementation from its weaknesses
 	THROW_CHECK2(invalid_argument, BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_EXTENT, (BLOCK_SIZE_HASHTAB_EXTENT % BLOCK_SIZE_HASHTAB_BUCKET) == 0);
 
 	// Does the union work?
@@ -615,6 +636,16 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename) :
 	THROW_CHECK2(runtime_error, sizeof(Bucket::p_byte), BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_BUCKET == sizeof(Bucket::p_byte));
 	THROW_CHECK2(runtime_error, sizeof(Extent), BLOCK_SIZE_HASHTAB_EXTENT, BLOCK_SIZE_HASHTAB_EXTENT == sizeof(Extent));
 	THROW_CHECK2(runtime_error, sizeof(Extent::p_byte), BLOCK_SIZE_HASHTAB_EXTENT, BLOCK_SIZE_HASHTAB_EXTENT == sizeof(Extent::p_byte));
+
+	m_filename = filename;
+	m_size = size;
+	open_file();
+
+	// Now we know size we can compute stuff
+
+	BEESTRACE("hash table size " << m_size);
+	BEESTRACE("hash table bucket size " << BLOCK_SIZE_HASHTAB_BUCKET);
+	BEESTRACE("hash table extent size " << BLOCK_SIZE_HASHTAB_EXTENT);
 
 	BEESLOG("opened hash table filename '" << filename << "' length " << m_size);
 	m_buckets = m_size / BLOCK_SIZE_HASHTAB_BUCKET;
@@ -631,7 +662,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename) :
 	}
 
 	if (!m_cell_ptr) {
-		THROW_ERROR(runtime_error, "unable to mmap " << filename);
+		THROW_ERRNO("unable to mmap " << filename);
 	}
 
 	if (!using_shared_map()) {

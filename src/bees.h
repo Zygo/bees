@@ -411,7 +411,7 @@ public:
 		uint8_t	p_byte[BLOCK_SIZE_HASHTAB_EXTENT];
 	} __attribute__((packed));
 
-	BeesHashTable(shared_ptr<BeesContext> ctx, string filename);
+	BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t size = BLOCK_SIZE_HASHTAB_EXTENT);
 	~BeesHashTable();
 
 	vector<Cell>	find_cell(HashType hash);
@@ -458,6 +458,7 @@ private:
 
 	DefaultBool		m_shared;
 
+	void open_file();
 	void writeback_loop();
 	void prefetch_loop();
 	void try_mmap_flags(int flags);
