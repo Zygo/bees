@@ -120,6 +120,9 @@ namespace crucible {
 	template<> void pread_or_die<string>(int fd, string& str, off_t offset);
 	template<> void pread_or_die<vector<char>>(int fd, vector<char>& str, off_t offset);
 	template<> void pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t>& str, off_t offset);
+	template<> void pwrite_or_die<string>(int fd, const string& str, off_t offset);
+	template<> void pwrite_or_die<vector<char>>(int fd, const vector<char>& str, off_t offset);
+	template<> void pwrite_or_die<vector<uint8_t>>(int fd, const vector<uint8_t>& str, off_t offset);
 
 	// A different approach to reading a simple string
 	string read_string(int fd, size_t size);
