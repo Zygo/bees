@@ -374,6 +374,8 @@ public:
 	BeesStringFile(Fd dir_fd, string name, size_t limit = 1024 * 1024);
 	string read();
 	void write(string contents);
+	void name(const string &new_name);
+	string name() const;
 };
 
 class BeesHashTable {

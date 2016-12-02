@@ -351,6 +351,18 @@ BeesStringFile::BeesStringFile(Fd dir_fd, string name, size_t limit) :
 	BEESLOG("BeesStringFile " << name_fd(m_dir_fd) << "/" << m_name << " max size " << pretty(m_limit));
 }
 
+void
+BeesStringFile::name(const string &new_name)
+{
+	m_name = new_name;
+}
+
+string
+BeesStringFile::name() const
+{
+	return m_name;
+}
+
 string
 BeesStringFile::read()
 {

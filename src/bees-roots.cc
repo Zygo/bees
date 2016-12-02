@@ -50,9 +50,18 @@ string
 BeesRoots::crawl_state_filename() const
 {
 	string rv;
+
+	// Legacy filename included UUID
 	rv += "beescrawl.";
 	rv += m_ctx->root_uuid();
 	rv += ".dat";
+
+	struct stat buf;
+	if (fstatat(m_ctx->home_fd(), rv.c_str(), &buf, AT_SYMLINK_NOFOLLOW)) {
+		// Use new filename
+		rv = "beescrawl.dat";
+	}
+
 	return rv;
 }
 
@@ -100,6 +109,12 @@ BeesRoots::state_save()
 	lock.unlock();
 
 	m_crawl_state_file.write(ofs.str());
+
+	// Renaming things is hard after release
+	if (m_crawl_state_file.name() != "beescrawl.dat") {
+		renameat(m_ctx->home_fd(), m_crawl_state_file.name().c_str(), m_ctx->home_fd(), "beescrawl.dat");
+		m_crawl_state_file.name("beescrawl.dat");
+	}
 
 	BEESNOTE("relocking crawl state");
 	lock.lock();
