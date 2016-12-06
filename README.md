@@ -233,6 +233,11 @@ Fixed bugs:
 * 4.7: *slow backref* bug no longer triggers a softlockup panic.  It still
   too long to resolve a block address to a root/inode/offset triple.
 
+Fixed bugs not yet integrated in mainline Linux:
+
+* 7f8e406 ("btrfs: improve delayed refs iterations"): reduces the cost
+  of LOGICAL_INO ioctl from 30-70% of bees running time to under 5%.
+
 Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
 
 * *slow backref*: If the number of references to a single shared extent
