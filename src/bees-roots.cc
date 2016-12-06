@@ -661,7 +661,9 @@ BeesCrawl::fetch_extents()
 	{
 		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 		BEESTOOLONG("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
+		Timer crawl_timer;
 		ioctl_ok = sk.do_ioctl_nothrow(m_ctx->root_fd());
+		BEESCOUNTADD(crawl_ms, crawl_timer.age() * 1000);
 	}
 
 	if (ioctl_ok) {

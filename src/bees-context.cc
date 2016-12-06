@@ -24,10 +24,16 @@ getenv_or_die(const char *name)
 BeesFdCache::BeesFdCache()
 {
 	m_root_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root) -> Fd {
-		return ctx->roots()->open_root_nocache(root);
+		Timer open_timer;
+		auto rv = ctx->roots()->open_root_nocache(root);
+		BEESCOUNTADD(open_root_ms, open_timer.age() * 1000);
+		return rv;
 	});
 	m_file_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino) -> Fd {
-		return ctx->roots()->open_root_ino_nocache(root, ino);
+		Timer open_timer;
+		auto rv = ctx->roots()->open_root_ino_nocache(root, ino);
+		BEESCOUNTADD(open_ino_ms, open_timer.age() * 1000);
+		return rv;
 	});
 }
 
