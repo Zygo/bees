@@ -223,20 +223,25 @@ Other Caveats
 A Brief List Of Btrfs Kernel Bugs
 ---------------------------------
 
-Fixed bugs:
+Missing features (usually not available in older LTS kernels):
 
 * 3.13: `FILE_EXTENT_SAME` ioctl added.  No way to reliably dedup with
   concurrent modifications before this.
 * 3.16: `SEARCH_V2` ioctl added.  Bees could use `SEARCH` instead.
 * 4.2: `FILE_EXTENT_SAME` no longer updates mtime, can be used at EOF.
-  Kernel deadlock bugs fixed.
+
+Bug fixes (sometimes included in older LTS kernels):
+
+* 4.5: hang in the `INO_PATHS` ioctl used by Bees.
+* 4.5: use-after-free in the `FILE_EXTENT_SAME` ioctl used by Bees.
 * 4.7: *slow backref* bug no longer triggers a softlockup panic.  It still
   too long to resolve a block address to a root/inode/offset triple.
 
 Fixed bugs not yet integrated in mainline Linux:
 
-* 7f8e406 ("btrfs: improve delayed refs iterations"): reduces the cost
-  of LOGICAL_INO ioctl from 30-70% of bees running time to under 5%.
+* 7f8e406 ("btrfs: improve delayed refs iterations"): significantly
+  reduces the CPU time cost of the LOGICAL_INO ioctl (from 30-70% of
+  bees running time to under 5%).
 
 Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
 
@@ -282,8 +287,10 @@ Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
   the filesystem after a crash).  Alternatively, place BEESHOME on a
   non-btrfs filesystem.
 
-* If the fsync() BeesTempFile::make_copy is removed, the filesystem
-  hangs within a few hours, requiring a reboot to recover.
+* If the `fsync()` in `BeesTempFile::make_copy` is removed, the filesystem
+  hangs within a few hours, requiring a reboot to recover.  On the other
+  hand, there may be net performance benefits to calling `fsync()` before
+  or after each dedup.  This needs further investigation.
 
 Not really a bug, but a gotcha nonetheless:
 
@@ -314,7 +321,7 @@ Requirements
   TODO: remove the one function used from this library.
   It supports a feature Bees no longer implements.
 
-* Linux kernel 4.2 or later
+* Linux kernel 4.4.3 or later
 
   Don't bother trying to make Bees work with older kernels.
   It won't end well.
