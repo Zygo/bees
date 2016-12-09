@@ -1,3 +1,4 @@
+#include "bees-version.h"
 #include "bees.h"
 
 #include "crucible/interp.h"
@@ -557,7 +558,7 @@ bees_main(ArgList args)
 	list<shared_ptr<BeesContext>> all_contexts;
 	shared_ptr<BeesContext> bc;
 
-	// Subscribe to fanotify events
+	// Create a context and start crawlers
 	bool did_subscription = false;
 	for (string arg : args) {
 		catch_all([&]() {
@@ -585,6 +586,8 @@ bees_main(ArgList args)
 int
 main(int argc, const char **argv)
 {
+	cerr << "bees version " << BEES_VERSION << endl;
+
 	if (argc < 2) {
 		do_cmd_help(argv);
 		return 2;
