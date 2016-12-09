@@ -11,13 +11,6 @@
 using namespace crucible;
 using namespace std;
 
-static inline
-bool
-using_any_madvise()
-{
-	return true;
-}
-
 ostream &
 operator<<(ostream &os, const BeesHash &bh)
 {
@@ -645,11 +638,13 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	THROW_CHECK2(runtime_error, m_void_ptr, m_bucket_ptr, m_void_ptr == m_bucket_ptr);
 	THROW_CHECK2(runtime_error, m_void_ptr, m_extent_ptr, m_void_ptr == m_extent_ptr);
 
-	// madvise fails if MAP_SHARED
-	if (using_any_madvise()) {
-		// DONTFORK because fork won't end well
+	{
+		// It's OK if this fails (e.g. kernel not built with CONFIG_TRANSPARENT_HUGEPAGE)
+		// We don't fork any more so DONTFORK isn't really needed
 		BEESTOOLONG("madvise(MADV_HUGEPAGE | MADV_DONTFORK)");
-		DIE_IF_NON_ZERO(madvise(m_byte_ptr, m_size, MADV_HUGEPAGE | MADV_DONTFORK));
+		if (madvise(m_byte_ptr, m_size, MADV_HUGEPAGE | MADV_DONTFORK)) {
+			BEESLOG("mostly harmless: madvise(MADV_HUGEPAGE | MADV_DONTFORK) failed: " << strerror(errno));
+		}
 	}
 
 	for (uint64_t i = 0; i < m_size / sizeof(Extent); ++i) {
