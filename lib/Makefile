@@ -18,8 +18,6 @@ OBJS = \
 
 include ../makeflags
 
-LDFLAGS = -shared -luuid
-
 depends.mk: *.c *.cc
 	for x in *.c; do $(CC) $(CFLAGS) -M "$$x"; done > depends.mk.new
 	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done >> depends.mk.new
@@ -34,4 +32,4 @@ depends.mk: *.c *.cc
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 libcrucible.so: $(OBJS) Makefile
-	$(CXX) $(LDFLAGS) -o $@ $(OBJS)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS) -shared -luuid
