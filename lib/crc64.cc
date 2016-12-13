@@ -65,13 +65,6 @@ namespace crucible {
 		}
 	}
 
-	// This function is only used for tests
-	uint64_t
-	Digest::CRC::crc64(const char *s)
-	{
-		return crc64(static_cast<const void *>(s), strlen(s));
-	}
-
 	uint64_t
 	Digest::CRC::crc64(const void *p, size_t len)
 	{
