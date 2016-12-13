@@ -1,4 +1,4 @@
-CCFLAGS  = -Wall -Wextra -Werror -O3 -I../include -ggdb -fpic
+CCFLAGS  = -Wall -Wextra -Werror -O3 -march=native -I../include -ggdb -fpic
 # CCFLAGS  = -Wall -Wextra -Werror -O0 -I../include -ggdb -fpic
 CFLAGS   = $(CCFLAGS) -std=c99
 CXXFLAGS = $(CCFLAGS) -std=c++11 -Wold-style-cast
