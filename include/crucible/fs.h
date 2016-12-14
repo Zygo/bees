@@ -156,7 +156,7 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchHeader &hdr);
 
 	struct BtrfsIoctlSearchKey : public btrfs_ioctl_search_key {
-		BtrfsIoctlSearchKey(size_t buf_size = 16 * 1024);
+		BtrfsIoctlSearchKey(size_t buf_size = 4096);
 		virtual bool do_ioctl_nothrow(int fd);
 		virtual void do_ioctl(int fd);
 

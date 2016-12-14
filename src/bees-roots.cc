@@ -644,7 +644,7 @@ BeesCrawl::fetch_extents()
 
 	Timer crawl_timer;
 
-	BtrfsIoctlSearchKey sk;
+	BtrfsIoctlSearchKey sk(BEES_MAX_CRAWL_SIZE * (sizeof(btrfs_file_extent_item) + sizeof(btrfs_ioctl_search_header)));
 	sk.tree_id = old_state.m_root;
 	sk.min_objectid = old_state.m_objectid;
 	sk.min_type = sk.max_type = BTRFS_EXTENT_DATA_KEY;
