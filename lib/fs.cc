@@ -708,6 +708,12 @@ namespace crucible {
 	}
 
 	bool
+	BtrfsIoctlSearchHeader::operator<(const BtrfsIoctlSearchHeader &that) const
+	{
+		return tie(objectid, type, offset, len, transid) < tie(that.objectid, that.type, that.offset, that.len, that.transid);
+	}
+
+	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
 	{
 		vector<char> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
@@ -727,13 +733,12 @@ namespace crucible {
 		static_cast<btrfs_ioctl_search_key&>(*this) = ioctl_ptr->key;
 
 		m_result.clear();
-		m_result.reserve(nr_items);
 
 		size_t offset = pointer_distance(ioctl_ptr->buf, ioctl_ptr);
 		for (decltype(nr_items) i = 0; i < nr_items; ++i) {
 			BtrfsIoctlSearchHeader item;
 			offset = item.set_data(ioctl_arg, offset);
-			m_result.push_back(item);
+			m_result.insert(item);
 		}
 
 		return true;

@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <iosfwd>
+#include <set>
 #include <vector>
 
 #include <fcntl.h>
@@ -150,6 +151,7 @@ namespace crucible {
 		BtrfsIoctlSearchHeader();
 		vector<char> m_data;
 		size_t set_data(const vector<char> &v, size_t offset);
+		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_header &hdr);
@@ -164,7 +166,8 @@ namespace crucible {
 		void next_min(const BtrfsIoctlSearchHeader& ref);
 
 		size_t m_buf_size;
-		vector<BtrfsIoctlSearchHeader> m_result;
+		set<BtrfsIoctlSearchHeader> m_result;
+
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_key &key);
