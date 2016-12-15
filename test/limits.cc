@@ -126,13 +126,7 @@ test_cast_0x80000000_to_things()
 {
 	auto sv = 0x80000000LL;
 	auto uv = 0x80000000ULL;
-	if (sizeof(off_t) == 4) {
-		SHOULD_FAIL(ranged_cast<off_t>(sv));
-	} else if (sizeof(off_t) == 8) {
-		SHOULD_PASS(ranged_cast<off_t>(sv), sv);
-	} else {
-		assert(!"unhandled case, please add code for off_t here");
-	}
+	SHOULD_PASS(ranged_cast<off_t>(sv), sv);
 	SHOULD_PASS(ranged_cast<uint64_t>(uv), uv);
 	SHOULD_PASS(ranged_cast<uint32_t>(uv), uv);
 	SHOULD_FAIL(ranged_cast<uint16_t>(uv));
@@ -171,13 +165,7 @@ test_cast_0xffffffff_to_things()
 {
 	auto sv = 0xffffffffLL;
 	auto uv = 0xffffffffULL;
-	if (sizeof(off_t) == 4) {
-		SHOULD_FAIL(ranged_cast<off_t>(sv));
-	} else if (sizeof(off_t) == 8) {
-		SHOULD_PASS(ranged_cast<off_t>(sv), sv);
-	} else {
-		assert(!"unhandled case, please add code for off_t here");
-	}
+	SHOULD_PASS(ranged_cast<off_t>(sv), sv);
 	SHOULD_PASS(ranged_cast<uint64_t>(uv), uv);
 	SHOULD_PASS(ranged_cast<uint32_t>(uv), uv);
 	SHOULD_FAIL(ranged_cast<uint16_t>(uv));
@@ -216,13 +204,7 @@ test_cast_0xfffffffff_to_things()
 {
 	auto sv = 0xfffffffffLL;
 	auto uv = 0xfffffffffULL;
-	if (sizeof(off_t) == 4) {
-		SHOULD_FAIL(ranged_cast<off_t>(sv));
-	} else if (sizeof(off_t) == 8) {
-		SHOULD_PASS(ranged_cast<off_t>(sv), sv);
-	} else {
-		assert(!"unhandled case, please add code for off_t here");
-	}
+	SHOULD_PASS(ranged_cast<off_t>(sv), sv);
 	SHOULD_PASS(ranged_cast<uint64_t>(uv), uv);
 	SHOULD_FAIL(ranged_cast<uint32_t>(uv));
 	SHOULD_FAIL(ranged_cast<uint16_t>(uv));
