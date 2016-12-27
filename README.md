@@ -167,11 +167,10 @@ Bees has been tested in combination with the following:
 * IO errors during dedup (read errors will throw exceptions, Bees will catch them and skip over the affected extent)
 * Filesystems mounted *with* the flushoncommit option
 * 4K filesystem data block size / clone alignment
-* 64-bit CPUs (amd64)
+* 64-bit and 32-bit host CPUs (amd64, x86, arm)
 * Large (>16M) extents
 * Huge files (>1TB--although Btrfs performance on such files isn't great in general)
 * filesystems up to 25T bytes, 100M+ files
-
 
 Bad Btrfs Feature Interactions
 ------------------------------
@@ -179,7 +178,6 @@ Bad Btrfs Feature Interactions
 Bees has not been tested with the following, and undesirable interactions may occur:
 
 * Non-4K filesystem data block size (should work if recompiled)
-* 32-bit CPUs (x86, arm)
 * Non-equal hash (SUM) and filesystem data block (CLONE) sizes (probably never will work)
 * btrfs read-only snapshots (never tested, probably wouldn't work well)
 * btrfs send/receive (receive is probably OK, but send requires RO snapshots.  See above)
