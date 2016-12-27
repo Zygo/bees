@@ -499,8 +499,13 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 
 	THROW_CHECK1(invalid_argument, src, src.size() > 0);
 
-	// FIXME:  don't know where these come from, but we can't handle them.
-	// Grab a trace for the log.
+	// FIEMAP used to give us garbage data, e.g. distinct adjacent
+	// extents merged into a single entry in the FIEMAP output.
+	// FIEMAP didn't stop giving us garbage data, we just stopped
+	// using FIEMAP.
+	// We shouldn't get absurdly large extents any more; however,
+	// it's still a problem if we do, so bail out and leave a trace
+	// in the log.
 	THROW_CHECK1(invalid_argument, src, src.size() < BLOCK_SIZE_MAX_TEMP_FILE);
 
 	realign();

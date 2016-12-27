@@ -196,7 +196,7 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 
 	Fd file_fd = m_ctx->roots()->open_root_ino(bior.m_root, bior.m_inum);
 	if (!file_fd) {
-		// Delete snapshots generate craptons of these
+		// Deleted snapshots generate craptons of these
 		// BEESINFO("No FD in chase_extent_ref " << bior);
 		BEESCOUNT(chase_no_fd);
 		return BeesFileRange();
