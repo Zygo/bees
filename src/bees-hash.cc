@@ -595,7 +595,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	m_buckets(0),
 	m_cells(0),
 	m_writeback_thread("hash_writeback"),
-	m_prefetch_thread("hash_prefetch " + m_ctx->root_path()),
+	m_prefetch_thread("hash_prefetch"),
 	m_flush_rate_limit(BEES_FLUSH_RATE),
 	m_prefetch_rate_limit(BEES_FLUSH_RATE),
 	m_stats_file(m_ctx->home_fd(), "beesstats.txt")

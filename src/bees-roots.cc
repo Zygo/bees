@@ -358,8 +358,8 @@ BeesRoots::state_load()
 BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
-	m_crawl_thread("crawl " + ctx->root_path()),
-	m_writeback_thread("crawl_writeback " + ctx->root_path())
+	m_crawl_thread("crawl"),
+	m_writeback_thread("crawl_writeback")
 {
 	m_crawl_thread.exec([&]() {
 		catch_all([&]() {
