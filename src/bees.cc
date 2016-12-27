@@ -394,8 +394,13 @@ BeesStringFile::write(string contents)
 		Fd ofd = openat_or_die(m_dir_fd, tmpname, FLAGS_CREATE_FILE, S_IRUSR | S_IWUSR);
 		BEESNOTE("writing " << tmpname << " in " << name_fd(m_dir_fd));
 		write_or_die(ofd, contents);
+#if 0
+		// This triggers too many btrfs bugs.  I wish I was kidding.
+		// Forget snapshots, balance, compression, and dedup:
+		// the system call you have to fear on btrfs is fsync().
 		BEESNOTE("fsyncing " << tmpname << " in " << name_fd(m_dir_fd));
 		DIE_IF_NON_ZERO(fsync(ofd));
+#endif
 	}
 	BEESNOTE("renaming " << tmpname << " to " << m_name << " in FD " << name_fd(m_dir_fd));
 	BEESTRACE("renaming " << tmpname << " to " << m_name << " in FD " << name_fd(m_dir_fd));
