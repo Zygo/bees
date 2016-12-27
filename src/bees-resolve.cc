@@ -477,11 +477,6 @@ BeesResolver::find_all_matches(BeesBlockData &bbd)
 bool
 BeesResolver::operator<(const BeesResolver &that) const
 {
-	if (that.m_bior_count < m_bior_count) {
-		return true;
-	} else if (m_bior_count < that.m_bior_count) {
-		return false;
-	}
-	return m_addr < that.m_addr;
+	// Lowest count, highest address
+	return tie(that.m_bior_count, m_addr) < tie(m_bior_count, that.m_addr);
 }
-

@@ -42,8 +42,8 @@ BeesCrawlState::BeesCrawlState() :
 bool
 BeesCrawlState::operator<(const BeesCrawlState &that) const
 {
-	return tie(m_root, m_objectid, m_offset, m_min_transid, m_max_transid)
-		< tie(that.m_root, that.m_objectid, that.m_offset, that.m_min_transid, that.m_max_transid);
+	return tie(m_objectid, m_offset, m_root, m_min_transid, m_max_transid)
+		< tie(that.m_objectid, that.m_offset, that.m_root, that.m_min_transid, that.m_max_transid);
 }
 
 string
@@ -208,15 +208,15 @@ BeesRoots::crawl_roots()
 	auto crawl_map_copy = m_root_crawl_map;
 	lock.unlock();
 
+#if 0
+	// Scan the same inode/offset tuple in each subvol (good for snapshots)
 	BeesFileRange first_range;
 	shared_ptr<BeesCrawl> first_crawl;
 	for (auto i : crawl_map_copy) {
 		auto this_crawl = i.second;
 		auto this_range = this_crawl->peek_front();
 		if (this_range) {
-			auto tuple_this = make_tuple(this_range.fid().ino(), this_range.fid().root(), this_range.begin());
-			auto tuple_first = make_tuple(first_range.fid().ino(), first_range.fid().root(), first_range.begin());
-			if (!first_range || tuple_this < tuple_first) {
+			if (!first_range || this_range < first_range) {
 				first_crawl = this_crawl;
 				first_range = this_range;
 			}
@@ -234,6 +234,27 @@ BeesRoots::crawl_roots()
 		THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
 		return;
 	}
+#else
+	// Scan each subvol one extent at a time (good for continuous forward progress)
+	bool crawled = false;
+	for (auto i : crawl_map_copy) {
+		auto this_crawl = i.second;
+		auto this_range = this_crawl->peek_front();
+		if (this_range) {
+			catch_all([&]() {
+				// BEESINFO("scan_forward " << this_range);
+				m_ctx->scan_forward(this_range);
+			});
+			crawled = true;
+			BEESCOUNT(crawl_scan);
+			m_crawl_current = this_crawl->get_state();
+			auto this_range_popped = this_crawl->pop_front();
+			THROW_CHECK2(runtime_error, this_range, this_range_popped, this_range == this_range_popped);
+		}
+	}
+
+	if (crawled) return;
+#endif
 
 	BEESLOG("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
 	BEESCOUNT(crawl_done);
