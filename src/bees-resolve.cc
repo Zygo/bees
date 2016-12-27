@@ -378,7 +378,10 @@ BeesResolver::for_each_extent_ref(BeesBlockData bbd, function<bool(const BeesFil
 				// We have reliable block addresses now, so we guarantee we can hit the desired block.
 				// Failure in chase_extent_ref means we are done, and don't need to look up all the
 				// other references.
-				stop_now = true;
+				// Or...not?  If we have a compressed extent, some refs will not match
+				// if there is are two references to the same extent with a reference
+				// to a different extent between them.
+				// stop_now = true;
 			}
 		});
 
