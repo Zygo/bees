@@ -97,6 +97,15 @@ fi
     chmod 700 "$DB_PATH"
 }
 
-bees "$MNT_DIR"
+filter_output(){
+     sed -e 's/^.*crawl:/crawl:/g' \
+         -e 's/^.*status:/status:/g' \
+         -e 's/^.*bees:/bees:/g' \
+         -e 's/^.*crawl_writeback:/crawl_writeback:/g' \
+         -e 's/^.*main:/main:/g' \
+         -e 's/^.*hash_prefetch:/hash_prefetch:/g'
+}
+
+bees "$MNT_DIR" 3>&1 2>&1 | filter_output
 
 exit 0
