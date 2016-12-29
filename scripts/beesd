@@ -97,10 +97,6 @@ fi
     chmod 700 "$DB_PATH"
 }
 
-if YN "$LOG_SHORT_PATH"; then
-    cd "$MNT_DIR" || exit 1
-    bees .
-else
-    bees "$MNT_DIR"
-fi
+bees "$MNT_DIR"
+
 exit 0
