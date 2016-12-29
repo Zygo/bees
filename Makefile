@@ -1,4 +1,6 @@
-default install all: lib src test README.html
+PREFIX ?= /
+
+default all: lib src test README.html
 
 clean:
 	git clean -dfx
@@ -17,3 +19,7 @@ test: lib src
 README.html: README.md
 	markdown README.md > README.html.new
 	mv -f README.html.new README.html
+
+install: lib src test
+	install -Dm644 lib/libcrucible.so $(PREFIX)/usr/lib/libcrucible.so
+	install -Dm755 bin/bees $(PREFIX)/usr/bin/bees
