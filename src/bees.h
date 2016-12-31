@@ -607,7 +607,7 @@ friend ostream & operator<<(ostream &os, const BeesRangePair &brp);
 };
 
 class BeesWorkQueueBase {
-	string 				m_name; 
+	string 				m_name;
 
 protected:
 	static mutex			s_mutex;
@@ -622,7 +622,7 @@ public:
 
 	virtual size_t active_size() const = 0;
 	virtual list<string> peek_active(size_t count) const = 0;
- 
+
 	static void for_each_work_queue(function<void(BeesWorkQueueBase *)> f);
 };
 

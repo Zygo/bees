@@ -130,7 +130,7 @@
 	};
 
 #endif
-	 
+
 #ifndef BTRFS_IOC_CLONE_RANGE
 
 	struct btrfs_ioctl_clone_range_args {

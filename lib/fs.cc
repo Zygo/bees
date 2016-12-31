@@ -913,7 +913,7 @@ namespace crucible {
 	ostream &
 	operator<<(ostream &os, const BtrfsIoctlSearchHeader &hdr)
 	{
-		os << "BtrfsIoctlSearchHeader { " 
+		os << "BtrfsIoctlSearchHeader { "
 			<< static_cast<const btrfs_ioctl_search_header &>(hdr)
 			<< ", data = ";
 		hexdump(os, hdr.m_data);
@@ -923,7 +923,7 @@ namespace crucible {
 	ostream &
 	operator<<(ostream &os, const BtrfsIoctlSearchKey &key)
 	{
-		os << "BtrfsIoctlSearchKey { " 
+		os << "BtrfsIoctlSearchKey { "
 			<< static_cast<const btrfs_ioctl_search_key &>(key)
 			<< ", buf_size = " << key.m_buf_size
 			<< ", buf[" << key.m_result.size() << "] = {";

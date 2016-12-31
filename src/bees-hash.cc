@@ -262,8 +262,8 @@ BeesHashTable::prefetch_loop()
 		graph_blob << "Uptime:  " << m_ctx->total_timer().age() << " seconds\n";
 		graph_blob << "Version: " << BEES_VERSION << "\n";
 
-		graph_blob 
-			<< "\nHash table page occupancy histogram (" << occupied_count << "/" << total_count << " cells occupied, " << (occupied_count * 100 / total_count) << "%)\n" 
+		graph_blob
+			<< "\nHash table page occupancy histogram (" << occupied_count << "/" << total_count << " cells occupied, " << (occupied_count * 100 / total_count) << "%)\n"
 			<< out.str() << "0%      |      25%      |      50%      |      75%      |   100% page fill\n"
 			<< "compressed " << compressed_count << " (" << percent(compressed_count, occupied_count) << ")"
 			<< " new-style " << compressed_offset_count << " (" << percent(compressed_offset_count, occupied_count) << ")"

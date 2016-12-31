@@ -77,7 +77,7 @@ namespace crucible {
 	void
 	TimeQueue<Task>::push(const Task &task, double delay)
 	{
-		Timestamp time = chrono::high_resolution_clock::now() + 
+		Timestamp time = chrono::high_resolution_clock::now() +
 			chrono::duration_cast<chrono::high_resolution_clock::duration>(chrono::duration<double>(delay));
 		unique_lock<mutex> lock(m_mutex);
 		while (m_set.size() > m_max_queue_depth) {
@@ -91,7 +91,7 @@ namespace crucible {
 	void
 	TimeQueue<Task>::push_nowait(const Task &task, double delay)
 	{
-		Timestamp time = chrono::high_resolution_clock::now() + 
+		Timestamp time = chrono::high_resolution_clock::now() +
 			chrono::duration_cast<chrono::high_resolution_clock::duration>(chrono::duration<double>(delay));
 		unique_lock<mutex> lock(m_mutex);
 		m_set.insert(Item(time, task));

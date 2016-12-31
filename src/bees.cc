@@ -462,7 +462,7 @@ BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
 
 void
 BeesTempFile::realign()
-{ 
+{
 	if (m_end_offset > BLOCK_SIZE_MAX_TEMP_FILE) {
 		BEESLOG("temporary file size " << to_hex(m_end_offset) << " > max " << BLOCK_SIZE_MAX_TEMP_FILE);
 		BEESCOUNT(tmp_trunc);

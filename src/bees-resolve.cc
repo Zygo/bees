@@ -105,7 +105,7 @@ BeesResolver::adjust_offset(const BeesFileRange &haystack, const BeesBlockData &
 	bool is_legacy = false;
 	if (m_addr.is_compressed()) {
 		BtrfsExtentWalker ew(haystack.fd(), haystack.begin(), m_ctx->root_fd());
-		BEESTRACE("haystack extent data " << ew); 
+		BEESTRACE("haystack extent data " << ew);
 		Extent e = ew.current();
 		if (m_addr.has_compressed_offset()) {
 			off_t coff = m_addr.get_compressed_offset();
