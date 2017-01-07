@@ -3,7 +3,6 @@ PROGRAMS = \
 	crc64 \
 	execpipe \
 	fd \
-	interp \
 	limits \
 	path \
 	process \

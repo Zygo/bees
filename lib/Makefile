@@ -8,7 +8,6 @@ OBJS = \
 	extentwalker.o \
 	fd.o \
 	fs.o \
-	interp.o \
 	ntoa.o \
 	path.o \
 	process.o \

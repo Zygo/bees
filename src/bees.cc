@@ -1,7 +1,6 @@
 #include "bees-version.h"
 #include "bees.h"
 
-#include "crucible/interp.h"
 #include "crucible/limits.h"
 #include "crucible/process.h"
 #include "crucible/string.h"
@@ -25,7 +24,7 @@ using namespace crucible;
 using namespace std;
 
 int
-do_cmd_help(const ArgList &argv)
+do_cmd_help(const char **argv)
 {
 	cerr << "Usage: " << argv[0] << " fs-root-path [fs-root-path-2...]\n"
 		"Performs best-effort extent-same deduplication on btrfs.\n"
@@ -555,8 +554,10 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 }
 
 int
-bees_main(ArgList args)
+bees_main(int argc, const char **argv)
 {
+	vector<string> args(argv, argv + argc);
+
 	set_catch_explainer([&](string s) {
 		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
 		BEESCOUNT(exception_caught);
@@ -603,11 +604,9 @@ main(int argc, const char **argv)
 		return 2;
 	}
 
-	ArgList args(argv + 1);
-
 	int rv = 1;
 	catch_and_explain([&]() {
-		rv = bees_main(args);
+		rv = bees_main(argc, argv);
 	});
 	return rv;
 }
