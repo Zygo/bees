@@ -4,7 +4,6 @@ OBJS = \
 	crc64.o \
 	chatter.o \
 	error.o \
-	execpipe.o \
 	extentwalker.o \
 	fd.o \
 	fs.o \

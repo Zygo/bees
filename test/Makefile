@@ -1,7 +1,6 @@
 PROGRAMS = \
 	chatter \
 	crc64 \
-	execpipe \
 	fd \
 	limits \
 	path \
