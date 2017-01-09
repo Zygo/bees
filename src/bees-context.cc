@@ -260,9 +260,7 @@ BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 bool
 BeesContext::dedup(const BeesRangePair &brp)
 {
-	// TOOLONG and NOTE can retroactively fill in the filename details, but LOG can't
-	BEESNOTE("dedup " << brp);
-
+	// Open the files
 	brp.first.fd(shared_from_this());
 	brp.second.fd(shared_from_this());
 
@@ -273,6 +271,12 @@ BeesContext::dedup(const BeesRangePair &brp)
 	bees_sync(brp.first.fd());
 #endif
 
+	// To avoid hammering all the cores with long-running ioctls,
+	// only do one dedup at any given time.
+	BEESNOTE("Waiting to dedup " << brp);
+	unique_lock<mutex> lock(bees_ioctl_mutex);
+
+	BEESNOTE("dedup " << brp);
 	BEESTOOLONG("dedup " << brp);
 
 	thread_local BeesFileId tl_first_fid, tl_second_fid;
@@ -435,6 +439,9 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	off_t block_count = ((e.size() + BLOCK_MASK_SUMS) & ~BLOCK_MASK_SUMS) / BLOCK_SIZE_SUMS;
 	BEESTRACE(e << " block_count " << block_count);
 	string bar(block_count, '#');
+
+	// Only one thread may create tmpfiles at any given time
+	unique_lock<mutex> tmpfile_lock(bees_tmpfile_mutex, defer_lock);
 
 	for (off_t next_p = e.begin(); next_p < e.end(); ) {
 
@@ -736,6 +743,10 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			// BEESLOG("noinsert_set.count(" << to_hex(p) << ") " << noinsert_set.count(p));
 			if (noinsert_set.count(p)) {
 				if (p - last_p > 0) {
+					if (!tmpfile_lock) {
+						BEESNOTE("waiting for tmpfile");
+						tmpfile_lock.lock();
+					}
 					rewrite_file_range(BeesFileRange(bfr.fd(), last_p, p));
 					blocks_rewritten = true;
 				}
@@ -747,6 +758,10 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		}
 		BEESTRACE("last");
 		if (next_p - last_p > 0) {
+			if (!tmpfile_lock) {
+				BEESNOTE("waiting for tmpfile");
+				tmpfile_lock.lock();
+			}
 			rewrite_file_range(BeesFileRange(bfr.fd(), last_p, next_p));
 			blocks_rewritten = true;
 		}
@@ -868,12 +883,19 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
 	THROW_CHECK1(invalid_argument, addr, !addr.is_magic());
 	THROW_CHECK0(invalid_argument, !!root_fd());
+
+	// To avoid hammering all the cores with long-running ioctls,
+	// only do one resolve at any given time.
+	BEESNOTE("waiting to resolve addr " << addr);
+	unique_lock<mutex> lock(bees_ioctl_mutex);
+
 	Timer resolve_timer;
 
 	// There is no performance benefit if we restrict the buffer size.
         BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
 
 	{
+		BEESNOTE("resolving addr " << addr);
 		BEESTOOLONG("Resolving addr " << addr << " in " << root_path() << " refs " << log_ino.m_iors.size());
 		if (log_ino.do_ioctl_nothrow(root_fd())) {
 			BEESCOUNT(resolve_ok);

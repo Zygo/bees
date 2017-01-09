@@ -6,6 +6,8 @@
 #include <fstream>
 #include <tuple>
 
+#include <inttypes.h>
+
 using namespace crucible;
 using namespace std;
 
@@ -150,8 +152,9 @@ BeesRoots::crawl_state_erase(const BeesCrawlState &bcs)
 		return;
 	}
 
-	if (m_root_crawl_map.count(bcs.m_root)) {
-		m_root_crawl_map.erase(bcs.m_root);
+	auto found = m_root_crawl_map.find(bcs.m_root);
+	if (found != m_root_crawl_map.end()) {
+		m_root_crawl_map.erase(found);
 		m_crawl_dirty = true;
 	}
 }
@@ -234,7 +237,8 @@ BeesRoots::crawl_roots()
 		THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
 		return;
 	}
-#else
+#endif
+#if 0
 	// Scan each subvol one extent at a time (good for continuous forward progress)
 	bool crawled = false;
 	for (auto i : crawl_map_copy) {
@@ -270,7 +274,7 @@ void
 BeesRoots::crawl_thread()
 {
 	BEESNOTE("crawling");
-	while (1) {
+	while (true) {
 		catch_all([&]() {
 			crawl_roots();
 		});
@@ -280,8 +284,9 @@ BeesRoots::crawl_thread()
 void
 BeesRoots::writeback_thread()
 {
-	while (1) {
-		BEESNOTE(m_crawl_current << (m_crawl_dirty ? " (dirty)" : ""));
+	while (true) {
+		// BEESNOTE(m_crawl_current << (m_crawl_dirty ? " (dirty)" : ""));
+		BEESNOTE((m_crawl_dirty ? "dirty" : "clean") << ", interval " << BEES_WRITEBACK_INTERVAL << "s");
 
 		catch_all([&]() {
 			BEESNOTE("saving crawler state");
@@ -382,15 +387,18 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_crawl_thread("crawl"),
 	m_writeback_thread("crawl_writeback")
 {
-	m_crawl_thread.exec([&]() {
+	unsigned max_crawlers = max(1U, thread::hardware_concurrency());
+	m_lock_set.max_size(max_crawlers);
+
+	// m_crawl_thread.exec([&]() {
 		catch_all([&]() {
 			state_load();
 		});
 		m_writeback_thread.exec([&]() {
 			writeback_thread();
 		});
-		crawl_thread();
-	});
+		// crawl_thread();
+	// });
 }
 
 Fd
@@ -612,8 +620,53 @@ BeesRoots::open_root_ino(uint64_t root, uint64_t ino)
 
 BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) :
 	m_ctx(ctx),
-	m_state(initial_state)
+	m_state(initial_state),
+	m_thread(astringprintf("crawl_%" PRIu64, m_state.m_root))
 {
+	m_thread.exec([&]() {
+		crawl_thread();
+	});
+}
+
+BeesCrawl::~BeesCrawl()
+{
+	BEESLOGNOTE("Stopping crawl thread " << m_state);
+	unique_lock<mutex> lock(m_mutex);
+	m_stopped = true;
+	m_cond_stopped.notify_all();
+	lock.unlock();
+	BEESLOGNOTE("Joining crawl thread " << m_state);
+	m_thread.join();
+	BEESLOG("Stopped crawl thread " << m_state);
+}
+
+void
+BeesCrawl::crawl_thread()
+{
+	Timer crawl_timer;
+	while (!m_stopped) {
+		BEESNOTE("waiting for crawl thread limit");
+		LockSet<uint64_t>::Lock crawl_lock(m_ctx->roots()->lock_set(), m_state.m_root);
+		auto this_range = pop_front();
+		if (this_range) {
+			catch_all([&]() {
+				// BEESINFO("scan_forward " << this_range);
+				m_ctx->scan_forward(this_range);
+			});
+			BEESCOUNT(crawl_scan);
+		} else {
+			auto crawl_time = crawl_timer.age();
+			BEESLOGNOTE("Crawl ran out of data after " << crawl_time << "s, waiting for more...");
+			crawl_lock.unlock();
+			unique_lock<mutex> lock(m_mutex);
+			if (m_stopped) {
+				break;
+			}
+			m_cond_stopped.wait_for(lock, chrono::duration<double>(BEES_COMMIT_INTERVAL));
+			crawl_timer.reset();
+		}
+	}
+	BEESLOG("Crawl thread stopped");
 }
 
 bool
@@ -661,7 +714,7 @@ BeesCrawl::fetch_extents()
 	}
 
 	BEESNOTE("crawling " << get_state());
-	BEESLOG("Crawling " << get_state());
+	// BEESLOG("Crawling " << get_state());
 
 	Timer crawl_timer;
 
@@ -680,6 +733,9 @@ BeesCrawl::fetch_extents()
 	BEESTRACE("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 	bool ioctl_ok = false;
 	{
+		BEESNOTE("waiting to search crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
+		unique_lock<mutex> lock(bees_ioctl_mutex);
+
 		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 		BEESTOOLONG("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 		Timer crawl_timer;
@@ -700,7 +756,7 @@ BeesCrawl::fetch_extents()
 		return next_transid();
 	}
 
-	BEESLOG("Crawling " << sk.m_result.size() << " results from " << get_state());
+	// BEESLOG("Crawling " << sk.m_result.size() << " results from " << get_state());
 	auto results_left = sk.m_result.size();
 	BEESNOTE("crawling " << results_left << " results from " << get_state());
 	size_t count_other = 0;
@@ -717,7 +773,6 @@ BeesCrawl::fetch_extents()
 
 		BEESTRACE("i = " << i);
 
-#if 1
 		// We need the "+ 1" and objectid rollover that next_min does.
 		auto new_state = get_state();
 		new_state.m_objectid = sk.min_objectid;
@@ -729,7 +784,6 @@ BeesCrawl::fetch_extents()
 		// is a lot of metadata we can't process.  Favor forward
 		// progress over losing search results.
 		set_state(new_state);
-#endif
 
 		// Ignore things that aren't EXTENT_DATA_KEY
 		if (i.type != BTRFS_EXTENT_DATA_KEY) {
@@ -797,7 +851,7 @@ BeesCrawl::fetch_extents()
 			}
 		}
 	}
-	BEESLOG("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
+	// BEESLOG("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
 
 	return true;
 }
@@ -836,12 +890,6 @@ BeesCrawl::pop_front()
 	}
 	auto rv = *m_extents.begin();
 	m_extents.erase(m_extents.begin());
-#if 0
-	auto state = get_state();
-	state.m_objectid = rv.fid().ino();
-	state.m_offset = rv.begin();
-	set_state(state);
-#endif
 	return rv;
 }
 

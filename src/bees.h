@@ -101,7 +101,7 @@ const double BEES_INFO_BURST = 1.0;
 const size_t BEES_MAX_QUEUE_SIZE = 1024;
 
 // Read this many items at a time in SEARCHv2
-const size_t BEES_MAX_CRAWL_SIZE = 4096;
+const size_t BEES_MAX_CRAWL_SIZE = 1024;
 
 // If an extent has this many refs, pretend it does not exist
 // to avoid a crippling btrfs performance bug
@@ -490,23 +490,28 @@ class BeesCrawl {
 	mutex					m_state_mutex;
 	BeesCrawlState				m_state;
 
+	BeesThread				m_thread;
+	bool					m_stopped = false;
+	condition_variable			m_cond_stopped;
+
 	bool fetch_extents();
 	void fetch_extents_harder();
 	bool next_transid();
 
 public:
+	~BeesCrawl();
 	BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state);
 	BeesFileRange peek_front();
 	BeesFileRange pop_front();
 	BeesCrawlState get_state();
 	void set_state(const BeesCrawlState &bcs);
+	void crawl_thread();
 };
 
 class BeesRoots {
 	shared_ptr<BeesContext>			m_ctx;
 
 	BeesStringFile				m_crawl_state_file;
-	BeesCrawlState				m_crawl_current;
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
 	condition_variable			m_condvar;
@@ -514,6 +519,7 @@ class BeesRoots {
 	Timer					m_crawl_timer;
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
+	LockSet<uint64_t>			m_lock_set;
 
 	void insert_new_crawl();
 	void insert_root(const BeesCrawlState &bcs);
@@ -541,6 +547,7 @@ public:
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
+	LockSet<uint64_t> &lock_set() { return m_lock_set; }
 };
 
 struct BeesHash {
@@ -822,5 +829,7 @@ string pretty(double d);
 extern RateLimiter bees_info_rate_limit;
 void bees_sync(int fd);
 string format_time(time_t t);
+extern mutex bees_ioctl_mutex;
+extern mutex bees_tmpfile_mutex;
 
 #endif
