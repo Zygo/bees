@@ -234,22 +234,19 @@ Bug fixes (sometimes included in older LTS kernels):
 * 4.5: use-after-free in the `FILE_EXTENT_SAME` ioctl used by Bees.
 * 4.7: *slow backref* bug no longer triggers a softlockup panic.  It still
   too long to resolve a block address to a root/inode/offset triple.
-
-Fixed bugs not yet integrated in mainline Linux:
-
-* 7f8e406 ("btrfs: improve delayed refs iterations"): significantly
-  reduces the CPU time cost of the LOGICAL_INO ioctl (from 30-70% of
-  bees running time to under 5%).
+* 4.10-rc1: reduced CPU time cost of the LOGICAL_INO ioctl and dedup
+  backref processing in general.
 
 Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
 
-* *slow backref*: If the number of references to a single shared extent
-  within a single file grows above a few thousand, the kernel consumes CPU
-  for up to 40 uninterruptible minutes while holding various locks that
-  block access to the filesystem.  Bees avoids this bug by measuring the
-  time the kernel spends performing certain operations and permanently
-  blacklisting any extent or hash where the kernel starts to get slow.
-  Inside Bees, such blocks are marked as 'toxic' hash/block addresses.
+* *slow backrefs* (aka toxic extents): If the number of references to a
+  single shared extent within a single file grows above a few thousand,
+  the kernel consumes CPU for minutes at a time while holding various
+  locks that block access to the filesystem.  Bees avoids this bug by
+  measuring the time the kernel spends performing certain operations
+  and permanently blacklisting any extent or hash where the kernel
+  starts to get slow.  Inside Bees, such blocks are marked as 'toxic'
+  hash/block addresses.
 
 * `LOGICAL_INO` output is arbitrarily limited to 2730 references
   even if more buffer space is provided for results.  Once this number
