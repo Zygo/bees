@@ -134,11 +134,6 @@ performance by caching, but really fixing this requires rewriting the
 crawler to scan the btrfs extent tree directly instead of the subvol
 FS trees.
 
-* Bees had support for multiple worker threads in the past; however,
-this was removed because it made Bees too aggressive to coexist with
-other applications on the same machine.  It also hit the *slow backrefs*
-on N CPU cores instead of just one.
-
 * Block reads are currently more allocation- and CPU-intensive than they
 should be, especially for filesystems on SSD where the IO overhead is
 much smaller.  This is a problem for power-constrained environments
