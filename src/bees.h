@@ -1,7 +1,6 @@
 #ifndef BEES_H
 #define BEES_H
 
-#include "crucible/bool.h"
 #include "crucible/cache.h"
 #include "crucible/chatter.h"
 #include "crucible/error.h"
@@ -487,7 +486,7 @@ class BeesCrawl {
 
 	mutex					m_mutex;
 	set<BeesFileRange>			m_extents;
-	DefaultBool				m_deferred;
+	bool					m_deferred = false;
 
 	mutex					m_state_mutex;
 	BeesCrawlState				m_state;
@@ -512,7 +511,7 @@ class BeesRoots {
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
 	condition_variable			m_condvar;
-	DefaultBool				m_crawl_dirty;
+	bool					m_crawl_dirty = false;
 	Timer					m_crawl_timer;
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
@@ -568,7 +567,7 @@ class BeesBlockData {
 	mutable BeesAddress	m_addr;
 	mutable Blob		m_data;
 	mutable BeesHash	m_hash;
-	mutable DefaultBool	m_hash_done;
+	mutable bool		m_hash_done = false;
 
 public:
 	// Constructor with the immutable fields
@@ -672,7 +671,7 @@ public:
 struct BeesResolveAddrResult {
 	BeesResolveAddrResult();
 	vector<BtrfsInodeOffsetRoot> m_biors;
-	DefaultBool m_is_toxic;
+	bool m_is_toxic = false;
 	bool is_toxic() const { return m_is_toxic; }
 };
 
@@ -750,22 +749,22 @@ class BeesResolver {
 	unsigned				m_bior_count;
 
 	// We found matching data, so we can dedup
-	DefaultBool				m_found_data;
+	bool					m_found_data = false;
 
 	// We found matching data, so we *did* dedup
-	DefaultBool				m_found_dup;
+	bool					m_found_dup = false;
 
 	// We found matching hash, so the hash table is still correct
-	DefaultBool				m_found_hash;
+	bool					m_found_hash = false;
 
 	// We found matching physical address, so the hash table isn't totally wrong
-	DefaultBool				m_found_addr;
+	bool					m_found_addr = false;
 
 	// We found matching physical address, but data did not match
-	DefaultBool				m_wrong_data;
+	bool					m_wrong_data = false;
 
 	// The whole thing is a placebo to avoid crippling btrfs performance bugs
-	DefaultBool				m_is_toxic;
+	bool					m_is_toxic = false;
 
 	BeesFileRange chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &needle_bbd);
 	BeesBlockData adjust_offset(const BeesFileRange &haystack, const BeesBlockData &needle);
