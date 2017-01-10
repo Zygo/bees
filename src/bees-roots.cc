@@ -154,8 +154,10 @@ BeesRoots::crawl_state_erase(const BeesCrawlState &bcs)
 
 	auto found = m_root_crawl_map.find(bcs.m_root);
 	if (found != m_root_crawl_map.end()) {
+		auto hold_this_until_unlocked = found->second;
 		m_root_crawl_map.erase(found);
 		m_crawl_dirty = true;
+		lock.unlock();
 	}
 }
 
