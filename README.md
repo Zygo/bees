@@ -313,21 +313,13 @@ Requirements
 
 * libuuid-dev
 
-  TODO: remove the one function used from this library.
-  It supports a feature Bees no longer implements.
+  This library is only required for a feature that was removed after v0.1.
+  The lingering support code can be removed.
 
 * Linux kernel 4.4.3 or later
 
   Don't bother trying to make Bees work with older kernels.
   It won't end well.
-
-* 64-bit host and target CPU
-
-  This code has never been tested on a 32-bit target CPU.
-
-  A 64-bit host CPU may be required for the self-tests.
-  Some of the ioctls don't work properly with a 64-bit
-  kernel and 32-bit userspace.
 
 Build
 -----
@@ -438,6 +430,6 @@ You can also use Github:
 Copyright & License
 ===================
 
-Copyright 2015-2016 Zygo Blaxell <bees@furryterror.org>.
+Copyright 2015-2017 Zygo Blaxell <bees@furryterror.org>.
 
 GPL (version 3 or later).
