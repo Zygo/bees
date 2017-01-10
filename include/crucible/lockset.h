@@ -7,6 +7,7 @@
 
 #include <condition_variable>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <set>
 
@@ -17,14 +18,18 @@ namespace crucible {
 	class LockSet {
 
 	public:
-		using key_type = T;
 		using set_type = set<T>;
+		using key_type = typename set_type::key_type;
 
 	private:
 
 		set_type			m_set;
 		mutex				m_mutex;
 		condition_variable		m_condvar;
+		size_t				m_max_size = numeric_limits<size_t>::max();
+
+		bool full();
+		bool locked(const key_type &name);
 
 	public:
 		~LockSet();
@@ -37,6 +42,8 @@ namespace crucible {
 		bool empty();
 		set_type copy();
 		void wait_unlock(double interval);
+
+		void max_size(size_t max);
 
 		class Lock {
 			LockSet		&m_lockset;
@@ -69,11 +76,32 @@ namespace crucible {
 	}
 
 	template <class T>
+	bool
+	LockSet<T>::full()
+	{
+		return m_set.size() >= m_max_size;
+	}
+
+	template <class T>
+	bool
+	LockSet<T>::locked(const key_type &name)
+	{
+		return m_set.count(name);
+	}
+
+	template <class T>
+	void
+	LockSet<T>::max_size(size_t s)
+	{
+		m_max_size = s;
+	}
+
+	template <class T>
 	void
 	LockSet<T>::lock(const key_type &name)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		while (m_set.count(name)) {
+		while (full() || locked(name)) {
 			m_condvar.wait(lock);
 		}
 		auto rv = m_set.insert(name);
@@ -85,7 +113,7 @@ namespace crucible {
 	LockSet<T>::try_lock(const key_type &name)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		if (m_set.count(name)) {
+		if (full() || locked(name)) {
 			return false;
 		}
 		auto rv = m_set.insert(name);
@@ -98,8 +126,8 @@ namespace crucible {
 	LockSet<T>::unlock(const key_type &name)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		m_condvar.notify_all();
 		auto erase_count = m_set.erase(name);
+		m_condvar.notify_all();
 		THROW_CHECK1(invalid_argument, erase_count, erase_count == 1);
 	}
 
