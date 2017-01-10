@@ -555,7 +555,8 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 int
 bees_main(int argc, const char **argv)
 {
-	vector<string> args(argv, argv + argc);
+	THROW_CHECK1(invalid_argument, argc, argc >= 1);
+	vector<string> args(argv + 1, argv + argc - 1);
 
 	set_catch_explainer([&](string s) {
 		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
