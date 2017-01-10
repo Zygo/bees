@@ -555,9 +555,6 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 int
 bees_main(int argc, const char **argv)
 {
-	THROW_CHECK1(invalid_argument, argc, argc >= 1);
-	vector<string> args(argv + 1, argv + argc - 1);
-
 	set_catch_explainer([&](string s) {
 		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
 		BEESCOUNT(exception_caught);
@@ -568,6 +565,9 @@ bees_main(int argc, const char **argv)
 
 	list<shared_ptr<BeesContext>> all_contexts;
 	shared_ptr<BeesContext> bc;
+
+	THROW_CHECK1(invalid_argument, argc, argc >= 0);
+	vector<string> args(argv + 1, argv + argc);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
