@@ -819,6 +819,7 @@ public:
 };
 
 // And now, a giant pile of extern declarations
+extern const char *BEES_VERSION;
 string pretty(double d);
 extern RateLimiter bees_info_rate_limit;
 void bees_sync(int fd);

@@ -1,4 +1,3 @@
-#include "bees-version.h"
 #include "bees.h"
 
 #include "crucible/limits.h"

@@ -11,8 +11,8 @@ LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
 depends.mk: Makefile *.cc
-	echo "#define BEES_VERSION \"$(shell git describe --always --dirty || echo UNKNOWN)\"" > bees-version.new.h
-	mv -f bees-version.new.h bees-version.h
+	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
+	mv -f bees-version.new.c bees-version.c
 	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
 	mv -fv depends.mk.new depends.mk
 
@@ -33,9 +33,11 @@ BEES_OBJS = \
 	bees-roots.o \
 	bees-thread.o \
 	bees-types.o \
+	bees-version.o \
 
 ../bin/bees: $(BEES_OBJS)
 	$(CXX) $(CXXFLAGS) -o "$@" $(BEES_OBJS) $(LDFLAGS) $(LIBS)
 
 clean:
-	-rm -fv *.o bees-version.h
+	-rm -fv bees-version.h
+	-rm -fv *.o bees-version.c
