@@ -195,93 +195,6 @@ BeesRoots::transid_max()
 }
 
 void
-BeesRoots::crawl_roots()
-{
-	BEESNOTE("Crawling roots");
-
-	unique_lock<mutex> lock(m_mutex);
-	if (m_root_crawl_map.empty()) {
-		BEESNOTE("idle, crawl map is empty");
-		m_condvar.wait(lock);
-		// Don't count the time we were waiting as part of the crawl time
-		m_crawl_timer.reset();
-	}
-
-	// Work from a copy because BeesCrawl might change the world under us
-	auto crawl_map_copy = m_root_crawl_map;
-	lock.unlock();
-
-#if 0
-	// Scan the same inode/offset tuple in each subvol (good for snapshots)
-	BeesFileRange first_range;
-	shared_ptr<BeesCrawl> first_crawl;
-	for (auto i : crawl_map_copy) {
-		auto this_crawl = i.second;
-		auto this_range = this_crawl->peek_front();
-		if (this_range) {
-			if (!first_range || this_range < first_range) {
-				first_crawl = this_crawl;
-				first_range = this_range;
-			}
-		}
-	}
-
-	if (first_range) {
-		catch_all([&]() {
-			// BEESINFO("scan_forward " << first_range);
-			m_ctx->scan_forward(first_range);
-		});
-		BEESCOUNT(crawl_scan);
-		m_crawl_current = first_crawl->get_state();
-		auto first_range_popped = first_crawl->pop_front();
-		THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
-		return;
-	}
-#endif
-#if 0
-	// Scan each subvol one extent at a time (good for continuous forward progress)
-	bool crawled = false;
-	for (auto i : crawl_map_copy) {
-		auto this_crawl = i.second;
-		auto this_range = this_crawl->peek_front();
-		if (this_range) {
-			catch_all([&]() {
-				// BEESINFO("scan_forward " << this_range);
-				m_ctx->scan_forward(this_range);
-			});
-			crawled = true;
-			BEESCOUNT(crawl_scan);
-			m_crawl_current = this_crawl->get_state();
-			auto this_range_popped = this_crawl->pop_front();
-			THROW_CHECK2(runtime_error, this_range, this_range_popped, this_range == this_range_popped);
-		}
-	}
-
-	if (crawled) return;
-#endif
-
-	BEESLOG("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
-	BEESCOUNT(crawl_done);
-	BEESNOTE("idle, waiting for more data");
-	lock.lock();
-	m_condvar.wait(lock);
-
-	// Don't count the time we were waiting as part of the crawl time
-	m_crawl_timer.reset();
-}
-
-void
-BeesRoots::crawl_thread()
-{
-	BEESNOTE("crawling");
-	while (true) {
-		catch_all([&]() {
-			crawl_roots();
-		});
-	}
-}
-
-void
 BeesRoots::writeback_thread()
 {
 	while (true) {
@@ -384,21 +297,17 @@ BeesRoots::state_load()
 BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
-	m_crawl_thread("crawl"),
 	m_writeback_thread("crawl_writeback")
 {
 	unsigned max_crawlers = max(1U, thread::hardware_concurrency());
 	m_lock_set.max_size(max_crawlers);
 
-	// m_crawl_thread.exec([&]() {
-		catch_all([&]() {
-			state_load();
-		});
-		m_writeback_thread.exec([&]() {
-			writeback_thread();
-		});
-		// crawl_thread();
-	// });
+	catch_all([&]() {
+		state_load();
+	});
+	m_writeback_thread.exec([&]() {
+		writeback_thread();
+	});
 }
 
 Fd

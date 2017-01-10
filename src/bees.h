@@ -517,7 +517,6 @@ class BeesRoots {
 	condition_variable			m_condvar;
 	bool					m_crawl_dirty = false;
 	Timer					m_crawl_timer;
-	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
 	LockSet<uint64_t>			m_lock_set;
 
@@ -534,7 +533,6 @@ class BeesRoots {
 	BeesCrawlState crawl_state_get(uint64_t root);
 	void crawl_state_set_dirty();
 	void crawl_state_erase(const BeesCrawlState &bcs);
-	void crawl_thread();
 	void writeback_thread();
 	uint64_t next_root(uint64_t root = 0);
 	void current_state_set(const BeesCrawlState &bcs);
