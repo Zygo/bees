@@ -556,7 +556,7 @@ BeesCrawl::crawl_thread()
 {
 	Timer crawl_timer;
 	while (!m_stopped) {
-		BEESNOTE("waiting for crawl thread limit");
+		BEESNOTE("waiting for crawl thread limit " << m_state);
 		LockSet<uint64_t>::Lock crawl_lock(m_ctx->roots()->lock_set(), m_state.m_root);
 		auto this_range = pop_front();
 		if (this_range) {
