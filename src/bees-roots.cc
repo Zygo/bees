@@ -301,8 +301,7 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_writeback_thread("crawl_writeback")
 {
-	unsigned max_crawlers = max(1U, thread::hardware_concurrency());
-	m_lock_set.max_size(max_crawlers);
+	m_lock_set.max_size(bees_worker_thread_count());
 
 	catch_all([&]() {
 		state_load();
@@ -555,20 +554,22 @@ void
 BeesCrawl::crawl_thread()
 {
 	Timer crawl_timer;
+	LockSet<uint64_t>::Lock crawl_lock(m_ctx->roots()->lock_set(), m_state.m_root, false);
 	while (!m_stopped) {
 		BEESNOTE("waiting for crawl thread limit " << m_state);
-		LockSet<uint64_t>::Lock crawl_lock(m_ctx->roots()->lock_set(), m_state.m_root);
+		crawl_lock.lock();
+		BEESNOTE("pop_front " << m_state);
 		auto this_range = pop_front();
+		crawl_lock.unlock();
 		if (this_range) {
 			catch_all([&]() {
-				// BEESINFO("scan_forward " << this_range);
+				BEESNOTE("scan_forward " << this_range);
 				m_ctx->scan_forward(this_range);
 			});
 			BEESCOUNT(crawl_scan);
 		} else {
 			auto crawl_time = crawl_timer.age();
 			BEESLOGNOTE("Crawl ran out of data after " << crawl_time << "s, waiting for more...");
-			crawl_lock.unlock();
 			unique_lock<mutex> lock(m_mutex);
 			if (m_stopped) {
 				break;

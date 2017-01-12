@@ -311,7 +311,7 @@ BeesHashTable::fetch_missing_extent(HashType hash)
 	BEESNOTE("waiting to fetch hash extent #" << extent_number << ", " << missing_buckets << " left to fetch");
 
 	// Acquire blocking lock on this extent only
-	LockSet<uint64_t>::Lock extent_lock(m_extent_lock_set, extent_number);
+	decltype(m_extent_lock_set)::Lock extent_lock(m_extent_lock_set, extent_number);
 
 	// Check missing again because someone else might have fetched this
 	// extent for us while we didn't hold any locks

@@ -703,6 +703,8 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 
 	Timer						m_total_timer;
 
+	LockSet<uint64_t>			m_extent_lock_set;
+
 	void set_root_fd(Fd fd);
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
@@ -740,6 +742,7 @@ public:
 	shared_ptr<BeesTempFile> tmpfile();
 
 	const Timer &total_timer() const { return m_total_timer; }
+	LockSet<uint64_t> &extent_lock_set() { return m_extent_lock_set; }
 
 	// TODO: move the rest of the FD cache methods here
 	void insert_root_ino(Fd fd);
@@ -828,6 +831,6 @@ extern RateLimiter bees_info_rate_limit;
 void bees_sync(int fd);
 string format_time(time_t t);
 extern mutex bees_ioctl_mutex;
-extern mutex bees_tmpfile_mutex;
+extern unsigned bees_worker_thread_count();
 
 #endif

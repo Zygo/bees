@@ -252,6 +252,7 @@ BeesContext::home_fd()
 BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 	m_parent_ctx(parent)
 {
+	m_extent_lock_set.max_size(bees_worker_thread_count());;
 	if (m_parent_ctx) {
 		m_fd_cache = m_parent_ctx->fd_cache();
 	}
@@ -439,9 +440,6 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	off_t block_count = ((e.size() + BLOCK_MASK_SUMS) & ~BLOCK_MASK_SUMS) / BLOCK_SIZE_SUMS;
 	BEESTRACE(e << " block_count " << block_count);
 	string bar(block_count, '#');
-
-	// Only one thread may create tmpfiles at any given time
-	unique_lock<mutex> tmpfile_lock(bees_tmpfile_mutex, defer_lock);
 
 	for (off_t next_p = e.begin(); next_p < e.end(); ) {
 
@@ -743,10 +741,6 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			// BEESLOG("noinsert_set.count(" << to_hex(p) << ") " << noinsert_set.count(p));
 			if (noinsert_set.count(p)) {
 				if (p - last_p > 0) {
-					if (!tmpfile_lock) {
-						BEESNOTE("waiting for tmpfile");
-						tmpfile_lock.lock();
-					}
 					rewrite_file_range(BeesFileRange(bfr.fd(), last_p, p));
 					blocks_rewritten = true;
 				}
@@ -758,10 +752,6 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		}
 		BEESTRACE("last");
 		if (next_p - last_p > 0) {
-			if (!tmpfile_lock) {
-				BEESNOTE("waiting for tmpfile");
-				tmpfile_lock.lock();
-			}
 			rewrite_file_range(BeesFileRange(bfr.fd(), last_p, next_p));
 			blocks_rewritten = true;
 		}
@@ -852,6 +842,9 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 			e = ew.current();
 
 			catch_all([&]() {
+				uint64_t extent_bytenr = e.bytenr();
+				BEESNOTE("waiting for extent bytenr " << to_hex(extent_bytenr));
+				decltype(m_extent_lock_set)::Lock extent_lock(m_extent_lock_set, extent_bytenr);
 				Timer one_extent_timer;
 				return_bfr = scan_one_extent(bfr, e);
 				BEESCOUNTADD(scanf_extent_ms, one_extent_timer.age() * 1000);
@@ -950,8 +943,9 @@ BeesContext::set_root_fd(Fd fd)
 	m_root_uuid = fsinfo.uuid();
 	BEESLOG("Filesystem UUID is " << m_root_uuid);
 
-	// 65536 is big enough for two max-sized extents
-	m_resolve_cache.max_size(65536);
+	// 65536 is big enough for two max-sized extents.
+	// Need enough total space in the cache for the maximum number of active threads.
+	m_resolve_cache.max_size(65536 * bees_worker_thread_count());
 	m_resolve_cache.func([&](BeesAddress addr) -> BeesResolveAddrResult {
 		return resolve_addr_uncached(addr);
 	});

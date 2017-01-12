@@ -205,14 +205,6 @@ operator<<(ostream &os, const BeesStatTmpl<T> &bs)
  * effectively crash the kernel. */
 mutex bees_ioctl_mutex;
 
-/**
- * Don't allow two threads to create temporary copies of extent data at
- * the same time.  If two threads create temporary copies of the same
- * extent at the same time they will not be properly deduped.  This lock
- * goes into effect as the first temporary extent is created by a thread,
- * and is released after the source extent scan is finished. */
-mutex bees_tmpfile_mutex;
-
 template <class T>
 T&
 BeesStatTmpl<T>::at(string idx)
@@ -566,6 +558,12 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 
 	BEESCOUNT(tmp_copy);
 	return rv;
+}
+
+unsigned
+bees_worker_thread_count()
+{
+	return max(1U, thread::hardware_concurrency());
 }
 
 int
