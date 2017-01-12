@@ -8,15 +8,15 @@ namespace crucible {
 
 	// FIXME:  ExtentCursor is probably a better name
 	struct Extent {
-		off_t		m_begin;
-		off_t		m_end;
-		uint64_t	m_physical;
-		uint64_t	m_flags;
+		off_t		m_begin = 0;
+		off_t		m_end = 0;
+		uint64_t	m_physical = 0;
+		uint64_t	m_flags = 0;
 
 		// Btrfs extent reference details
-		off_t		m_physical_len;
-		off_t		m_logical_len;
-		off_t		m_offset;
+		off_t		m_physical_len = 0;
+		off_t		m_logical_len = 0;
+		off_t		m_offset = 0;
 
 		// fiemap flags are uint32_t, so bits 32..63 are OK for us
 
@@ -38,10 +38,12 @@ namespace crucible {
 		off_t physical_len() const { return m_physical_len; }
 		off_t logical_len() const { return m_logical_len; }
 		off_t offset() const { return m_offset; }
+		bool compressed() const;
+		uint64_t bytenr() const;
 		bool operator==(const Extent &that) const;
 		bool operator!=(const Extent &that) const { return !(*this == that); }
 
-		Extent();
+		Extent() = default;
 		Extent(const Extent &e) = default;
 	};
 

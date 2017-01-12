@@ -79,17 +79,6 @@ namespace crucible {
 			<< "] }";
 	}
 
-	Extent::Extent() :
-		m_begin(0),
-		m_end(0),
-		m_physical(0),
-		m_flags(0),
-		m_physical_len(0),
-		m_logical_len(0),
-		m_offset(0)
-	{
-	}
-
 	Extent::operator bool() const
 	{
 		THROW_CHECK2(invalid_argument, m_begin, m_end, m_end >= m_begin);
@@ -107,6 +96,18 @@ namespace crucible {
 	Extent::operator==(const Extent &that) const
 	{
 		return m_begin == that.m_begin && m_end == that.m_end && m_physical == that.m_physical && m_flags == that.m_flags;
+	}
+
+	bool
+	Extent::compressed() const
+	{
+		return m_flags & FIEMAP_EXTENT_ENCODED;
+	}
+
+	uint64_t
+	Extent::bytenr() const
+	{
+		return compressed() ? m_physical : m_physical - m_offset;
 	}
 
 	ExtentWalker::ExtentWalker(Fd fd) :
