@@ -335,9 +335,6 @@ BeesHashTable::fetch_missing_extent(HashType hash)
 	}
 
 	BEESCOUNT(hash_extent_in);
-	// We don't block when fetching an extent but we do slow down the
-	// prefetch thread.
-	m_prefetch_rate_limit.borrow(BLOCK_SIZE_HASHTAB_EXTENT);
 	lock.lock();
 	m_buckets_missing.erase(extent_number);
 }
@@ -596,7 +593,6 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	m_writeback_thread("hash_writeback"),
 	m_prefetch_thread("hash_prefetch"),
 	m_flush_rate_limit(BEES_FLUSH_RATE),
-	m_prefetch_rate_limit(BEES_FLUSH_RATE),
 	m_stats_file(m_ctx->home_fd(), "beesstats.txt")
 {
 	// Sanity checks to protect the implementation from its weaknesses

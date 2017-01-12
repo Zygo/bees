@@ -444,7 +444,6 @@ private:
 	BeesThread  		m_writeback_thread;
 	BeesThread	        m_prefetch_thread;
 	RateLimiter		m_flush_rate_limit;
-	RateLimiter		m_prefetch_rate_limit;
 	mutex			m_extent_mutex;
 	mutex			m_bucket_mutex;
 	condition_variable	m_condvar;
