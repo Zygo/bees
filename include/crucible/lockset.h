@@ -63,6 +63,7 @@ namespace crucible {
 			bool try_lock();
 		};
 
+		Lock make_lock(const key_type &name, bool start_locked = true);
 	};
 
 	template <class T>
@@ -215,7 +216,7 @@ namespace crucible {
 
 	template <class T>
 	LockSet<T>::Lock::Lock(Lock &&that) :
-		m_lockset(that.lockset),
+		m_lockset(that.m_lockset),
 		m_name(that.m_name),
 		m_locked(that.m_locked)
 	{
@@ -234,6 +235,13 @@ namespace crucible {
 		m_locked = that.m_locked;
 		that.m_locked = false;
 		return *this;
+	}
+
+	template <class T>
+	typename LockSet<T>::Lock
+	LockSet<T>::make_lock(const key_type &name, bool start_locked)
+	{
+		return Lock(*this, name, start_locked);
 	}
 
 }
