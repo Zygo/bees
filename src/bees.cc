@@ -203,7 +203,7 @@ operator<<(ostream &os, const BeesStatTmpl<T> &bs)
  * Some of them consume egregious amounts of kernel CPU time and are
  * not interruptible, so if we have more threads than cores we will
  * effectively crash the kernel. */
-mutex bees_ioctl_mutex;
+LockSet<pid_t> bees_ioctl_lock_set;
 
 template <class T>
 T&
@@ -582,6 +582,9 @@ bees_main(int argc, const char **argv)
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 	vector<string> args(argv + 1, argv + argc);
+
+	// Set global concurrency limits - use only half the cores for ioctls
+	bees_ioctl_lock_set.max_size(max(1U, bees_worker_thread_count() / 2));
 
 	// Create a context and start crawlers
 	bool did_subscription = false;

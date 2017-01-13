@@ -1,6 +1,7 @@
 #include "bees.h"
 
 #include "crucible/cache.h"
+#include "crucible/process.h"
 #include "crucible/string.h"
 
 #include <fstream>
@@ -554,7 +555,7 @@ void
 BeesCrawl::crawl_thread()
 {
 	Timer crawl_timer;
-	LockSet<uint64_t>::Lock crawl_lock(m_ctx->roots()->lock_set(), m_state.m_root, false);
+	auto crawl_lock = m_ctx->roots()->lock_set().make_lock(m_state.m_root, false);
 	while (!m_stopped) {
 		BEESNOTE("waiting for crawl thread limit " << m_state);
 		crawl_lock.lock();
@@ -646,7 +647,7 @@ BeesCrawl::fetch_extents()
 	bool ioctl_ok = false;
 	{
 		BEESNOTE("waiting to search crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
-		unique_lock<mutex> lock(bees_ioctl_mutex);
+		auto lock = bees_ioctl_lock_set.make_lock(gettid());
 
 		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 		BEESTOOLONG("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));

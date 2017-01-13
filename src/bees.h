@@ -830,7 +830,7 @@ string pretty(double d);
 extern RateLimiter bees_info_rate_limit;
 void bees_sync(int fd);
 string format_time(time_t t);
-extern mutex bees_ioctl_mutex;
+extern LockSet<pid_t> bees_ioctl_lock_set;
 extern unsigned bees_worker_thread_count();
 
 #endif

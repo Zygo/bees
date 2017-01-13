@@ -1,6 +1,7 @@
 #include "bees.h"
 
 #include "crucible/limits.h"
+#include "crucible/process.h"
 #include "crucible/string.h"
 
 #include <fstream>
@@ -280,7 +281,7 @@ BeesContext::dedup(const BeesRangePair &brp)
 	// To avoid hammering all the cores with long-running ioctls,
 	// only do one dedup at any given time.
 	BEESNOTE("Waiting to dedup " << brp);
-	unique_lock<mutex> lock(bees_ioctl_mutex);
+	auto dedup_lock = bees_ioctl_lock_set.make_lock(gettid());
 #endif
 
 	BEESNOTE("dedup " << brp);
@@ -850,7 +851,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 			catch_all([&]() {
 				uint64_t extent_bytenr = e.bytenr();
 				BEESNOTE("waiting for extent bytenr " << to_hex(extent_bytenr));
-				decltype(m_extent_lock_set)::Lock extent_lock(m_extent_lock_set, extent_bytenr);
+				auto extent_lock = m_extent_lock_set.make_lock(extent_bytenr);
 				Timer one_extent_timer;
 				return_bfr = scan_one_extent(bfr, e);
 				BEESCOUNTADD(scanf_extent_ms, one_extent_timer.age() * 1000);
@@ -886,7 +887,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// To avoid hammering all the cores with long-running ioctls,
 	// only do one resolve at any given time.
 	BEESNOTE("waiting to resolve addr " << addr);
-	unique_lock<mutex> lock(bees_ioctl_mutex);
+	auto lock = bees_ioctl_lock_set.make_lock(gettid());
 
 	Timer resolve_timer;
 
