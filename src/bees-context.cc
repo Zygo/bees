@@ -272,10 +272,16 @@ BeesContext::dedup(const BeesRangePair &brp)
 	bees_sync(brp.first.fd());
 #endif
 
+	// dedup isn't very long-running compared to LOGICAL_INO.
+	// Also we are approaching saturation on systems with many cores.
+	// Hopefully the lock on the extent bytenr will avoid hitting
+	// kernel deadlocks too often!
+#if 0
 	// To avoid hammering all the cores with long-running ioctls,
 	// only do one dedup at any given time.
 	BEESNOTE("Waiting to dedup " << brp);
 	unique_lock<mutex> lock(bees_ioctl_mutex);
+#endif
 
 	BEESNOTE("dedup " << brp);
 	BEESTOOLONG("dedup " << brp);
