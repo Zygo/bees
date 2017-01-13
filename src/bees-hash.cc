@@ -635,12 +635,20 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	THROW_CHECK2(runtime_error, m_void_ptr, m_bucket_ptr, m_void_ptr == m_bucket_ptr);
 	THROW_CHECK2(runtime_error, m_void_ptr, m_extent_ptr, m_void_ptr == m_extent_ptr);
 
-	{
-		// It's OK if this fails (e.g. kernel not built with CONFIG_TRANSPARENT_HUGEPAGE)
-		// We don't fork any more so DONTFORK isn't really needed
-		BEESTOOLONG("madvise(MADV_HUGEPAGE | MADV_DONTFORK)");
-		if (madvise(m_byte_ptr, m_size, MADV_HUGEPAGE | MADV_DONTFORK)) {
-			BEESLOG("mostly harmless: madvise(MADV_HUGEPAGE | MADV_DONTFORK) failed: " << strerror(errno));
+	// Give all the madvise hints that the kernel understands
+	const struct madv_flag {
+		const char *name;
+		int value;
+	} madv_flags[] = {
+		{ .name = "MADV_HUGEPAGE", .value = MADV_HUGEPAGE },
+		{ .name = "MADV_DONTFORK", .value = MADV_DONTFORK },
+		{ .name = "MADV_DONTDUMP", .value = MADV_DONTDUMP },
+		{ .name = "", .value = 0 },
+	};
+	for (auto fp = madv_flags; fp->value; ++fp) {
+		BEESTOOLONG("madvise(" << fp->name << ")");
+		if (madvise(m_byte_ptr, m_size, fp->value)) {
+			BEESLOG("madvise(..., " << fp->name << "): " << strerror(errno) << " (ignored)");
 		}
 	}
 
