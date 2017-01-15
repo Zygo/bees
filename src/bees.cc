@@ -46,7 +46,7 @@ do_cmd_help(const char **argv)
 
 RateLimiter bees_info_rate_limit(BEES_INFO_RATE, BEES_INFO_BURST);
 
-thread_local BeesTracer *BeesTracer::s_next_tracer = nullptr;
+thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 
 BeesTracer::~BeesTracer()
 {
@@ -56,20 +56,20 @@ BeesTracer::~BeesTracer()
 			BEESLOG("---  END  TRACE --- exception ---");
 		}
 	}
-	s_next_tracer = m_next_tracer;
+	tl_next_tracer = m_next_tracer;
 }
 
 BeesTracer::BeesTracer(function<void()> f) :
 	m_func(f)
 {
-	m_next_tracer = s_next_tracer;
-	s_next_tracer = this;
+	m_next_tracer = tl_next_tracer;
+	tl_next_tracer = this;
 }
 
 void
 BeesTracer::trace_now()
 {
-	BeesTracer *tp = s_next_tracer;
+	BeesTracer *tp = tl_next_tracer;
 	BEESLOG("--- BEGIN TRACE ---");
 	while (tp) {
 		tp->m_func();
@@ -78,18 +78,19 @@ BeesTracer::trace_now()
 	BEESLOG("---  END  TRACE ---");
 }
 
-thread_local BeesNote *BeesNote::s_next = nullptr;
+thread_local BeesNote *BeesNote::tl_next = nullptr;
 mutex BeesNote::s_mutex;
 map<pid_t, BeesNote*> BeesNote::s_status;
-thread_local string BeesNote::s_name;
+thread_local string BeesNote::tl_name;
 
 BeesNote::~BeesNote()
 {
-	unique_lock<mutex> lock(s_mutex);
-	s_next = m_prev;
-	if (s_next) {
-		s_status[gettid()] = s_next;
+	tl_next = m_prev;
+	if (tl_next) {
+		unique_lock<mutex> lock(s_mutex);
+		s_status[gettid()] = tl_next;
 	} else {
+		unique_lock<mutex> lock(s_mutex);
 		s_status.erase(gettid());
 	}
 }
@@ -97,28 +98,26 @@ BeesNote::~BeesNote()
 BeesNote::BeesNote(function<void(ostream &os)> f) :
 	m_func(f)
 {
+	m_name = tl_name;
+	m_prev = tl_next;
+	tl_next = this;
 	unique_lock<mutex> lock(s_mutex);
-	m_name = s_name;
-	m_prev = s_next;
-	s_next = this;
-	s_status[gettid()] = s_next;
+	s_status[gettid()] = tl_next;
 }
 
 void
 BeesNote::set_name(const string &name)
 {
-	unique_lock<mutex> lock(s_mutex);
-	s_name = name;
+	tl_name = name;
 }
 
 string
 BeesNote::get_name()
 {
-	unique_lock<mutex> lock(s_mutex);
-	if (s_name.empty()) {
+	if (tl_name.empty()) {
 		return "bees";
 	} else {
-		return s_name;
+		return tl_name;
 	}
 }
 

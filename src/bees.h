@@ -184,7 +184,7 @@ class BeesTracer {
 	function<void()> m_func;
 	BeesTracer *m_next_tracer = 0;
 	
-	thread_local static BeesTracer *s_next_tracer;
+	thread_local static BeesTracer *tl_next_tracer;
 public:
 	BeesTracer(function<void()> f);
 	~BeesTracer();
@@ -200,8 +200,8 @@ class BeesNote {
 	static mutex			s_mutex;
 	static map<pid_t, BeesNote*>	s_status;
 
-	thread_local static BeesNote	*s_next;
-	thread_local static string	s_name;
+	thread_local static BeesNote	*tl_next;
+	thread_local static string	tl_name;
 
 public:
 	BeesNote(function<void(ostream &)> f);
