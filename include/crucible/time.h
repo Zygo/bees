@@ -32,10 +32,11 @@ namespace crucible {
 		Timer	m_timer;
 		double	m_rate;
 		double	m_burst;
-		double  m_tokens;
+		double  m_tokens = 0.0;
 		mutex	m_mutex;
 
 		void update_tokens();
+		RateLimiter() = delete;
 	public:
 		RateLimiter(double rate, double burst);
 		RateLimiter(double rate);
