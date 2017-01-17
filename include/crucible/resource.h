@@ -3,11 +3,11 @@
 
 #include "crucible/error.h"
 
-#include <cassert>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <iostream>
+#include <stdexcept>
 
 namespace crucible {
 	using namespace std;
@@ -44,35 +44,29 @@ namespace crucible {
 
 	private:
 		using traits_type = ResourceTraits<Key, Resource>;
-
-		class ResourceHolder {
-			resource_ptr_type m_ptr;
-		public:
-			~ResourceHolder();
-			ResourceHolder(resource_ptr_type that);
-			ResourceHolder(const ResourceHolder &that) = default;
-			ResourceHolder(ResourceHolder &&that) = default;
-			ResourceHolder& operator=(ResourceHolder &&that) = default;
-			ResourceHolder& operator=(const ResourceHolder &that) = default;
-			resource_ptr_type get_resource_ptr() const;
-		};
-
-		using holder_ptr_type = shared_ptr<ResourceHolder>;
-		using weak_holder_ptr_type = weak_ptr<ResourceHolder>;
-		using map_type = map<key_type, weak_holder_ptr_type>;
+		using weak_ptr_type = weak_ptr<Resource>;
+		using map_type = map<key_type, weak_ptr_type>;
 
 		// The only instance variable
-		holder_ptr_type m_ptr;
+		resource_ptr_type m_ptr;
 
 		// A bunch of static variables and functions
-		static mutex &s_mutex();
-		static shared_ptr<map_type> s_map();
-		static holder_ptr_type insert(const key_type &key);
-		static holder_ptr_type insert(const resource_ptr_type &res);
-		static void erase(const key_type &key);
+		static mutex s_map_mutex;
+		static mutex s_ptr_mutex;
+		static map_type s_map;
+		static resource_ptr_type insert(const key_type &key);
+		static resource_ptr_type insert(const resource_ptr_type &res);
+		static void clean_locked();
 		static ResourceTraits<Key, Resource> s_traits;
 
 	public:
+
+		// Exceptions
+		struct duplicate_resource : public invalid_argument {
+			key_type m_key;
+			key_type get_key() const;
+			duplicate_resource(const key_type &key);
+		};
 
 		// test for resource.  A separate operator because key_type could be confused with bool.
 		bool operator!() const;
@@ -89,8 +83,15 @@ namespace crucible {
 		ResourceHandle(const resource_ptr_type &res);
 		ResourceHandle& operator=(const resource_ptr_type &res);
 
-		// default constructor is public
+		// default constructor is public and mostly harmless
 		ResourceHandle() = default;
+
+		// copy/assign/move/move-assign - with a mutex to help shared_ptr be atomic
+		ResourceHandle(const ResourceHandle &that);
+		ResourceHandle(ResourceHandle &&that);
+		ResourceHandle& operator=(const ResourceHandle &that);
+		ResourceHandle& operator=(ResourceHandle &&that);
+		~ResourceHandle();
 
 		// forward anything else to the Resource constructor
 		// if we can do so unambiguously
@@ -109,7 +110,7 @@ namespace crucible {
 
 		// get pointer to Resource object (nothrow, result may be null)
 		resource_ptr_type get_resource_ptr() const;
-		// this version throws and is probably not thread safe
+		// this version throws
 		resource_ptr_type operator->() const;
 
 		// dynamic casting of the resource (throws if cast fails)
@@ -145,144 +146,100 @@ namespace crucible {
 	}
 
 	template <class Key, class Resource>
-	ResourceHandle<Key, Resource>::ResourceHolder::ResourceHolder(resource_ptr_type that) :
-		m_ptr(that)
+	ResourceHandle<Key, Resource>::duplicate_resource::duplicate_resource(const key_type &key) :
+		invalid_argument("duplicate resource"),
+		m_key(key)
 	{
-		// Cannot insert ourselves here since our shared_ptr does not exist yet.
 	}
 
 	template <class Key, class Resource>
-	mutex &
-	ResourceHandle<Key, Resource>::s_mutex()
+	auto
+	ResourceHandle<Key, Resource>::duplicate_resource::get_key() const -> key_type
 	{
-		static mutex gcc_won_t_instantiate_this_either;
-		return gcc_won_t_instantiate_this_either;
-	}
-
-	template <class Key, class Resource>
-	shared_ptr<typename ResourceHandle<Key, Resource>::map_type>
-	ResourceHandle<Key, Resource>::s_map()
-	{
-		static shared_ptr<map_type> gcc_won_t_instantiate_the_damn_static_vars;
-		if (!gcc_won_t_instantiate_the_damn_static_vars) {
-			gcc_won_t_instantiate_the_damn_static_vars = make_shared<map_type>();
-		}
-		return gcc_won_t_instantiate_the_damn_static_vars;
+		return m_key;
 	}
 
 	template <class Key, class Resource>
 	void
-	ResourceHandle<Key, Resource>::erase(const key_type &key)
+	ResourceHandle<Key, Resource>::clean_locked()
 	{
-		unique_lock<mutex> lock(s_mutex());
-		// Resources are allowed to set their Keys to null.
-		if (s_traits.is_null_key(key)) {
-			// Clean out any dead weak_ptr objects.
-			for (auto i = s_map()->begin(); i != s_map()->end(); ) {
-				if (! (*i).second.lock()) {
-					i = s_map()->erase(i);
-				} else {
-					++i;
-				}
+		// Must be called with lock held
+		for (auto i = s_map.begin(); i != s_map.end(); ) {
+			auto this_i = i;
+			++i;
+			if (this_i->second.expired()) {
+				s_map.erase(this_i);
 			}
-			return;
-		}
-		auto erased = s_map()->erase(key);
-		if (erased != 1) {
-			cerr << __PRETTY_FUNCTION__ << ": WARNING: s_map()->erase(" << key << ") returned " << erased << " != 1" << endl;
 		}
 	}
 
 	template <class Key, class Resource>
-	ResourceHandle<Key, Resource>::ResourceHolder::~ResourceHolder()
-	{
-		if (!m_ptr) {
-			// Probably something harmless like a failed constructor.
-			cerr << __PRETTY_FUNCTION__ << ": WARNING: destroying null m_ptr" << endl;
-			return;
-		}
-		Key key = s_traits.get_key(*m_ptr);
-		ResourceHandle::erase(key);
-	}
-
-	template <class Key, class Resource>
-	typename ResourceHandle<Key, Resource>::holder_ptr_type
+	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::insert(const key_type &key)
 	{
 		// no Resources for null keys
 		if (s_traits.is_null_key(key)) {
-			return holder_ptr_type();
+			return resource_ptr_type();
 		}
-		unique_lock<mutex> lock(s_mutex());
-		// find ResourceHolder for non-null key
-		auto found = s_map()->find(key);
-		if (found != s_map()->end()) {
-			holder_ptr_type rv = (*found).second.lock();
-			// a weak_ptr may have expired
+		unique_lock<mutex> lock(s_map_mutex);
+		auto found = s_map.find(key);
+		if (found != s_map.end()) {
+			resource_ptr_type rv = found->second.lock();
 			if (rv) {
+				// Use existing Resource
 				return rv;
+			} else {
+				// It's OK for the map to temporarily contain an expired weak_ptr to some dead Resource
+				clean_locked();
 			}
 		}
 		// not found or expired, throw any existing ref away and make a new one
 		resource_ptr_type rpt = s_traits.make_resource(key);
-		holder_ptr_type hpt = make_shared<ResourceHolder>(rpt);
 		// store weak_ptr in map
-		(*s_map())[key] = hpt;
+		s_map[key] = rpt;
 		// return shared_ptr
-		return hpt;
+		return rpt;
 	};
 
 	template <class Key, class Resource>
-	typename ResourceHandle<Key, Resource>::holder_ptr_type
+	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::insert(const resource_ptr_type &res)
 	{
-		// no Resource, no ResourceHolder.
+		// no Resources for null keys
 		if (!res) {
-			return holder_ptr_type();
+			return resource_ptr_type();
 		}
-		// no ResourceHolders for null keys either.
 		key_type key = s_traits.get_key(*res);
 		if (s_traits.is_null_key(key)) {
-			return holder_ptr_type();
+			return resource_ptr_type();
 		}
-		unique_lock<mutex> lock(s_mutex());
-		// find ResourceHolder for non-null key
-		auto found = s_map()->find(key);
-		if (found != s_map()->end()) {
-			holder_ptr_type rv = (*found).second.lock();
-			// The map doesn't own the ResourceHolders, the ResourceHandles do.
-			// It's OK for the map to contain an expired weak_ptr to some dead ResourceHolder...
+		unique_lock<mutex> lock(s_map_mutex);
+		// find Resource for non-null key
+		auto found = s_map.find(key);
+		if (found != s_map.end()) {
+			resource_ptr_type rv = found->second.lock();
+			// It's OK for the map to temporarily contain an expired weak_ptr to some dead Resource...
 			if (rv) {
-				// found ResourceHolder, look at pointer
-				resource_ptr_type rp = rv->get_resource_ptr();
-				// We do not store references to null Resources.
-				assert(rp);
-				// Key retrieved for an existing object must match key searched or be null.
-				key_type found_key = s_traits.get_key(*rp);
-				bool found_key_is_null = s_traits.is_null_key(found_key);
-				assert(found_key_is_null || found_key == key);
-				if (!found_key_is_null) {
-					// We do not store references to duplicate resources.
-					if (rp.owner_before(res) || res.owner_before(rp)) {
-						cerr << "inserting new Resource with existing Key " << key << " not allowed at " << __PRETTY_FUNCTION__ << endl;;
-						abort();
-						// THROW_ERROR(out_of_range, "inserting new Resource with existing Key " << key << " not allowed at " << __PRETTY_FUNCTION__);
-					}
-					// rv is good, return it
-					return rv;
+				// ...but not a duplicate Resource.
+				if (rv.owner_before(res) || res.owner_before(rv)) {
+					throw duplicate_resource(key);
 				}
+				// Use the existing Resource (discard the caller's).
+				return rv;
+			} else {
+				// Clean out expired weak_ptrs
+				clean_locked();
 			}
 		}
-		// not found or expired, make a new one
-		holder_ptr_type rv = make_shared<ResourceHolder>(res);
-		s_map()->insert(make_pair(key, weak_holder_ptr_type(rv)));
-		// no need to check s_map result, we are either replacing a dead weak_ptr or adding a new one
-		return rv;
+		// not found or expired, make a new one or replace old one
+		s_map[key] = res;
+		return res;
 	};
 
 	template <class Key, class Resource>
 	ResourceHandle<Key, Resource>::ResourceHandle(const key_type &key)
 	{
+		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(key);
 	}
 
@@ -290,6 +247,7 @@ namespace crucible {
 	ResourceHandle<Key, Resource>&
 	ResourceHandle<Key, Resource>::operator=(const key_type &key)
 	{
+		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(key);
 		return *this;
 	}
@@ -297,6 +255,7 @@ namespace crucible {
 	template <class Key, class Resource>
 	ResourceHandle<Key, Resource>::ResourceHandle(const resource_ptr_type &res)
 	{
+		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(res);
 	}
 
@@ -304,36 +263,87 @@ namespace crucible {
 	ResourceHandle<Key, Resource>&
 	ResourceHandle<Key, Resource>::operator=(const resource_ptr_type &res)
 	{
+		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(res);
 		return *this;
 	}
 
 	template <class Key, class Resource>
-	typename ResourceHandle<Key, Resource>::resource_ptr_type
-	ResourceHandle<Key, Resource>::ResourceHolder::get_resource_ptr() const
+	ResourceHandle<Key, Resource>::ResourceHandle(const ResourceHandle &that)
 	{
-		return m_ptr;
+		unique_lock<mutex> lock(s_ptr_mutex);
+		m_ptr = that.m_ptr;
+	}
+
+	template <class Key, class Resource>
+	ResourceHandle<Key, Resource>::ResourceHandle(ResourceHandle &&that)
+	{
+		unique_lock<mutex> lock(s_ptr_mutex);
+		swap(m_ptr, that.m_ptr);
+	}
+
+	template <class Key, class Resource>
+	ResourceHandle<Key, Resource> &
+	ResourceHandle<Key, Resource>::operator=(ResourceHandle &&that)
+	{
+		unique_lock<mutex> lock(s_ptr_mutex);
+		m_ptr = that.m_ptr;
+		that.m_ptr.reset();
+		return *this;
+	}
+
+	template <class Key, class Resource>
+	ResourceHandle<Key, Resource> &
+	ResourceHandle<Key, Resource>::operator=(const ResourceHandle &that)
+	{
+		unique_lock<mutex> lock(s_ptr_mutex);
+		m_ptr = that.m_ptr;
+		return *this;
+	}
+
+	template <class Key, class Resource>
+	ResourceHandle<Key, Resource>::~ResourceHandle()
+	{
+		unique_lock<mutex> lock_ptr(s_ptr_mutex);
+		// No pointer, nothing to do
+		if (!m_ptr) {
+			return;
+		}
+		// Save key so we can clean the map
+		auto key = s_traits.get_key(*m_ptr);
+		// Save pointer so we can release lock before deleting
+		auto ptr_copy = m_ptr;
+		m_ptr.reset();
+		// Release lock
+		lock_ptr.unlock();
+		// Delete our (possibly last) reference to pointer
+		ptr_copy.reset();
+		// Remove weak_ptr from map if it has expired
+		// (and not been replaced in the meantime)
+		unique_lock<mutex> lock_map(s_map_mutex);
+		auto found = s_map.find(key);
+		if (found != s_map.end() && found->second.expired()) {
+			s_map.erase(key);
+		}
 	}
 
 	template <class Key, class Resource>
 	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::get_resource_ptr() const
 	{
-		if (!m_ptr) {
-			return resource_ptr_type();
-		}
-		return m_ptr->get_resource_ptr();
+		unique_lock<mutex> lock(s_ptr_mutex);
+		return m_ptr;
 	}
 
 	template <class Key, class Resource>
 	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::operator->() const
 	{
-		resource_ptr_type rp = get_resource_ptr();
-		if (!rp) {
+		unique_lock<mutex> lock(s_ptr_mutex);
+		if (!m_ptr) {
 			THROW_ERROR(out_of_range, __PRETTY_FUNCTION__ << " called on null Resource");
 		}
-		return rp;
+		return m_ptr;
 	}
 
 	template <class Key, class Resource>
@@ -341,12 +351,12 @@ namespace crucible {
 	shared_ptr<T>
 	ResourceHandle<Key, Resource>::cast() const
 	{
+		unique_lock<mutex> lock(s_ptr_mutex);
 		shared_ptr<T> dp;
-		resource_ptr_type rp = get_resource_ptr();
-		if (!rp) {
+		if (!m_ptr) {
 			return dp;
 		}
-		dp = dynamic_pointer_cast<T>(rp);
+		dp = dynamic_pointer_cast<T>(m_ptr);
 		if (!dp) {
 			throw bad_cast();
 		}
@@ -357,11 +367,11 @@ namespace crucible {
 	typename ResourceHandle<Key, Resource>::key_type
 	ResourceHandle<Key, Resource>::get_key() const
 	{
-		resource_ptr_type rp = get_resource_ptr();
-		if (!rp) {
+		unique_lock<mutex> lock(s_ptr_mutex);
+		if (!m_ptr) {
 			return s_traits.get_null_key();
 		} else {
-			return s_traits.get_key(*rp);
+			return s_traits.get_key(*m_ptr);
 		}
 	}
 
@@ -378,8 +388,18 @@ namespace crucible {
 		return s_traits.is_null_key(operator key_type());
 	}
 
+	// Apparently GCC wants these to be used before they are defined.
 	template <class Key, class Resource>
 	ResourceTraits<Key, Resource> ResourceHandle<Key, Resource>::s_traits;
+
+	template <class Key, class Resource>
+	mutex ResourceHandle<Key, Resource>::s_map_mutex;
+
+	template <class Key, class Resource>
+	mutex ResourceHandle<Key, Resource>::s_ptr_mutex;
+
+	template <class Key, class Resource>
+	typename ResourceHandle<Key, Resource>::map_type ResourceHandle<Key, Resource>::s_map;
 
 
 }
