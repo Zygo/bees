@@ -11,10 +11,12 @@ LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
 depends.mk: Makefile *.cc
-	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
-	mv -f bees-version.new.c bees-version.c
 	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
 	mv -fv depends.mk.new depends.mk
+
+bees-version.c: Makefile *.cc *.h
+	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
+	mv -f bees-version.new.c bees-version.c
 
 -include depends.mk
 
