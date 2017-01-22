@@ -17,19 +17,15 @@ OBJS = \
 
 include ../makeflags
 
-depends.mk: *.c *.cc
-	for x in *.c; do $(CC) $(CFLAGS) -M "$$x"; done > depends.mk.new
+depends.mk: *.cc
 	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done >> depends.mk.new
 	mv -fv depends.mk.new depends.mk
 
-.version.cc: Makefile ../makeflags *.c *.cc ../include/crucible/*.h
+.version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\"; }" > .version.new.cc
 	mv -f .version.new.cc .version.cc
 
 -include depends.mk
-
-%.o: %.c
-	$(CC) $(CFLAGS) -o $@ -c $<
 
 %.o: %.cc ../include/crucible/%.h
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
