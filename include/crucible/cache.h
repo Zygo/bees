@@ -154,7 +154,9 @@ namespace crucible {
 		if (!inserted) {
 			found->second.first = m_ctr++;
 		}
-		return found->second.second;
+		// Make copy before releasing lock
+		auto rv = found->second.second;
+		return rv;
 	}
 
 	template<class Return, class... Arguments>
