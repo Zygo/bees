@@ -822,7 +822,8 @@ BeesCrawl::peek_front()
 	if (m_extents.empty()) {
 		return BeesFileRange();
 	}
-	return *m_extents.begin();
+	auto rv = *m_extents.begin();
+	return rv;
 }
 
 BeesFileRange
@@ -848,7 +849,8 @@ BeesCrawlState
 BeesCrawl::get_state()
 {
 	unique_lock<mutex> lock(m_state_mutex);
-	return m_state;
+	auto rv = m_state;
+	return rv;
 }
 
 void

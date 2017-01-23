@@ -969,7 +969,8 @@ BeesContext::tmpfile()
 	if (!m_tmpfiles[this_thread::get_id()]) {
 		m_tmpfiles[this_thread::get_id()] = make_shared<BeesTempFile>(shared_from_this());
 	}
-	return m_tmpfiles[this_thread::get_id()];
+	auto rv = m_tmpfiles[this_thread::get_id()];
+	return rv;
 }
 
 shared_ptr<BeesFdCache>
@@ -980,7 +981,8 @@ BeesContext::fd_cache()
 	if (!m_fd_cache) {
 		m_fd_cache = make_shared<BeesFdCache>();
 	}
-	return m_fd_cache;
+	auto rv = m_fd_cache;
+	return rv;
 }
 
 shared_ptr<BeesRoots>
@@ -991,7 +993,8 @@ BeesContext::roots()
 	if (!m_roots) {
 		m_roots = make_shared<BeesRoots>(shared_from_this());
 	}
-	return m_roots;
+	auto rv = m_roots;
+	return rv;
 }
 
 shared_ptr<BeesHashTable>
@@ -1002,7 +1005,8 @@ BeesContext::hash_table()
 	if (!m_hash_table) {
 		m_hash_table = make_shared<BeesHashTable>(shared_from_this(), "beeshash.dat");
 	}
-	return m_hash_table;
+	auto rv = m_hash_table;
+	return rv;
 }
 
 void

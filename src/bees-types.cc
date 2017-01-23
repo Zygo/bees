@@ -286,7 +286,8 @@ Fd
 BeesFileRange::fd() const
 {
 	unique_lock<mutex> lock(s_mutex);
-	return m_fd;
+	auto rv = m_fd;
+	return rv;
 }
 
 Fd
@@ -310,7 +311,8 @@ BeesFileRange::fd(const shared_ptr<BeesContext> &ctx) const
 		}
 	}
 	// We either had a fid and opened it, or we didn't and we're just stuck with our fd
-	return m_fd;
+	auto rv = m_fd;
+	return rv;
 }
 
 BeesFileRange
