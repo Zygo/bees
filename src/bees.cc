@@ -86,11 +86,10 @@ thread_local string BeesNote::tl_name;
 BeesNote::~BeesNote()
 {
 	tl_next = m_prev;
+	unique_lock<mutex> lock(s_mutex);
 	if (tl_next) {
-		unique_lock<mutex> lock(s_mutex);
 		s_status[gettid()] = tl_next;
 	} else {
-		unique_lock<mutex> lock(s_mutex);
 		s_status.erase(gettid());
 	}
 }
@@ -203,11 +202,10 @@ template <class T>
 T&
 BeesStatTmpl<T>::at(string idx)
 {
-	unique_lock<mutex> lock(m_mutex);
-    if (!m_stats_map.count(idx)) {
+	if (!m_stats_map.count(idx)) {
 		m_stats_map[idx] = 0;
 	}
-    return m_stats_map[idx];
+	return m_stats_map[idx];
 }
 
 template <class T>
@@ -215,7 +213,8 @@ T
 BeesStatTmpl<T>::at(string idx) const
 {
 	unique_lock<mutex> lock(m_mutex);
-    return m_stats_map.at(idx);
+	auto rv = m_stats_map.at(idx);
+	return rv;
 }
 
 template <class T>
@@ -223,7 +222,7 @@ void
 BeesStatTmpl<T>::add_count(string idx, size_t amount)
 {
 	unique_lock<mutex> lock(m_mutex);
-    if (!m_stats_map.count(idx)) {
+	if (!m_stats_map.count(idx)) {
 		m_stats_map[idx] = 0;
 	}
 	m_stats_map.at(idx) += amount;
@@ -255,14 +254,17 @@ BeesStats
 BeesStats::operator-(const BeesStats &that) const
 {
 	if (&that == this) return BeesStats();
+
 	unique_lock<mutex> this_lock(m_mutex);
 	BeesStats this_copy;
 	this_copy.m_stats_map = m_stats_map;
+	this_lock.unlock();
+
 	unique_lock<mutex> that_lock(that.m_mutex);
 	BeesStats that_copy;
 	that_copy.m_stats_map = that.m_stats_map;
-	this_lock.unlock();
 	that_lock.unlock();
+
 	for (auto i : that.m_stats_map) {
 		if (i.second != 0) {
 			this_copy.at(i.first) -= i.second;

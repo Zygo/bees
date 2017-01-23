@@ -155,12 +155,12 @@ class BeesStatTmpl {
 	map<string, T>	m_stats_map;
 	mutable mutex	m_mutex;
 
+	T& at(string idx);
 public:
 	BeesStatTmpl() = default;
 	BeesStatTmpl(const BeesStatTmpl &that);
 	BeesStatTmpl &operator=(const BeesStatTmpl &that);
 	void add_count(string idx, size_t amount = 1);
-	T& at(string idx);
 	T at(string idx) const;
 
 friend ostream& operator<< <>(ostream &os, const BeesStatTmpl<T> &bs);
