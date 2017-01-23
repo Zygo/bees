@@ -161,7 +161,10 @@ namespace crucible {
 	LockSet<T>::copy()
 	{
 		unique_lock<mutex> lock(m_mutex);
-		return m_set;
+		// Make temporary copy of set while protected by mutex
+		auto rv = m_set;
+		// Return temporary copy after releasing lock
+		return rv;
 	}
 
 	template <class T>

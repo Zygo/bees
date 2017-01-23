@@ -332,7 +332,9 @@ namespace crucible {
 	ResourceHandle<Key, Resource>::get_resource_ptr() const
 	{
 		unique_lock<mutex> lock(s_ptr_mutex);
-		return m_ptr;
+		// Make isolated copy of pointer with lock held, and return the copy
+		auto rv = m_ptr;
+		return rv;
 	}
 
 	template <class Key, class Resource>
@@ -343,7 +345,9 @@ namespace crucible {
 		if (!m_ptr) {
 			THROW_ERROR(out_of_range, __PRETTY_FUNCTION__ << " called on null Resource");
 		}
-		return m_ptr;
+		// Make isolated copy of pointer with lock held, and return the copy
+		auto rv = m_ptr;
+		return rv;
 	}
 
 	template <class Key, class Resource>

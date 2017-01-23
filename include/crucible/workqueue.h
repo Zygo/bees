@@ -124,7 +124,9 @@ namespace crucible {
 		if (m_set.empty()) {
 			return key_type();
 		} else {
-			return *m_set.begin();
+			// Make copy with lock held
+			auto rv = *m_set.begin();
+			return rv;
 		}
 	}
 
@@ -149,7 +151,8 @@ namespace crucible {
 	WorkQueue<Task>::copy()
 	{
 		unique_lock<mutex> lock(m_mutex);
-		return m_set;
+		auto rv = m_set;
+		return rv;
 	}
 
 	template <class Task>
