@@ -3,6 +3,7 @@
 
 #include "crucible/error.h"
 
+#include <cassert>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -52,7 +53,6 @@ namespace crucible {
 
 		// A bunch of static variables and functions
 		static mutex s_map_mutex;
-		static mutex s_ptr_mutex;
 		static map_type s_map;
 		static resource_ptr_type insert(const key_type &key);
 		static resource_ptr_type insert(const resource_ptr_type &res);
@@ -83,14 +83,14 @@ namespace crucible {
 		ResourceHandle(const resource_ptr_type &res);
 		ResourceHandle& operator=(const resource_ptr_type &res);
 
-		// default constructor is public and mostly harmless
+		// default construct/assign/move is public and mostly harmless
 		ResourceHandle() = default;
+		ResourceHandle(const ResourceHandle &that) = default;
+		ResourceHandle(ResourceHandle &&that) = default;
+		ResourceHandle& operator=(const ResourceHandle &that) = default;
+		ResourceHandle& operator=(ResourceHandle &&that) = default;
 
-		// copy/assign/move/move-assign - with a mutex to help shared_ptr be atomic
-		ResourceHandle(const ResourceHandle &that);
-		ResourceHandle(ResourceHandle &&that);
-		ResourceHandle& operator=(const ResourceHandle &that);
-		ResourceHandle& operator=(ResourceHandle &&that);
+		// Nontrivial destructor
 		~ResourceHandle();
 
 		// forward anything else to the Resource constructor
@@ -239,7 +239,6 @@ namespace crucible {
 	template <class Key, class Resource>
 	ResourceHandle<Key, Resource>::ResourceHandle(const key_type &key)
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(key);
 	}
 
@@ -247,7 +246,6 @@ namespace crucible {
 	ResourceHandle<Key, Resource>&
 	ResourceHandle<Key, Resource>::operator=(const key_type &key)
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(key);
 		return *this;
 	}
@@ -255,7 +253,6 @@ namespace crucible {
 	template <class Key, class Resource>
 	ResourceHandle<Key, Resource>::ResourceHandle(const resource_ptr_type &res)
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(res);
 	}
 
@@ -263,61 +260,21 @@ namespace crucible {
 	ResourceHandle<Key, Resource>&
 	ResourceHandle<Key, Resource>::operator=(const resource_ptr_type &res)
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		m_ptr = insert(res);
-		return *this;
-	}
-
-	template <class Key, class Resource>
-	ResourceHandle<Key, Resource>::ResourceHandle(const ResourceHandle &that)
-	{
-		unique_lock<mutex> lock(s_ptr_mutex);
-		m_ptr = that.m_ptr;
-	}
-
-	template <class Key, class Resource>
-	ResourceHandle<Key, Resource>::ResourceHandle(ResourceHandle &&that)
-	{
-		unique_lock<mutex> lock(s_ptr_mutex);
-		swap(m_ptr, that.m_ptr);
-	}
-
-	template <class Key, class Resource>
-	ResourceHandle<Key, Resource> &
-	ResourceHandle<Key, Resource>::operator=(ResourceHandle &&that)
-	{
-		unique_lock<mutex> lock(s_ptr_mutex);
-		m_ptr = that.m_ptr;
-		that.m_ptr.reset();
-		return *this;
-	}
-
-	template <class Key, class Resource>
-	ResourceHandle<Key, Resource> &
-	ResourceHandle<Key, Resource>::operator=(const ResourceHandle &that)
-	{
-		unique_lock<mutex> lock(s_ptr_mutex);
-		m_ptr = that.m_ptr;
 		return *this;
 	}
 
 	template <class Key, class Resource>
 	ResourceHandle<Key, Resource>::~ResourceHandle()
 	{
-		unique_lock<mutex> lock_ptr(s_ptr_mutex);
 		// No pointer, nothing to do
 		if (!m_ptr) {
 			return;
 		}
 		// Save key so we can clean the map
 		auto key = s_traits.get_key(*m_ptr);
-		// Save pointer so we can release lock before deleting
-		auto ptr_copy = m_ptr;
+		// Drop pointer early
 		m_ptr.reset();
-		// Release lock
-		lock_ptr.unlock();
-		// Delete our (possibly last) reference to pointer
-		ptr_copy.reset();
 		// Remove weak_ptr from map if it has expired
 		// (and not been replaced in the meantime)
 		unique_lock<mutex> lock_map(s_map_mutex);
@@ -331,23 +288,17 @@ namespace crucible {
 	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::get_resource_ptr() const
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
-		// Make isolated copy of pointer with lock held, and return the copy
-		auto rv = m_ptr;
-		return rv;
+		return m_ptr;
 	}
 
 	template <class Key, class Resource>
 	typename ResourceHandle<Key, Resource>::resource_ptr_type
 	ResourceHandle<Key, Resource>::operator->() const
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		if (!m_ptr) {
 			THROW_ERROR(out_of_range, __PRETTY_FUNCTION__ << " called on null Resource");
 		}
-		// Make isolated copy of pointer with lock held, and return the copy
-		auto rv = m_ptr;
-		return rv;
+		return m_ptr;
 	}
 
 	template <class Key, class Resource>
@@ -355,7 +306,6 @@ namespace crucible {
 	shared_ptr<T>
 	ResourceHandle<Key, Resource>::cast() const
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		shared_ptr<T> dp;
 		if (!m_ptr) {
 			return dp;
@@ -371,7 +321,6 @@ namespace crucible {
 	typename ResourceHandle<Key, Resource>::key_type
 	ResourceHandle<Key, Resource>::get_key() const
 	{
-		unique_lock<mutex> lock(s_ptr_mutex);
 		if (!m_ptr) {
 			return s_traits.get_null_key();
 		} else {
@@ -400,11 +349,7 @@ namespace crucible {
 	mutex ResourceHandle<Key, Resource>::s_map_mutex;
 
 	template <class Key, class Resource>
-	mutex ResourceHandle<Key, Resource>::s_ptr_mutex;
-
-	template <class Key, class Resource>
 	typename ResourceHandle<Key, Resource>::map_type ResourceHandle<Key, Resource>::s_map;
-
 
 }
 
