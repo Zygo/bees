@@ -36,6 +36,7 @@ BeesFdCache::BeesFdCache()
 		BEESCOUNTADD(open_ino_ms, open_timer.age() * 1000);
 		return rv;
 	});
+	m_file_cache.max_size(BEES_FD_CACHE_SIZE);
 }
 
 Fd

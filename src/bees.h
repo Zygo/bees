@@ -81,6 +81,9 @@ const int BEES_PROGRESS_INTERVAL = 3600;
 // Status is output every freakin second.  Use a ramdisk.
 const int BEES_STATUS_INTERVAL = 1;
 
+// Number of FDs to open (not counting 100 roots)
+const size_t BEES_FD_CACHE_SIZE = 384;
+
 // Log warnings when an operation takes too long
 const double BEES_TOO_LONG = 2.5;
 
