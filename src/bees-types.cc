@@ -186,31 +186,21 @@ BeesFileRange::grow_begin(off_t delta)
 BeesFileRange::BeesFileRange(const BeesBlockData &bbd) :
 	m_fd(bbd.fd()),
 	m_begin(bbd.begin()),
-	m_end(bbd.end()),
-	m_file_size(-1)
+	m_end(bbd.end())
 {
 }
 
 BeesFileRange::BeesFileRange(Fd fd, off_t begin, off_t end) :
 	m_fd(fd),
 	m_begin(begin),
-	m_end(end),
-	m_file_size(-1)
+	m_end(end)
 {
 }
 
 BeesFileRange::BeesFileRange(const BeesFileId &fid, off_t begin, off_t end) :
 	m_fid(fid),
 	m_begin(begin),
-	m_end(end),
-	m_file_size(-1)
-{
-}
-
-BeesFileRange::BeesFileRange() :
-	m_begin(0),
-	m_end(0),
-	m_file_size(-1)
+	m_end(end)
 {
 }
 

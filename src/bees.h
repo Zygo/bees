@@ -256,12 +256,12 @@ class BeesFileRange {
 protected:
 	mutable Fd		m_fd;
 	mutable BeesFileId	m_fid;
-	off_t			m_begin, m_end;
-	mutable off_t		m_file_size;
+	off_t			m_begin = 0, m_end = 0;
+	mutable off_t		m_file_size = -1;
 
 public:
 
-	BeesFileRange();
+	BeesFileRange() = default;
 	BeesFileRange(Fd fd, off_t begin, off_t end);
 	BeesFileRange(const BeesFileId &fid, off_t begin, off_t end);
 	BeesFileRange(const BeesBlockData &bbd);
