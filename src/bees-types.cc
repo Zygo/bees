@@ -71,7 +71,18 @@ operator<<(ostream &os, const BeesFileRange &bfr)
 	if (bfr.end() == numeric_limits<off_t>::max()) {
 		os << "- [" << to_hex(bfr.begin()) << "..eof]";
 	} else {
-		os << pretty(bfr.size()) << " [" << to_hex(bfr.begin()) << ".." << to_hex(bfr.end()) << "]";
+		os << pretty(bfr.size()) << " ";
+		if (bfr.begin() != 0) {
+			os << "[" << to_hex(bfr.begin());
+		} else {
+			os << "(";
+		}
+		os << ".." << to_hex(bfr.end());
+		if (!!bfr.m_fd && bfr.end() >= bfr.file_size()) {
+			os << ")";
+		} else {
+			os << "]";
+		}
 	}
 	if (bfr.m_fid) {
 		os << " fid = " << bfr.m_fid;
