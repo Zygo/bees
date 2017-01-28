@@ -254,7 +254,6 @@ ostream& operator<<(ostream &os, const BeesFileId &bfi);
 
 class BeesFileRange {
 protected:
-	static mutex		s_mutex;
 	mutable Fd		m_fd;
 	mutable BeesFileId	m_fid;
 	off_t			m_begin, m_end;
