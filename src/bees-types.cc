@@ -103,8 +103,6 @@ operator<<(ostream &os, const BeesRangePair &brp)
 		<< "\ndst = " << brp.second.fd() << " " << name_fd(brp.second.fd());
 }
 
-mutex BeesFileRange::s_mutex;
-
 bool
 BeesFileRange::operator<(const BeesFileRange &that) const
 {
@@ -156,7 +154,6 @@ off_t
 BeesFileRange::file_size() const
 {
 	if (m_file_size <= 0) {
-		// Use method fd() not member m_fd() so we hold lock
 		Stat st(fd());
 		m_file_size = st.st_size;
 		// These checks could trigger on valid input, but that would mean we have
@@ -296,23 +293,18 @@ BeesFileRange::operator BeesBlockData() const
 Fd
 BeesFileRange::fd() const
 {
-	unique_lock<mutex> lock(s_mutex);
-	auto rv = m_fd;
-	return rv;
+	return m_fd;
 }
 
 Fd
 BeesFileRange::fd(const shared_ptr<BeesContext> &ctx) const
 {
-	unique_lock<mutex> lock(s_mutex);
 	// If we don't have a fid we can't do much here
 	if (m_fid) {
 		if (!m_fd) {
 			// If we don't have a fd, open by fid
 			if (m_fid && ctx) {
-				lock.unlock();
 				Fd new_fd = ctx->roots()->open_root_ino(m_fid);
-				lock.lock();
 				m_fd = new_fd;
 			}
 		} else {
@@ -322,8 +314,7 @@ BeesFileRange::fd(const shared_ptr<BeesContext> &ctx) const
 		}
 	}
 	// We either had a fid and opened it, or we didn't and we're just stuck with our fd
-	auto rv = m_fd;
-	return rv;
+	return m_fd;
 }
 
 BeesFileRange
