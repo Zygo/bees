@@ -295,7 +295,7 @@ BeesContext::dedup(const BeesRangePair &brp)
 	}
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
-	dst_line << " (" << first_addr << "->" << second_addr << ")";
+	dst_line << " {" << first_addr << "->" << second_addr << "}";
 	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
 		BEESLOGTRACE("equal physical addresses in dedup");
 		BEESCOUNT(bug_dedup_same_physical);
