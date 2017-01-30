@@ -51,7 +51,13 @@ thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 BeesTracer::~BeesTracer()
 {
 	if (uncaught_exception()) {
-		m_func();
+		try {
+			m_func();
+		} catch (exception &e) {
+			BEESLOG("Nested exception: " << e.what());
+		} catch (...) {
+			BEESLOG("Nested exception ...");
+		}
 		if (!m_next_tracer) {
 			BEESLOG("---  END  TRACE --- exception ---");
 		}
