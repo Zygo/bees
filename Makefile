@@ -30,7 +30,7 @@ install: lib src test
 install_scripts: ## Install scipts
 	install -Dm755 scripts/beesd $(PREFIX)/usr/bin/beesd
 	install -Dm644 scripts/beesd.conf.sample $(PREFIX)/etc/bees/beesd.conf.sample
-	install -Dm644 scripts/beesd@.service $(PREFIX)/usr/lib/systemd/system/beesd@.service
+	install -Dm644 scripts/beesd@.service $(PREFIX)/lib/systemd/system/beesd@.service
 
 help: ## Show help
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/\t/'
