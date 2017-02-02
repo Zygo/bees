@@ -273,12 +273,19 @@ namespace crucible {
 		}
 		// Save key so we can clean the map
 		auto key = s_traits.get_key(*m_ptr);
-		// Drop pointer early
+		// Save a weak_ptr so we can tell if we need to clean the map
+		weak_ptr_type wp = m_ptr;
+		// Drop shared_ptr
 		m_ptr.reset();
+		// If there are still other references to the shared_ptr, we can stop now
+		if (!wp.expired()) {
+			return;
+		}
 		// Remove weak_ptr from map if it has expired
 		// (and not been replaced in the meantime)
 		unique_lock<mutex> lock_map(s_map_mutex);
 		auto found = s_map.find(key);
+		// Map entry may have been replaced, so check for expiry again
 		if (found != s_map.end() && found->second.expired()) {
 			s_map.erase(key);
 		}
