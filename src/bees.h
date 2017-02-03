@@ -39,13 +39,6 @@ const off_t BLOCK_SIZE_MAX_EXTENT_SAME = 4096 * 4096;
 // Maximum length of a compressed extent in bytes
 const off_t BLOCK_SIZE_MAX_COMPRESSED_EXTENT = 128 * 1024;
 
-// Try to combine smaller extents into larger ones
-const off_t BLOCK_SIZE_MIN_EXTENT_DEFRAG = BLOCK_SIZE_MAX_COMPRESSED_EXTENT;
-
-// Avoid splitting extents that are already too small
-const off_t BLOCK_SIZE_MIN_EXTENT_SPLIT = BLOCK_SIZE_MAX_COMPRESSED_EXTENT;
-// const off_t BLOCK_SIZE_MIN_EXTENT_SPLIT = 1024LL * 1024 * 1024 * 1024;
-
 // Maximum length of any extent in bytes
 // except we've seen 1.03G extents...
 // ...FIEMAP is slow and full of lies
@@ -54,8 +47,6 @@ const off_t BLOCK_SIZE_MAX_EXTENT = 128 * 1024 * 1024;
 // Masks, so we don't have to write "(BLOCK_SIZE_CLONE - 1)" everywhere
 const off_t BLOCK_MASK_CLONE = BLOCK_SIZE_CLONE - 1;
 const off_t BLOCK_MASK_SUMS = BLOCK_SIZE_SUMS - 1;
-const off_t BLOCK_MASK_MMAP = BLOCK_SIZE_MMAP - 1;
-const off_t BLOCK_MASK_MAX_COMPRESSED_EXTENT = BLOCK_SIZE_MAX_COMPRESSED_EXTENT * 2 - 1;
 
 // Maximum temporary file size
 const off_t BLOCK_SIZE_MAX_TEMP_FILE = 1024 * 1024 * 1024;
@@ -69,14 +60,17 @@ const off_t BLOCK_SIZE_HASHTAB_EXTENT = 16 * 1024 * 1024;
 // Bytes per second we want to flush (8GB every two hours)
 const double BEES_FLUSH_RATE = 8.0 * 1024 * 1024 * 1024 / 7200.0;
 
-// Interval between writing non-hash-table things to disk (15 minutes)
-const int BEES_WRITEBACK_INTERVAL = 900;
+// How long we should wait for new btrfs transactions
+const double BEES_COMMIT_INTERVAL = 900;
+
+// Interval between writing non-hash-table things to disk, and starting new subvol crawlers
+const int BEES_WRITEBACK_INTERVAL = BEES_COMMIT_INTERVAL;
 
 // Statistics reports while scanning
 const int BEES_STATS_INTERVAL = 3600;
 
 // Progress shows instantaneous rates and thread status
-const int BEES_PROGRESS_INTERVAL = 3600;
+const int BEES_PROGRESS_INTERVAL = BEES_STATS_INTERVAL;
 
 // Status is output every freakin second.  Use a ramdisk.
 const int BEES_STATUS_INTERVAL = 1;
@@ -90,11 +84,8 @@ const double BEES_TOO_LONG = 2.5;
 // Avoid any extent where LOGICAL_INO takes this long
 const double BEES_TOXIC_DURATION = 9.9;
 
-// How long we should wait for new btrfs transactions
-const double BEES_COMMIT_INTERVAL = 900;
-
 // How long between hash table histograms
-const double BEES_HASH_TABLE_ANALYZE_INTERVAL = 3600;
+const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 
 // Rate limiting of informational messages
 const double BEES_INFO_RATE = 10.0;
