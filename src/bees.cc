@@ -419,6 +419,7 @@ BeesTempFile::create()
 	BEESNOTE("creating temporary file in " << m_ctx->root_path());
 	BEESTOOLONG("creating temporary file in " << m_ctx->root_path());
 
+	Timer create_timer;
 	DIE_IF_MINUS_ONE(m_fd = openat(m_ctx->root_fd(), ".", FLAGS_OPEN_TMPFILE, S_IRUSR | S_IWUSR));
 	BEESCOUNT(tmp_create);
 
@@ -426,6 +427,8 @@ BeesTempFile::create()
 	// Resolves won't work there anyway.  There are lots of tempfiles
 	// and they're short-lived, so this ends up being just a memory leak
 	// m_ctx->blacklist_add(BeesFileId(m_fd));
+
+	// Put this inode in the cache so we can resolve it later
 	m_ctx->insert_root_ino(m_fd);
 
 	// Set compression attribute
@@ -438,6 +441,9 @@ BeesTempFile::create()
 
 	// Always leave first block empty to avoid creating a file with an inline extent
 	m_end_offset = BLOCK_SIZE_CLONE;
+
+	// Count time spent here
+	BEESCOUNTADD(tmp_create_ms, create_timer.age() * 1000);
 }
 
 void
@@ -451,11 +457,15 @@ BeesTempFile::resize(off_t offset)
 	THROW_CHECK2(invalid_argument, m_end_offset, offset, m_end_offset < offset);
 
 	// Truncate
+	Timer resize_timer;
 	DIE_IF_NON_ZERO(ftruncate(m_fd, offset));
 	BEESCOUNT(tmp_resize);
 
 	// Success
 	m_end_offset = offset;
+
+	// Count time spent here
+	BEESCOUNTADD(tmp_resize_ms, resize_timer.age() * 1000);
 }
 
 BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
@@ -524,6 +534,7 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 	auto end = m_end_offset + src.size();
 	resize(end);
 
+	Timer copy_timer;
 	BeesFileRange rv(m_fd, begin, end);
 	BEESTRACE("copying to: " << rv);
 	BEESNOTE("copying " << src << " to " << rv);
@@ -549,6 +560,7 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 		src_p += len;
 		dst_p += len;
 	}
+	BEESCOUNTADD(tmp_copy_ms, copy_timer.age() * 1000);
 
 	// We seem to get lockups without this!
 	if (did_block_write) {
