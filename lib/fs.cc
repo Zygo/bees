@@ -716,10 +716,20 @@ namespace crucible {
 	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
 	{
-		vector<char> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
 		// Normally we like to be paranoid and fill empty bytes with zero,
 		// but these buffers can be huge.  80% of a 4GHz CPU huge.
-		ioctl_arg.resize(sizeof(btrfs_ioctl_search_args_v2) + m_buf_size);
+
+		// Keep the ioctl buffer from one run to the next to save on malloc costs
+		size_t target_buf_size = sizeof(btrfs_ioctl_search_args_v2) + m_buf_size;
+
+		thread_local vector<char> ioctl_arg;
+		if (ioctl_arg.size() < m_buf_size) {
+			ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
+			ioctl_arg.resize(target_buf_size);
+		} else {
+			memcpy(ioctl_arg.data(), static_cast<btrfs_ioctl_search_key*>(this), sizeof(btrfs_ioctl_search_key));
+		}
+
 		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(ioctl_arg.data());
 
 		ioctl_ptr->buf_size = m_buf_size;
