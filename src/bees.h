@@ -659,6 +659,7 @@ class BeesFdCache {
 	LRUCache<Fd, shared_ptr<BeesContext>, uint64_t>			m_root_cache;
 	LRUCache<Fd, shared_ptr<BeesContext>, uint64_t, uint64_t>	m_file_cache;
 	Timer								m_root_cache_timer;
+	Timer								m_file_cache_timer;
 
 public:
 	BeesFdCache();
