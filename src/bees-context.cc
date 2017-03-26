@@ -260,7 +260,7 @@ BeesContext::home_fd()
 BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 	m_parent_ctx(parent)
 {
-	m_extent_lock_set.max_size(bees_worker_thread_count());;
+	// m_extent_lock_set.max_size(bees_worker_thread_count());;
 	if (m_parent_ctx) {
 		m_fd_cache = m_parent_ctx->fd_cache();
 	}

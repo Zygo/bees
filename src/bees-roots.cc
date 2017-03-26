@@ -302,7 +302,7 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_writeback_thread("crawl_writeback")
 {
-	m_lock_set.max_size(bees_worker_thread_count());
+	// m_lock_set.max_size(bees_worker_thread_count());
 
 	catch_all([&]() {
 		state_load();
@@ -647,7 +647,7 @@ BeesCrawl::fetch_extents()
 	bool ioctl_ok = false;
 	{
 		BEESNOTE("waiting to search crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
-		auto lock = bees_ioctl_lock_set.make_lock(gettid());
+		// auto lock = bees_ioctl_lock_set.make_lock(gettid());
 
 		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
 		BEESTOOLONG("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
