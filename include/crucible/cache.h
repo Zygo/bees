@@ -124,7 +124,7 @@ namespace crucible {
 		if (found == m_map.end()) {
 			// No, release cache lock and acquire key lock
 			lock.unlock();
-			typename LockSet<Key>::Lock key_lock(m_lockset, k);
+			auto key_lock = m_lockset.make_lock(k);
 
 			// Did item appear in cache while we were waiting for key?
 			lock.lock();
@@ -197,7 +197,7 @@ namespace crucible {
 		if (found == m_map.end()) {
 			// No, release cache lock and acquire key lock
 			lock.unlock();
-			typename LockSet<Key>::Lock key_lock(m_lockset, k);
+			auto key_lock = m_lockset.make_lock(k);
 
 			// Did item appear in cache while we were waiting for key?
 			lock.lock();
