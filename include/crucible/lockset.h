@@ -2,14 +2,16 @@
 #define CRUCIBLE_LOCKSET_H
 
 #include <crucible/error.h>
+#include <crucible/process.h>
 
 #include <cassert>
 
 #include <condition_variable>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <memory>
 #include <mutex>
-#include <set>
 
 namespace crucible {
 	using namespace std;
@@ -18,7 +20,7 @@ namespace crucible {
 	class LockSet {
 
 	public:
-		using set_type = set<T>;
+		using set_type = map<T, pid_t>;
 		using key_type = typename set_type::key_type;
 
 	private:
@@ -30,6 +32,24 @@ namespace crucible {
 
 		bool full();
 		bool locked(const key_type &name);
+
+		class Lock {
+			LockSet		&m_lockset;
+			key_type	m_name;
+			bool		m_locked;
+
+			Lock() = delete;
+			Lock(const Lock &) = delete;
+			Lock& operator=(const Lock &) = delete;
+			Lock(Lock &&that) = delete;
+			Lock& operator=(Lock &&that) = delete;
+		public:
+			~Lock();
+			Lock(LockSet &lockset, const key_type &name, bool start_locked = true);
+			void lock();
+			void unlock();
+			bool try_lock();
+		};
 
 	public:
 		~LockSet();
@@ -45,25 +65,18 @@ namespace crucible {
 
 		void max_size(size_t max);
 
-		class Lock {
-			LockSet		&m_lockset;
-			key_type	m_name;
-			bool		m_locked;
+		class LockHandle {
+			shared_ptr<Lock> m_lock;
 
-			Lock() = delete;
-			Lock(const Lock &) = delete;
-			Lock& operator=(const Lock &) = delete;
 		public:
-			~Lock();
-			Lock(LockSet &lockset, const key_type &m_name, bool start_locked = true);
-			Lock(Lock &&that);
-			Lock& operator=(Lock &&that);
-			void lock();
-			void unlock();
-			bool try_lock();
+			LockHandle(LockSet &lockset, const key_type &name, bool start_locked = true) :
+				m_lock(make_shared<Lock>(lockset, name, start_locked)) {}
+			void lock() { m_lock->lock(); }
+			void unlock() { m_lock->unlock(); }
+			bool try_lock() { return m_lock->try_lock(); }
 		};
 
-		Lock make_lock(const key_type &name, bool start_locked = true);
+		LockHandle make_lock(const key_type &name, bool start_locked = true);
 	};
 
 	template <class T>
@@ -105,7 +118,7 @@ namespace crucible {
 		while (full() || locked(name)) {
 			m_condvar.wait(lock);
 		}
-		auto rv = m_set.insert(name);
+		auto rv = m_set.insert(make_pair(name, gettid()));
 		THROW_CHECK0(runtime_error, rv.second);
 	}
 
@@ -117,7 +130,7 @@ namespace crucible {
 		if (full() || locked(name)) {
 			return false;
 		}
-		auto rv = m_set.insert(name);
+		auto rv = m_set.insert(make_pair(name, gettid()));
 		THROW_CHECK1(runtime_error, name, rv.second);
 		return true;
 	}
@@ -215,33 +228,10 @@ namespace crucible {
 	}
 
 	template <class T>
-	LockSet<T>::Lock::Lock(Lock &&that) :
-		m_lockset(that.m_lockset),
-		m_name(that.m_name),
-		m_locked(that.m_locked)
-	{
-		that.m_locked = false;
-	}
-
-	template <class T>
-	typename LockSet<T>::Lock &
-	LockSet<T>::Lock::operator=(Lock &&that)
-	{
-		THROW_CHECK2(invalid_argument, &m_lockset, &that.m_lockset, &m_lockset == &that.m_lockset);
-		if (m_locked && that.m_name != m_name) {
-			unlock();
-		}
-		m_name = that.m_name;
-		m_locked = that.m_locked;
-		that.m_locked = false;
-		return *this;
-	}
-
-	template <class T>
-	typename LockSet<T>::Lock
+	typename LockSet<T>::LockHandle
 	LockSet<T>::make_lock(const key_type &name, bool start_locked)
 	{
-		return Lock(*this, name, start_locked);
+		return LockHandle(*this, name, start_locked);
 	}
 
 }
