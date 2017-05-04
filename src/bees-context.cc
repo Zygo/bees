@@ -361,6 +361,7 @@ BeesContext::rewrite_file_range(const BeesFileRange &bfr)
 	// BEESLOG("\torig_bbd " << orig_bbd);
 	BeesBlockData dup_bbd(dup_brp.first.fd(), dup_brp.first.begin(), min(BLOCK_SIZE_SUMS, dup_brp.first.size()));
 	// BEESLOG("BeesResolver br(..., " << bfr << ")");
+	BEESTRACE("BeesContext::rewrite_file_range calling BeesResolver " << bfr);
 	BeesResolver br(m_ctx, BeesAddress(bfr.fd(), bfr.begin()));
 	// BEESLOG("\treplace_src " << dup_bbd);
 	br.replace_src(dup_bbd);
@@ -566,6 +567,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			catch_all([&]() {
 				BEESNOTE("resolving " << found_addr << " matched " << bbd);
 				BEESTRACE("resolving " << found_addr << " matched " << bbd);
+				BEESTRACE("BeesContext::scan_one_extent calling BeesResolver " << found_addr);
 				BeesResolver resolved(m_ctx, found_addr);
 				// Toxic extents are really toxic
 				if (resolved.is_toxic()) {
