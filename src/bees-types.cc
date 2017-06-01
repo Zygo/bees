@@ -930,6 +930,7 @@ BeesBlockData::data() const
 {
 	if (m_data.empty()) {
 		THROW_CHECK1(invalid_argument, size(), size() > 0);
+		BEESNOTE("Reading BeesBlockData " << *this);
 		BEESTOOLONG("Reading BeesBlockData " << *this);
 		Timer read_timer;
 
