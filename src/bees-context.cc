@@ -56,6 +56,12 @@ BeesFdCache::open_root(shared_ptr<BeesContext> ctx, uint64_t root)
 Fd
 BeesFdCache::open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino)
 {
+	if (m_file_cache_timer.age() > BEES_COMMIT_INTERVAL) {
+		BEESINFO("Clearing open FD cache to enable file delete");
+		m_file_cache.clear();
+		m_file_cache_timer.reset();
+		BEESCOUNT(open_clear);
+	}
 	return m_file_cache(ctx, root, ino);
 }
 

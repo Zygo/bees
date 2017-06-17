@@ -735,6 +735,7 @@ BeesCrawl::fetch_extents()
 				break;
 			case BTRFS_FILE_EXTENT_PREALLOC:
 				BEESCOUNT(crawl_prealloc);
+				// fallthrough
 			case BTRFS_FILE_EXTENT_REG: {
 				auto physical = call_btrfs_get(btrfs_stack_file_extent_disk_bytenr, i.m_data);
 				auto ram = call_btrfs_get(btrfs_stack_file_extent_ram_bytes, i.m_data);
