@@ -495,6 +495,14 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			break;
 		}
 
+		int attr = ioctl_iflags_get(rv);
+		if (attr & FS_NOCOW_FL) {
+			BEESLOG("Opening " << name_fd(root_fd) << "/" << file_path << " found incompatible flags " << attr << " (FS_NOCOW_FL)");
+			rv = Fd();
+			BEESCOUNT(open_wrong_flags);
+			break;
+		}
+
 		// Correct root?
 		auto file_root = btrfs_get_root_id(rv);
 		if (file_root != root) {

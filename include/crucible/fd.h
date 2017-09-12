@@ -13,6 +13,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+// ioctl
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+
 // socket
 #include <sys/socket.h>
 
@@ -140,6 +144,8 @@ namespace crucible {
 		Stat &fstat(int fd);
 		Stat &lstat(const string &filename);
 	};
+
+	int ioctl_iflags_get(int fd);
 
 	string st_mode_ntoa(mode_t mode);
 
