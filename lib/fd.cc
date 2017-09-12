@@ -488,6 +488,14 @@ namespace crucible {
 		lstat(filename);
 	}
 
+	int
+	ioctl_iflags_get(int fd)
+	{
+		int attr = 0;
+		DIE_IF_MINUS_ONE(ioctl(fd, FS_IOC_GETFLAGS, &attr));
+		return attr;
+	}
+
 	string
 	readlink_or_die(const string &path)
 	{
