@@ -303,11 +303,13 @@ Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`, which
 
 ### Ubuntu 16.04:
 `$ apt install build-essential btrfs-tools uuid-dev markdown`
+
 `$ make`
 
 ### Ubuntu 14.04:
 You may need docker - and check your kernel! Download and extract to /usr/src/bees.
 `$ docker run -ti -v /usr/src/bees:/usr/src/bees ubuntu:16.04`
+
 `# apt update && apt -y install build-essential btrfs-tools uuid-dev markdown && make`
 
 
