@@ -296,9 +296,24 @@ Not really a bug, but a gotcha nonetheless:
   children* until the FD is closed.  Bees avoids this gotcha by closing
   all of the FDs in its directory FD cache every 15 minutes.
 
+Build
+-----
+
+Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`, which must be copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH` on the target system respectively.
+
+### Ubuntu 16.04:
+`$ apt install build-essential btrfs-tools uuid-dev markdown`
+
+`$ make`
+
+### Ubuntu 14.04:
+You may need docker - and check your kernel! Download and extract to /usr/src/bees.
+`$ docker run -ti -v /usr/src/bees:/usr/src/bees ubuntu:16.04`
+
+`# apt update && apt -y install build-essential btrfs-tools uuid-dev markdown && make`
 
 
-Requirements
+Dependencies
 ------------
 
 * C++11 compiler (tested with GCC 4.9 and 6.2.0)
@@ -320,15 +335,9 @@ Requirements
 
   Don't bother trying to make Bees work with older kernels.
   It won't end well.
+  
+* markdown
 
-Build
------
-
-Build with `make`.
-
-The build produces `bin/bees` and `lib/libcrucible.so`, which must be
-copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH` on the target
-system respectively.
 
 Setup
 -----
