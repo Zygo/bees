@@ -73,97 +73,6 @@ BeesFdCache::insert_root_ino(shared_ptr<BeesContext> ctx, Fd fd)
 	return m_file_cache.insert(fd, ctx, fid.root(), fid.ino());
 }
 
-mutex BeesWorkQueueBase::s_mutex;
-set<BeesWorkQueueBase*> BeesWorkQueueBase::s_all_workers;
-
-BeesWorkQueueBase::BeesWorkQueueBase(const string &name) :
-	m_name(name)
-{
-}
-
-BeesWorkQueueBase::~BeesWorkQueueBase()
-{
-	unique_lock<mutex> lock(s_mutex);
-	s_all_workers.erase(this);
-}
-
-void
-BeesWorkQueueBase::for_each_work_queue(std::function<void (BeesWorkQueueBase*)> f)
-{
-	unique_lock<mutex> lock(s_mutex);
-	for (auto i : s_all_workers) {
-		f(i);
-	}
-}
-
-string
-BeesWorkQueueBase::name() const
-{
-	return m_name;
-}
-
-void
-BeesWorkQueueBase::name(const string &new_name)
-{
-	m_name = new_name;
-}
-
-template <class Task>
-BeesWorkQueue<Task>::~BeesWorkQueue()
-{
-}
-
-template <class Task>
-BeesWorkQueue<Task>::BeesWorkQueue(const string &name) :
-	BeesWorkQueueBase(name)
-{
-	unique_lock<mutex> lock(s_mutex);
-	s_all_workers.insert(this);
-}
-
-template <class Task>
-void
-BeesWorkQueue<Task>::push_active(const Task &t)
-{
-	BEESNOTE("pushing task " << t);
-	m_active_queue.push(t);
-}
-
-template <class Task>
-void
-BeesWorkQueue<Task>::push_active(const Task &t, size_t limit)
-{
-	// BEESNOTE("pushing limit " << limit << " task " << t);
-	m_active_queue.push_wait(t, limit);
-}
-
-template <class Task>
-size_t
-BeesWorkQueue<Task>::active_size() const
-{
-	return m_active_queue.size();
-}
-
-template <class Task>
-list<string>
-BeesWorkQueue<Task>::peek_active(size_t count) const
-{
-	list<string> rv;
-	for (auto i : m_active_queue.peek(count)) {
-		ostringstream oss;
-		oss << i;
-		rv.push_back(oss.str());
-	}
-	return rv;
-}
-
-template <class Task>
-Task
-BeesWorkQueue<Task>::pop()
-{
-	return m_active_queue.pop();
-}
-
 void
 BeesContext::dump_status()
 {
@@ -190,12 +99,6 @@ BeesContext::dump_status()
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}
 
-		BeesWorkQueueBase::for_each_work_queue([&](BeesWorkQueueBase *worker) {
-			ofs << "QUEUE: " << worker->name() << " active: " << worker->active_size() << "\n";
-			for (auto t : worker->peek_active(10)) {
-				ofs << "\t" << t << "\n";
-			}
-		});
 		ofs.close();
 
 		BEESNOTE("renaming status file '" << status_file << "'");
@@ -230,10 +133,6 @@ BeesContext::show_progress()
 			BEESLOG("\t" << deltaStats / BEES_PROGRESS_INTERVAL);
 		};
 		lastProgressStats = thisStats;
-
-		BeesWorkQueueBase::for_each_work_queue([&](BeesWorkQueueBase *worker) {
-			BEESLOG("QUEUE: " << worker->name() << " active: " << worker->active_size());
-		});
 
 		BEESLOG("THREADS:");
 
@@ -1054,8 +953,3 @@ BeesContext::insert_root_ino(Fd fd)
 {
 	fd_cache()->insert_root_ino(shared_from_this(), fd);
 }
-
-// instantiate templates for linkage ----------------------------------------
-
-template class BeesWorkQueue<BeesFileRange>;
-template class BeesWorkQueue<BeesRangePair>;

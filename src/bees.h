@@ -602,42 +602,6 @@ public:
 friend ostream & operator<<(ostream &os, const BeesRangePair &brp);
 };
 
-class BeesWorkQueueBase {
-	string 				m_name;
-
-protected:
-	static mutex			s_mutex;
-	static set<BeesWorkQueueBase *>	s_all_workers;
-
-public:
-	virtual ~BeesWorkQueueBase();
-	BeesWorkQueueBase(const string &name);
-
-	string name() const;
-	void name(const string &new_name);
-
-	virtual size_t active_size() const = 0;
-	virtual list<string> peek_active(size_t count) const = 0;
-
-	static void for_each_work_queue(function<void(BeesWorkQueueBase *)> f);
-};
-
-template <class Task>
-class BeesWorkQueue : public BeesWorkQueueBase {
-	WorkQueue<Task>				m_active_queue;
-
-public:
-	BeesWorkQueue(const string &name);
-	~BeesWorkQueue();
-	void push_active(const Task &task, size_t limit);
-	void push_active(const Task &task);
-
-	size_t active_size() const override;
-	list<string> peek_active(size_t count) const override;
-
-	Task pop();
-};
-
 class BeesTempFile {
 	shared_ptr<BeesContext> m_ctx;
 	Fd			m_fd;
