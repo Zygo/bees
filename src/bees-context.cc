@@ -181,29 +181,16 @@ BeesContext::dedup(const BeesRangePair &brp)
 
 	BEESTOOLONG("dedup " << brp);
 
-	thread_local BeesFileId tl_first_fid, tl_second_fid;
-	if (tl_first_fid != brp.first.fid()) {
-		BEESLOG("dedup: src " << name_fd(brp.first.fd()));
-		tl_first_fid = brp.first.fid();
-		tl_second_fid = BeesFileId();
-	}
-	ostringstream dst_line;
-	dst_line << "       dst " << pretty(brp.first.size()) << " [" << to_hex(brp.first.begin()) << ".." << to_hex(brp.first.end()) << "]";
-	if (brp.first.begin() != brp.second.begin()) {
-		dst_line << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "]";
-	}
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
-	dst_line << " {" << first_addr << "->" << second_addr << "}";
+
+	BEESLOG("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()));
+	BEESLOG("       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
+
 	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
 		BEESLOGTRACE("equal physical addresses in dedup");
 		BEESCOUNT(bug_dedup_same_physical);
 	}
-	if (tl_second_fid != brp.second.fid()) {
-		dst_line << " " << name_fd(brp.second.fd());
-		tl_second_fid = brp.second.fid();
-	}
-	BEESLOG(dst_line.str());
 
 	THROW_CHECK1(invalid_argument, brp, !brp.first.overlaps(brp.second));
 	THROW_CHECK1(invalid_argument, brp, brp.first.size() == brp.second.size());
@@ -687,13 +674,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 	// Visualize
 	if (bar != string(block_count, '.')) {
-		thread_local BeesFileId last_fid;
-		string file_name;
-		if (bfr.fid() != last_fid) {
-			last_fid = bfr.fid();
-			file_name = " " + name_fd(bfr.fd());
-		}
-		BEESLOG("scan: " << pretty(e.size()) << " " << to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end()) << file_name);
+		BEESLOG("scan: " << pretty(e.size()) << " " << to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end()) << ' ' << name_fd(bfr.fd()));
 	}
 
 	return bfr;
