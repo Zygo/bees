@@ -439,12 +439,11 @@ BeesTempFile::create()
 	m_ctx->insert_root_ino(m_fd);
 
 	// Set compression attribute
-	int flags = 0;
-	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	DIE_IF_MINUS_ONE(ioctl(m_fd, FS_IOC_GETFLAGS, &flags));
+	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
+	int flags = ioctl_iflags_get(m_fd);
 	flags |= FS_COMPR_FL;
 	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	DIE_IF_MINUS_ONE(ioctl(m_fd, FS_IOC_SETFLAGS, &flags));
+	ioctl_iflags_set(m_fd, flags);
 
 	// Always leave first block empty to avoid creating a file with an inline extent
 	m_end_offset = BLOCK_SIZE_CLONE;
