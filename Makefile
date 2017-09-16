@@ -5,7 +5,7 @@ default all: lib src test README.html
 clean: ## Cleanup
 	git clean -dfx
 
-.PHONY: lib src
+.PHONY: lib src test
 
 lib: ## Build libs
 	$(MAKE) -C lib
