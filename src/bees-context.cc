@@ -172,24 +172,6 @@ BeesContext::dedup(const BeesRangePair &brp)
 	brp.first.fd(shared_from_this());
 	brp.second.fd(shared_from_this());
 
-#if 0
-	// This avoids some sort of kernel race condition;
-	// however, it also doubles our dedup times.
-	// Is avoiding a crash every few weeks worth it?
-	bees_sync(brp.first.fd());
-#endif
-
-	// dedup isn't very long-running compared to LOGICAL_INO.
-	// Also we are approaching saturation on systems with many cores.
-	// Hopefully the lock on the extent bytenr will avoid hitting
-	// kernel deadlocks too often!
-#if 0
-	// To avoid hammering all the cores with long-running ioctls,
-	// only do one dedup at any given time.
-	BEESNOTE("Waiting to dedup " << brp);
-	auto dedup_lock = bees_ioctl_lock_set.make_lock(gettid());
-#endif
-
 	BEESNOTE("dedup " << brp);
 	BEESTOOLONG("dedup " << brp);
 
