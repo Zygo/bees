@@ -563,7 +563,11 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 
 	// We seem to get lockups without this!
 	if (did_block_write) {
+#if 1
+		// Is this fixed by "Btrfs: fix deadlock between dedup on same file and starting writeback"?
+		// No.
 		bees_sync(m_fd);
+#endif
 	}
 
 	BEESCOUNT(tmp_copy);
