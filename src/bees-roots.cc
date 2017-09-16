@@ -174,9 +174,9 @@ BeesRoots::transid_min()
 uint64_t
 BeesRoots::transid_max()
 {
-	BEESNOTE("Calculating transid_max");
 	uint64_t rv = 0;
 	uint64_t root = 0;
+	BEESNOTE("Calculating transid_max (" << rv << " as of root " << root << ")");
 	BEESTRACE("Calculating transid_max...");
 	do {
 		root = next_root(root);
