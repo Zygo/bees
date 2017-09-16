@@ -146,6 +146,7 @@ namespace crucible {
 	};
 
 	int ioctl_iflags_get(int fd);
+	void ioctl_iflags_set(int fd, int attr);
 
 	string st_mode_ntoa(mode_t mode);
 

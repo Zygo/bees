@@ -496,6 +496,12 @@ namespace crucible {
 		return attr;
 	}
 
+	void
+	ioctl_iflags_set(int fd, int attr)
+	{
+		DIE_IF_MINUS_ONE(ioctl(fd, FS_IOC_SETFLAGS, &attr));
+	}
+
 	string
 	readlink_or_die(const string &path)
 	{
