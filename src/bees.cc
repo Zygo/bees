@@ -580,7 +580,8 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 unsigned
 bees_worker_thread_count()
 {
-	return max(1U, thread::hardware_concurrency());
+	// Maybe # of cores * (scalar from 0.25..4)?
+	return max(1U, thread::hardware_concurrency() * 4);
 }
 
 int
@@ -600,8 +601,8 @@ bees_main(int argc, const char **argv)
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 	vector<string> args(argv + 1, argv + argc);
 
-	// Set global concurrency limits - use only half the cores for ioctls
-	bees_ioctl_lock_set.max_size(max(1U, bees_worker_thread_count() / 2));
+	// There can be only one because we measure running time with it
+	bees_ioctl_lock_set.max_size(1);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
