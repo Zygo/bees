@@ -576,14 +576,6 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			break;
 		}
 
-		int attr = ioctl_iflags_get(rv);
-		if (attr & FS_NOCOW_FL) {
-			BEESLOG("Opening " << name_fd(root_fd) << "/" << file_path << " found incompatible flags " << attr << " (FS_NOCOW_FL)");
-			rv = Fd();
-			BEESCOUNT(open_wrong_flags);
-			break;
-		}
-
 		// Correct root?
 		auto file_root = btrfs_get_root_id(rv);
 		if (file_root != root) {
@@ -599,6 +591,27 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			BEESLOG("Opening root " << name_fd(root_fd) << " path " << file_path << " found path st_dev " << file_stat.st_dev << " but root st_dev is " << root_stat.st_dev);
 			rv = Fd();
 			BEESCOUNT(open_wrong_dev);
+			break;
+		}
+
+		// As of 4.12 the kernel rejects dedup requests with
+		// src and dst that have different datasum flags.
+		//
+		// We can't detect those from userspace reliably, but
+		// we can detect the common case where one file is
+		// marked with the nodatasum (which implies nodatacow)
+		// on a filesystem that is mounted with datacow.
+		// These are arguably out of scope for dedup.
+		//
+		// To fix this properly, we have to keep track of which
+		// pairs of inodes failed to dedup, guess that the reason
+		// for failure was a mismatch of datasum flags, and
+		// create temporary files with the right flags somehow.
+		int attr = ioctl_iflags_get(rv);
+		if (attr & FS_NOCOW_FL) {
+			BEESLOG("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
+			rv = Fd();
+			BEESCOUNT(open_wrong_flags);
 			break;
 		}
 
