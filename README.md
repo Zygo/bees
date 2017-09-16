@@ -227,12 +227,16 @@ Bug fixes (sometimes included in older LTS kernels):
 
 * 4.5: hang in the `INO_PATHS` ioctl used by Bees.
 * 4.5: use-after-free in the `FILE_EXTENT_SAME` ioctl used by Bees.
+* 4.6: lost inodes after a rename, crash, and log tree replay
+  (triggered by the fsync() while writing `beescrawl.dat`).
 * 4.7: *slow backref* bug no longer triggers a softlockup panic.  It still
   too long to resolve a block address to a root/inode/offset triple.
-* 4.10-rc1: reduced CPU time cost of the LOGICAL_INO ioctl and dedup
+* 4.10: reduced CPU time cost of the LOGICAL_INO ioctl and dedup
   backref processing in general.
+* 4.13 integration trees: 053582a7d423 btrfs: add cond_resched() calls
+  when resolving backrefs
 
-Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
+Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
 
 * *slow backrefs* (aka toxic extents): If the number of references to a
   single shared extent within a single file grows above a few thousand,
@@ -253,6 +257,19 @@ Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
   blocks or filesystems with many snapshots (although this limit is
   far greater than the effective limit imposed by the *slow backref* bug).
 
+* `LOGICAL_INO` on compressed extents returns a list of root/inode/offset
+  tuples matching the extent bytenr of its argument.  On uncompressed
+  extents, any r/i/o tuple whose extent offset does not match the
+  argument's extent offset is discarded, i.e. only the single 4K block
+  matching the argument is returned, so a complete map of the extent
+  references requires calling `LOGICAL_INO` for every single block of
+  the extent.  This is undesirable behavior for Bees, which wants a
+  list of all extent refs referencing a data extent (i.e. Bees wants
+  the compressed-extent behavior in all cases).
+
+* `LOGICAL_INO` is only called from one thread at any time per process.
+  This means at most one core is irretrievably stuck in this ioctl.
+
 * `FILE_EXTENT_SAME` is arbitrarily limited to 16MB.  This is less than
   128MB which is the maximum extent size that can be created by defrag
   or prealloc.  Bees avoids feedback loops this can generate while
@@ -265,22 +282,9 @@ Unfixed kernel bugs (as of 4.5.7) with workarounds in Bees:
   to a temporary file and using the `FILE_EXTENT_SAME` ioctl to replace
   precisely the specified range of offending fragmented blocks.
 
-* When writing BeesStringFile, a crash can cause the directory entry
-  `beescrawl.dat.tmp` to exist without a corresponding inode.
-  This directory entry cannot be renamed or removed; however, it does
-  not prevent the creation of a second directory entry with the same
-  name that functions normally, so it doesn't prevent Bees operation.
-
-  The orphan directory entry can be removed by deleting its subvol,
-  so place BEESHOME on a separate subvol so you can delete these orphan
-  directory entries when they occur (or use btrfs zero-log before mounting
-  the filesystem after a crash).  Alternatively, place BEESHOME on a
-  non-btrfs filesystem.
-
 * If the `fsync()` in `BeesTempFile::make_copy` is removed, the filesystem
   hangs within a few hours, requiring a reboot to recover.  On the other
-  hand, there may be net performance benefits to calling `fsync()` before
-  or after each dedup.  This needs further investigation.
+  hand, the `fsync()` only costs about 8% of overall performance.
 
 Not really a bug, but a gotcha nonetheless:
 
@@ -290,6 +294,12 @@ Not really a bug, but a gotcha nonetheless:
   `btrfs-cleaner` will simply skip over the directory *and all of its
   children* until the FD is closed.  Bees avoids this gotcha by closing
   all of the FDs in its directory FD cache every 15 minutes.
+
+* If a file is deleted while Bees is caching an open FD to the file,
+  Bees continues to scan the file.  For very large files (e.g. VM
+  images), the deletion of the file can be delayed indefinitely.
+  To limit this delay, Bees closes all FDs in its file FD cache every
+  15 minutes.
 
 Build
 -----
