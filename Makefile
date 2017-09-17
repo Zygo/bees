@@ -1,5 +1,8 @@
 PREFIX ?= /
 
+MARKDOWN := $(shell which markdown markdown2 markdown_py 2>/dev/null)
+MARKDOWN ?= markdown
+
 default all: lib src test README.html
 
 clean: ## Cleanup
@@ -19,7 +22,7 @@ test: lib src
 	$(MAKE) -C test
 
 README.html: README.md
-	markdown README.md > README.html.new
+	$(MARKDOWN) README.md > README.html.new
 	mv -f README.html.new README.html
 
 install: ## Install bees + libs
