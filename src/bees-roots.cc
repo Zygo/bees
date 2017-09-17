@@ -397,7 +397,6 @@ Fd
 BeesRoots::open_root_nocache(uint64_t rootid)
 {
 	BEESTRACE("open_root_nocache " << rootid);
-	BEESNOTE("open_root_nocache " << rootid);
 
 	// Stop recursion at the root of the filesystem tree
 	if (rootid == BTRFS_FS_TREE_OBJECTID) {
