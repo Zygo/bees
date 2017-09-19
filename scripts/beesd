@@ -21,7 +21,7 @@ readonly CONFIG_DIR=/etc/bees/
     [ "$UID" == "0" ] || ERRO "Must be runned as root"
 }
 
-command -v bees &> /dev/null || ERRO "Missing 'bees' command"
+command -v /usr/libexec/bees &> /dev/null || ERRO "Missing 'bees' agent"
 
 ## Parse args
 UUID="$1"
@@ -123,6 +123,6 @@ filter_path(){
     fi
 }
 
-bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
+/usr/libexec/bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
 
 exit 0
