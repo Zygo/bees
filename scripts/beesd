@@ -18,7 +18,7 @@ readonly CONFIG_DIR=/etc/bees/
 ## Pre checks
 {
     [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
-    [ "$UID" == "0" ] || ERRO "Must be runned as root"
+    [ "$UID" == "0" ] || ERRO "Must be run as root"
 }
 
 command -v /usr/libexec/bees &> /dev/null || ERRO "Missing 'bees' agent"

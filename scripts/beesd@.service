@@ -3,7 +3,7 @@ Description=Bees - Best-Effort Extent-Same, a btrfs deduplicator daemon: %i
 After=local-fs.target
 
 [Service]
-ExecStart=/usr/bin/beesd %i
+ExecStart=/usr/sbin/beesd %i
 Nice=19
 IOSchedulingClass=idle
 CPUAccounting=true
