@@ -8,11 +8,17 @@ ExecStart=/usr/sbin/beesd %i
 Nice=19
 KillMode=control-group
 KillSignal=SIGTERM
+CPUShares=128
+StartupCPUShares=256
+BlockIOWeight=100
+StartupBlockIOWeight=250
 IOSchedulingClass=idle
+IOSchedulingPriority=7
+CPUSchedulingPolicy=batch
+Nice=19
 Restart=on-abnormal
 CPUAccounting=true
 MemoryAccounting=true
-# CPUQuota=95%
 
 [Install]
 WantedBy=local-fs.target
