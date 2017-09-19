@@ -2,8 +2,11 @@
 ## https://github.com/Zygo/bees
 ## It's a default values, change it, if needed
 
+# How to use?
+# Copy this file to a new file name and adjust the UUID below
+
 # Which FS will be used
-UUID=5d3c0ad5-bedf-463d-8235-b4d4f6f99476
+UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 ## System Vars
 # Change carefully
