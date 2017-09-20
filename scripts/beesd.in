@@ -1,5 +1,4 @@
 #!/bin/bash
-# /usr/bin/beesd
 
 ## Helpful functions
 INFO(){ echo "INFO:" "$@"; }
@@ -13,7 +12,7 @@ export CONFIG_FILE
 export UUID AL16M
 
 readonly AL16M="$((16*1024*1024))"
-readonly CONFIG_DIR=/etc/bees/
+readonly CONFIG_DIR=@PREFIX@/etc/bees/
 
 ## Pre checks
 {
@@ -21,7 +20,7 @@ readonly CONFIG_DIR=/etc/bees/
     [ "$UID" == "0" ] || ERRO "Must be run as root"
 }
 
-command -v /usr/libexec/bees &> /dev/null || ERRO "Missing 'bees' agent"
+command -v @LIBEXEC_PREFIX@/bees &> /dev/null || ERRO "Missing 'bees' agent"
 
 ## Parse args
 UUID="$1"
@@ -123,6 +122,6 @@ filter_path(){
     fi
 }
 
-/usr/libexec/bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
+@LIBEXEC_PREFIX@/bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
 
 exit 0
