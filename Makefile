@@ -1,5 +1,5 @@
 PREFIX ?= /
-LIBEXEC_PREFIX ?= $(PREFIX)/usr/lib
+LIBEXEC_PREFIX ?= $(PREFIX)/usr/lib/bees
 
 MARKDOWN := $(shell which markdown markdown2 markdown_py 2>/dev/null)
 MARKDOWN ?= markdown
@@ -35,7 +35,7 @@ README.html: README.md
 install: ## Install bees + libs
 install: lib src test
 	install -Dm644 lib/libcrucible.so $(PREFIX)/usr/lib/libcrucible.so
-	install -Dm755 bin/bees $(LIBEXEC_PREFIX)/bees/bees
+	install -Dm755 bin/bees $(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
 install_scripts: scripts/beesd
