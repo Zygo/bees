@@ -61,7 +61,6 @@ namespace crucible {
 		size_t size();
 		bool empty();
 		set_type copy();
-		void wait_unlock(double interval);
 
 		void max_size(size_t max);
 
@@ -143,15 +142,6 @@ namespace crucible {
 		auto erase_count = m_set.erase(name);
 		m_condvar.notify_all();
 		THROW_CHECK1(invalid_argument, erase_count, erase_count == 1);
-	}
-
-	template <class T>
-	void
-	LockSet<T>::wait_unlock(double interval)
-	{
-		unique_lock<mutex> lock(m_mutex);
-		if (m_set.empty()) return;
-		m_condvar.wait_for(lock, chrono::duration<double>(interval));
 	}
 
 	template <class T>
