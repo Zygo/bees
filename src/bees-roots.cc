@@ -316,6 +316,7 @@ Fd
 BeesRoots::open_root_nocache(uint64_t rootid)
 {
 	BEESTRACE("open_root_nocache " << rootid);
+	BEESNOTE("open_root_nocache " << rootid);
 
 	// Stop recursion at the root of the filesystem tree
 	if (rootid == BTRFS_FS_TREE_OBJECTID) {
@@ -388,7 +389,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				THROW_CHECK2(runtime_error, new_root_id, rootid, new_root_id == rootid);
 				Stat st(rv);
 				THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
-				BEESINFO("open_root_nocache " << rootid << ": " << name_fd(rv));
+				// BEESINFO("open_root_nocache " << rootid << ": " << name_fd(rv));
 				return rv;
 			}
 		}
