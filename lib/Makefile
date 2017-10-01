@@ -1,8 +1,9 @@
 default: libcrucible.so
 
 OBJS = \
-	crc64.o \
 	chatter.o \
+	cleanup.o \
+	crc64.o \
 	error.o \
 	extentwalker.o \
 	fd.o \
