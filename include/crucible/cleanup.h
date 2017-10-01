@@ -1,5 +1,5 @@
-#ifndef CRUCIBLE_CLEANER_H
-#define CRUCIBLE_CLEANER_H
+#ifndef CRUCIBLE_CLEANUP_H
+#define CRUCIBLE_CLEANUP_H
 
 #include <functional>
 
@@ -15,4 +15,4 @@ namespace crucible {
 
 }
 
-#endif // CRUCIBLE_CLEANER_H
+#endif // CRUCIBLE_CLEANUP_H
