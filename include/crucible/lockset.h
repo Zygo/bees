@@ -1,6 +1,7 @@
 #ifndef CRUCIBLE_LOCKSET_H
 #define CRUCIBLE_LOCKSET_H
 
+#include <crucible/cleanup.h>
 #include <crucible/error.h>
 #include <crucible/process.h>
 
@@ -12,6 +13,8 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
+#include <thread>
 
 namespace crucible {
 	using namespace std;
@@ -29,8 +32,11 @@ namespace crucible {
 		mutex				m_mutex;
 		condition_variable		m_condvar;
 		size_t				m_max_size = numeric_limits<size_t>::max();
+		set<uint64_t>			m_priorities;
+		uint64_t			m_priority_counter;
 
 		bool full();
+		bool first_in_priority(uint64_t my_priority);
 		bool locked(const key_type &name);
 
 		class Lock {
@@ -98,6 +104,26 @@ namespace crucible {
 
 	template <class T>
 	bool
+	LockSet<T>::first_in_priority(uint64_t my_priority)
+	{
+#if 1
+		auto counter = m_max_size;
+		for (auto i : m_priorities) {
+			if (i == my_priority) {
+				return true;
+			}
+			if (++counter > m_max_size) {
+				return false;
+			}
+		}
+		THROW_ERROR(runtime_error, "my_priority " << my_priority << " not in m_priorities (size " << m_priorities.size() << ")");
+#else
+		return *m_priorities.begin() == my_priority;
+#endif
+	}
+
+	template <class T>
+	bool
 	LockSet<T>::locked(const key_type &name)
 	{
 		return m_set.count(name);
@@ -105,9 +131,10 @@ namespace crucible {
 
 	template <class T>
 	void
-	LockSet<T>::max_size(size_t s)
+	LockSet<T>::max_size(size_t new_max_size)
 	{
-		m_max_size = s;
+		THROW_CHECK1(out_of_range, new_max_size, new_max_size > 0);
+		m_max_size = new_max_size;
 	}
 
 	template <class T>
@@ -115,11 +142,18 @@ namespace crucible {
 	LockSet<T>::lock(const key_type &name)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		while (full() || locked(name)) {
+		auto my_priority = m_priority_counter++;
+		Cleanup cleanup([&]() {
+			m_priorities.erase(my_priority);
+		});
+		m_priorities.insert(my_priority);
+		while (full() || locked(name) || !first_in_priority(my_priority)) {
 			m_condvar.wait(lock);
 		}
 		auto rv = m_set.insert(make_pair(name, gettid()));
 		THROW_CHECK0(runtime_error, rv.second);
+		// We removed our priority slot so other threads have to check again
+		m_condvar.notify_all();
 	}
 
 	template <class T>
@@ -142,6 +176,8 @@ namespace crucible {
 		unique_lock<mutex> lock(m_mutex);
 		auto erase_count = m_set.erase(name);
 		m_condvar.notify_all();
+		lock.unlock();
+		this_thread::yield();
 		THROW_CHECK1(invalid_argument, erase_count, erase_count == 1);
 	}
 
