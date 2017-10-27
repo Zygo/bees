@@ -55,10 +55,10 @@ if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
     ERRO "Missing disk: /dev/disk/by-uuid/$UUID"
 fi
 
-it_btrfs(){ [ "$(blkid -s TYPE -o value "$1")" == "btrfs" ]; }
+is_btrfs(){ [ "$(blkid -s TYPE -o value "$1")" == "btrfs" ]; }
 
 INFO "Check: Disk with btrfs"
-if ! it_btrfs "/dev/disk/by-uuid/$UUID"; then
+if ! is_btrfs "/dev/disk/by-uuid/$UUID"; then
     ERRO "Disk not contain btrfs: /dev/disk/by-uuid/$UUID"
 fi
 
