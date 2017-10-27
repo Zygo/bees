@@ -86,6 +86,11 @@ namespace crucible {
 		}
 	};
 
+	class ChatterTimestamp {
+	public:
+		ChatterTimestamp(int);
+	};
+
 	class ChatterBox {
 		string m_file;
 		int m_line;

@@ -35,6 +35,8 @@ do_cmd_help(char *argv[])
 		"\n"
 		"Options:\n"
 		"\t-h, --help\t\tShow this help\n"
+		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
+		"\t-T, --notimestamps\tOmit timestamps in log output\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -595,27 +597,39 @@ bees_main(int argc, char *argv[])
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 
+	// Defaults
+	int chatter_prefix_timestamp = 1;
+
 	// Parse options
 	int c;
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{ "help", no_argument, NULL, 'h' }
+			{ "timestamps",   no_argument, NULL, 't' },
+			{ "notimestamps", no_argument, NULL, 'T' },
+			{ "help",         no_argument, NULL, 'h' }
 		};
 
-		c = getopt_long(argc, argv, "h", long_options, &option_index);
+		c = getopt_long(argc, argv, "Tth", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
 
 		switch (c) {
 			case 'T':
+				chatter_prefix_timestamp = 0;
+				break;
+			case 't':
+				chatter_prefix_timestamp = 1;
+				break;
 			case 'h':
 				do_cmd_help(argv);
 			default:
 				return 2;
 		}
 	}
+
+	ChatterTimestamp cts(chatter_prefix_timestamp);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;

@@ -49,7 +49,6 @@ BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
 LOG_SHORT_PATH="${LOG_SHORT_PATH:-N}"
-LOG_FILTER_TIME="${LOG_FILTER_TIME:-N}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
@@ -101,19 +100,6 @@ fi
 
 MNT_DIR="${MNT_DIR//\/\//\/}"
 
-filter_time(){
-    if YN $LOG_FILTER_TIME; then
-        sed -e 's/^.*crawl:/crawl:/g' \
-            -e 's/^.*status:/status:/g' \
-            -e 's/^.*bees:/bees:/g' \
-            -e 's/^.*crawl_writeback:/crawl_writeback:/g' \
-            -e 's/^.*main:/main:/g' \
-            -e 's/^.*hash_prefetch:/hash_prefetch:/g'
-    else
-        cat
-    fi
-}
-
 filter_path(){
     if YN $LOG_SHORT_PATH; then
         sed -e "s#$MNT_DIR##g"
@@ -122,6 +108,6 @@ filter_path(){
     fi
 }
 
-@LIBEXEC_PREFIX@/bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
+@LIBEXEC_PREFIX@/bees $OPTIONS "$MNT_DIR" 3>&1 2>&1 | filter_path
 
 exit 0
