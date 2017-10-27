@@ -19,17 +19,22 @@
 #include <linux/fs.h>
 #include <sys/ioctl.h>
 
+#include <getopt.h>
+
 using namespace crucible;
 using namespace std;
 
 int
-do_cmd_help(const char **argv)
+do_cmd_help(char *argv[])
 {
-	cerr << "Usage: " << argv[0] << " fs-root-path [fs-root-path-2...]\n"
+	cerr << "Usage: " << argv[0] << " [options] fs-root-path [fs-root-path-2...]\n"
 		"Performs best-effort extent-same deduplication on btrfs.\n"
 		"\n"
 		"fs-root-path MUST be the root of a btrfs filesystem tree (id 5).\n"
 		"Other directories will be rejected.\n"
+		"\n"
+		"Options:\n"
+		"\t-h, --help\t\tShow this help\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -575,7 +580,7 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 }
 
 int
-bees_main(int argc, const char **argv)
+bees_main(int argc, char *argv[])
 {
 	set_catch_explainer([&](string s) {
 		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
@@ -589,14 +594,35 @@ bees_main(int argc, const char **argv)
 	shared_ptr<BeesContext> bc;
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
-	vector<string> args(argv + 1, argv + argc);
+
+	// Parse options
+	int c;
+	while (1) {
+		int option_index = 0;
+		static struct option long_options[] = {
+			{ "help", no_argument, NULL, 'h' }
+		};
+
+		c = getopt_long(argc, argv, "h", long_options, &option_index);
+		if (-1 == c) {
+			break;
+		}
+
+		switch (c) {
+			case 'T':
+			case 'h':
+				do_cmd_help(argv);
+			default:
+				return 2;
+		}
+	}
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
-	for (string arg : args) {
+	while (optind < argc) {
 		catch_all([&]() {
 			bc = make_shared<BeesContext>(bc);
-			bc->set_root_path(arg);
+			bc->set_root_path(argv[optind++]);
 			did_subscription = true;
 		});
 	}
@@ -617,7 +643,7 @@ bees_main(int argc, const char **argv)
 }
 
 int
-main(int argc, const char **argv)
+main(int argc, char *argv[])
 {
 	cerr << "bees version " << BEES_VERSION << endl;
 
