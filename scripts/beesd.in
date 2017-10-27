@@ -23,7 +23,23 @@ readonly CONFIG_DIR=@PREFIX@/etc/bees/
 command -v @LIBEXEC_PREFIX@/bees &> /dev/null || ERRO "Missing 'bees' agent"
 
 ## Parse args
-UUID="$1"
+ARGUMENTS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -*)
+            ARGUMENTS+=($1)
+        ;;
+        *)
+            if [ -z "$UUID" ]; then
+                UUID="$1"
+            else
+                ERRO "Only one filesystem may be supplied"
+            fi
+        ;;
+    esac
+    shift
+done
+
 case "$UUID" in
     *-*-*-*-*)
         FILE_CONFIG=""
@@ -38,7 +54,7 @@ case "$UUID" in
         source "$FILE_CONFIG"
     ;;
     *)
-        echo "beesd <btrfs_uuid>"
+        echo "beesd [options] <btrfs_uuid>"
         exit 1
     ;;
 esac
@@ -108,6 +124,6 @@ filter_path(){
     fi
 }
 
-@LIBEXEC_PREFIX@/bees $OPTIONS "$MNT_DIR" 3>&1 2>&1 | filter_path
+@LIBEXEC_PREFIX@/bees ${ARGUMENTS[@]} $OPTIONS "$MNT_DIR" 3>&1 2>&1 | filter_path
 
 exit 0
