@@ -612,7 +612,7 @@ bees_main(int argc, char *argv[])
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 
 	// Defaults
-	int chatter_prefix_timestamp = 1;
+	bool chatter_prefix_timestamp = true;
 
 	// Parse options
 	int c;
@@ -631,10 +631,10 @@ bees_main(int argc, char *argv[])
 
 		switch (c) {
 			case 'T':
-				chatter_prefix_timestamp = 0;
+				chatter_prefix_timestamp = false;
 				break;
 			case 't':
-				chatter_prefix_timestamp = 1;
+				chatter_prefix_timestamp = true;
 				break;
 			case 'h':
 				do_cmd_help(argv);
@@ -643,7 +643,7 @@ bees_main(int argc, char *argv[])
 		}
 	}
 
-	ChatterTimestamp cts(chatter_prefix_timestamp);
+	Chatter::enable_timestamp(chatter_prefix_timestamp);
 
 	// There can be only one because we measure running time with it
 	bees_ioctl_lock_set.max_size(1);
