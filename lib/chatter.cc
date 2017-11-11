@@ -17,7 +17,7 @@ namespace crucible {
 
 	static shared_ptr<set<string>> chatter_names;
 	static const char *SPACETAB = " \t";
-	static int chatter_prefix_timestamp = 1;
+	static bool add_prefix_timestamp = true;
 
 	static
 	void
@@ -49,11 +49,17 @@ namespace crucible {
 	{
 	}
 
+	void
+	Chatter::enable_timestamp(bool prefix_timestamp)
+	{
+		add_prefix_timestamp = prefix_timestamp;
+	}
+
 	Chatter::~Chatter()
 	{
 		ostringstream header_stream;
 
-		if (chatter_prefix_timestamp) {
+		if (add_prefix_timestamp) {
 			time_t ltime;
 			DIE_IF_MINUS_ONE(time(&ltime));
 			struct tm ltm;
@@ -95,11 +101,6 @@ namespace crucible {
 		: m_name(c.m_name), m_os(c.m_os), m_oss(c.m_oss.str())
 	{
 		c.m_oss.str("");
-	}
-
-	ChatterTimestamp::ChatterTimestamp(int prefix_timestamp)
-	{
-		chatter_prefix_timestamp = prefix_timestamp;
 	}
 
 	set<ChatterBox*> ChatterBox::s_boxes;

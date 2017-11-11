@@ -45,6 +45,8 @@ namespace crucible {
 		template <class T> Chatter &operator<<(const T& arg);
 
 		~Chatter();
+
+		static void enable_timestamp(bool prefix_timestamp);
 	};
 
 	template <class Argument>
@@ -84,11 +86,6 @@ namespace crucible {
 			c.get_os() << arg;
 			return c;
 		}
-	};
-
-	class ChatterTimestamp {
-	public:
-		ChatterTimestamp(int);
 	};
 
 	class ChatterBox {
