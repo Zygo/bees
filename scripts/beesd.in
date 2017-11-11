@@ -23,7 +23,23 @@ readonly CONFIG_DIR=@PREFIX@/etc/bees/
 command -v @LIBEXEC_PREFIX@/bees &> /dev/null || ERRO "Missing 'bees' agent"
 
 ## Parse args
-UUID="$1"
+ARGUMENTS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -*)
+            ARGUMENTS+=($1)
+        ;;
+        *)
+            if [ -z "$UUID" ]; then
+                UUID="$1"
+            else
+                ERRO "Only one filesystem may be supplied"
+            fi
+        ;;
+    esac
+    shift
+done
+
 case "$UUID" in
     *-*-*-*-*)
         FILE_CONFIG=""
@@ -38,7 +54,7 @@ case "$UUID" in
         source "$FILE_CONFIG"
     ;;
     *)
-        echo "beesd <btrfs_uuid>"
+        echo "beesd [options] <btrfs_uuid>"
         exit 1
     ;;
 esac
@@ -49,17 +65,16 @@ BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
 LOG_SHORT_PATH="${LOG_SHORT_PATH:-N}"
-LOG_FILTER_TIME="${LOG_FILTER_TIME:-N}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
     ERRO "Missing disk: /dev/disk/by-uuid/$UUID"
 fi
 
-it_btrfs(){ [ "$(blkid -s TYPE -o value "$1")" == "btrfs" ]; }
+is_btrfs(){ [ "$(blkid -s TYPE -o value "$1")" == "btrfs" ]; }
 
 INFO "Check: Disk with btrfs"
-if ! it_btrfs "/dev/disk/by-uuid/$UUID"; then
+if ! is_btrfs "/dev/disk/by-uuid/$UUID"; then
     ERRO "Disk not contain btrfs: /dev/disk/by-uuid/$UUID"
 fi
 
@@ -101,19 +116,6 @@ fi
 
 MNT_DIR="${MNT_DIR//\/\//\/}"
 
-filter_time(){
-    if YN $LOG_FILTER_TIME; then
-        sed -e 's/^.*crawl:/crawl:/g' \
-            -e 's/^.*status:/status:/g' \
-            -e 's/^.*bees:/bees:/g' \
-            -e 's/^.*crawl_writeback:/crawl_writeback:/g' \
-            -e 's/^.*main:/main:/g' \
-            -e 's/^.*hash_prefetch:/hash_prefetch:/g'
-    else
-        cat
-    fi
-}
-
 filter_path(){
     if YN $LOG_SHORT_PATH; then
         sed -e "s#$MNT_DIR##g"
@@ -122,6 +124,6 @@ filter_path(){
     fi
 }
 
-@LIBEXEC_PREFIX@/bees "$MNT_DIR" 3>&1 2>&1 | filter_time | filter_path
+@LIBEXEC_PREFIX@/bees ${ARGUMENTS[@]} $OPTIONS "$MNT_DIR" 3>&1 2>&1 | filter_path
 
 exit 0

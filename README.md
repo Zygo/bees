@@ -107,9 +107,9 @@ fresh full-filesystem rescan, and restart `bees'.
 Things You Might Expect That Bees Doesn't Have
 ----------------------------------------------
 
-* There's no configuration file or getopt command line option processing
-(patches welcome!).  There are some tunables hardcoded in the source
-that could eventually become configuration options.
+* There's no configuration file (patches welcome!).  There are some tunables
+hardcoded in the source that could eventually become configuration options.
+There's also an incomplete option parser (patches welcome!).
 
 * There's no way to *stop* the Bees daemon.  Use SIGKILL, SIGTERM, or
 Ctrl-C for now.  Some of the destructors are unreachable and have never

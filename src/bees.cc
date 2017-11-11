@@ -19,17 +19,24 @@
 #include <linux/fs.h>
 #include <sys/ioctl.h>
 
+#include <getopt.h>
+
 using namespace crucible;
 using namespace std;
 
 int
-do_cmd_help(const char **argv)
+do_cmd_help(char *argv[])
 {
-	cerr << "Usage: " << argv[0] << " fs-root-path [fs-root-path-2...]\n"
+	cerr << "Usage: " << argv[0] << " [options] fs-root-path [fs-root-path-2...]\n"
 		"Performs best-effort extent-same deduplication on btrfs.\n"
 		"\n"
 		"fs-root-path MUST be the root of a btrfs filesystem tree (id 5).\n"
 		"Other directories will be rejected.\n"
+		"\n"
+		"Options:\n"
+		"\t-h, --help\t\tShow this help\n"
+		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
+		"\t-T, --notimestamps\tOmit timestamps in log output\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -589,7 +596,7 @@ bees_worker_thread_count()
 }
 
 int
-bees_main(int argc, const char **argv)
+bees_main(int argc, char *argv[])
 {
 	set_catch_explainer([&](string s) {
 		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
@@ -603,17 +610,50 @@ bees_main(int argc, const char **argv)
 	shared_ptr<BeesContext> bc;
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
-	vector<string> args(argv + 1, argv + argc);
+
+	// Defaults
+	int chatter_prefix_timestamp = 1;
+
+	// Parse options
+	int c;
+	while (1) {
+		int option_index = 0;
+		static struct option long_options[] = {
+			{ "timestamps",   no_argument, NULL, 't' },
+			{ "notimestamps", no_argument, NULL, 'T' },
+			{ "help",         no_argument, NULL, 'h' }
+		};
+
+		c = getopt_long(argc, argv, "Tth", long_options, &option_index);
+		if (-1 == c) {
+			break;
+		}
+
+		switch (c) {
+			case 'T':
+				chatter_prefix_timestamp = 0;
+				break;
+			case 't':
+				chatter_prefix_timestamp = 1;
+				break;
+			case 'h':
+				do_cmd_help(argv);
+			default:
+				return 2;
+		}
+	}
+
+	ChatterTimestamp cts(chatter_prefix_timestamp);
 
 	// There can be only one because we measure running time with it
 	bees_ioctl_lock_set.max_size(1);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
-	for (string arg : args) {
+	while (optind < argc) {
 		catch_all([&]() {
 			bc = make_shared<BeesContext>(bc);
-			bc->set_root_path(arg);
+			bc->set_root_path(argv[optind++]);
 			did_subscription = true;
 		});
 	}
@@ -634,7 +674,7 @@ bees_main(int argc, const char **argv)
 }
 
 int
-main(int argc, const char **argv)
+main(int argc, char *argv[])
 {
 	cerr << "bees version " << BEES_VERSION << endl;
 
