@@ -16,7 +16,7 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
 ## Make path shorter in logs
-# LOG_SHORT_PATH=N
+# OPTIONS="--relative-paths"
 
 ## Remove timestamp from bees output
 # LOG_FILTER_TIME=N
