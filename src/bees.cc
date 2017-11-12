@@ -37,6 +37,8 @@ do_cmd_help(char *argv[])
 		"\t-h, --help\t\tShow this help\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --notimestamps\tOmit timestamps in log output\n"
+		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
+		"\t-P, --relative-paths\tShow paths relative to $CWD\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -597,6 +599,8 @@ bees_main(int argc, char *argv[])
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 
+	string cwd(readlink_or_die("/proc/self/cwd"));
+
 	// Defaults
 	bool chatter_prefix_timestamp = true;
 
@@ -607,10 +611,12 @@ bees_main(int argc, char *argv[])
 		static struct option long_options[] = {
 			{ "timestamps",   no_argument, NULL, 't' },
 			{ "notimestamps", no_argument, NULL, 'T' },
+			{ "absolute-paths", no_argument, NULL, 'p' },
+			{ "relative-paths", no_argument, NULL, 'P' },
 			{ "help",         no_argument, NULL, 'h' }
 		};
 
-		c = getopt_long(argc, argv, "Tth", long_options, &option_index);
+		c = getopt_long(argc, argv, "TtPph", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
@@ -622,6 +628,12 @@ bees_main(int argc, char *argv[])
 			case 't':
 				chatter_prefix_timestamp = true;
 				break;
+			case 'P':
+				crucible::set_relative_path(cwd);
+				break;
+			case 'p':
+				crucible::set_relative_path("");
+				break;
 			case 'h':
 				do_cmd_help(argv);
 			default:
@@ -630,6 +642,10 @@ bees_main(int argc, char *argv[])
 	}
 
 	Chatter::enable_timestamp(chatter_prefix_timestamp);
+
+	if (!relative_path().empty()) {
+		BEESLOG("using relative path " << relative_path() << "\n");
+	}
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
