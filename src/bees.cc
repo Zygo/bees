@@ -609,11 +609,11 @@ bees_main(int argc, char *argv[])
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{ "timestamps",   no_argument, NULL, 't' },
-			{ "notimestamps", no_argument, NULL, 'T' },
+			{ "timestamps",     no_argument, NULL, 't' },
+			{ "notimestamps",   no_argument, NULL, 'T' },
 			{ "absolute-paths", no_argument, NULL, 'p' },
 			{ "relative-paths", no_argument, NULL, 'P' },
-			{ "help",         no_argument, NULL, 'h' }
+			{ "help",           no_argument, NULL, 'h' }
 		};
 
 		c = getopt_long(argc, argv, "TtPph", long_options, &option_index);
