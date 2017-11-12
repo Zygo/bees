@@ -19,7 +19,7 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # OPTIONS="--relative-paths"
 
 ## Remove timestamp from bees output
-# LOG_FILTER_TIME=N
+# OPTIONS="--notimestamps"
 
 ## Bees DB size
 # Hash Table Sizing
