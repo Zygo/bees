@@ -637,7 +637,7 @@ bees_main(int argc, char *argv[])
 				chatter_prefix_timestamp = true;
 				break;
 			case 'h':
-				do_cmd_help(argv);
+				do_cmd_help(argv); // fallthrough
 			default:
 				return 2;
 		}
