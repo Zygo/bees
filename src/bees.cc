@@ -635,7 +635,7 @@ bees_main(int argc, char *argv[])
 				crucible::set_relative_path("");
 				break;
 			case 'h':
-				do_cmd_help(argv);
+				do_cmd_help(argv); // fallthrough
 			default:
 				return 2;
 		}
