@@ -7,7 +7,7 @@ MARKDOWN ?= markdown
 # allow local configuration to override above variables
 -include localconf
 
-default all: lib src test README.html
+default all: lib src scripts test README.html
 
 clean: ## Cleanup
 	git clean -dfx
