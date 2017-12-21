@@ -7,9 +7,6 @@ MARKDOWN ?= markdown
 # allow local configuration to override above variables
 -include localconf
 
-MARKDOWN := $(shell which markdown markdown2 markdown_py 2>/dev/null)
-MARKDOWN ?= markdown
-
 default all: lib src test README.html
 
 clean: ## Cleanup
