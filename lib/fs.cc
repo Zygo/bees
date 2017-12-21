@@ -625,7 +625,7 @@ namespace crucible {
 	void
 	Fiemap::do_ioctl(int fd)
 	{
-		CHECK_CONSTRAINT(m_min_count, m_min_count <= m_max_count);
+		THROW_CHECK1(out_of_range, m_min_count, m_min_count <= m_max_count);
 
 		auto extent_count = m_min_count;
 		vector<char> ioctl_arg = vector_copy_struct<fiemap>(this);
