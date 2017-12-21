@@ -100,12 +100,6 @@ namespace crucible {
 } while (0)
 
 // macros for checking a constraint
-#define CHECK_CONSTRAINT(value, expr) do { \
-	if (!(expr)) { \
-		THROW_ERROR(out_of_range, #value << " = " << value << " failed constraint check (" << #expr << ")"); \
-	} \
-} while(0)
-
 #define THROW_CHECK0(type, expr) do { \
 	if (!(expr)) { \
 		THROW_ERROR(type, "failed constraint check (" << #expr << ")"); \
