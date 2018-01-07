@@ -1,7 +1,7 @@
 PREFIX ?= /
 LIBEXEC_PREFIX ?= $(PREFIX)/usr/lib/bees
 
-MARKDOWN := $(shell which markdown markdown2 markdown_py 2>/dev/null)
+MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null))
 MARKDOWN ?= markdown
 
 # allow local configuration to override above variables
