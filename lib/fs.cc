@@ -468,6 +468,7 @@ namespace crucible {
 		static const bits_ntoa_table table[] = {
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_ZLIB),
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_LZO),
+			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_ZSTD),
 			NTOA_TABLE_ENTRY_END()
 		};
 		return bits_ntoa(compress_type, table);
