@@ -10,7 +10,7 @@ MARKDOWN ?= markdown
 default all: lib src test README.html
 
 clean: ## Cleanup
-	git clean -dfx
+	git clean -dfx -e localconf
 
 .PHONY: lib src test
 
