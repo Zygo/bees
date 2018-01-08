@@ -527,6 +527,22 @@ namespace crucible {
 		THROW_ERROR(runtime_error, "readlink: maximum buffer size exceeded");
 	}
 
+	string
+	relative_path()
+	{
+		return __relative_path;
+	}
+
+	void
+	set_relative_path(string path)
+	{
+		path = path + "/";
+		for (string::size_type i = path.find("//"); i != string::npos; i = path.find("//")) {
+			path.erase(i, 1);
+		}
+		__relative_path = path;
+	}
+
 	// Turn a FD into a human-recognizable filename OR an error message.
 	string
 	name_fd(int fd)
@@ -534,7 +550,12 @@ namespace crucible {
 		try {
 			ostringstream oss;
 			oss << "/proc/self/fd/" << fd;
-			return readlink_or_die(oss.str());
+			string path = readlink_or_die(oss.str());
+			if (!__relative_path.empty() && 0 == path.find(__relative_path))
+			{
+				path.erase(0, __relative_path.length());
+			}
+			return path;
 		} catch (exception &e) {
 			return string(e.what());
 		}

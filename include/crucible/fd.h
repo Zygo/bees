@@ -57,6 +57,10 @@ namespace crucible {
 
         typedef ResourceHandle<int, IOHandle> Fd;
 
+	static string __relative_path;
+	void set_relative_path(string path);
+	string relative_path();
+
 	// Functions named "foo_or_die" throw exceptions on failure.
 
 	// Attempt to open the file with the given mode

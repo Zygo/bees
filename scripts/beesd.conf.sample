@@ -15,11 +15,8 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # BEESHOME="$MNT_DIR/.beeshome"
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
-## Make path shorter in logs
-# LOG_SHORT_PATH=N
-
-## Remove timestamp from bees output
-# LOG_FILTER_TIME=N
+## Default options to apply, see --help for details
+# OPTIONS="--relative-paths --notimestamps"
 
 ## Bees DB size
 # Hash Table Sizing
