@@ -166,6 +166,7 @@ Bees has been tested in combination with the following:
 * Large (>16M) extents
 * Huge files (>1TB--although Btrfs performance on such files isn't great in general)
 * filesystems up to 25T bytes, 100M+ files
+* btrfs read-only snapshots
 
 Bad Btrfs Feature Interactions
 ------------------------------
@@ -174,15 +175,13 @@ Bees has not been tested with the following, and undesirable interactions may oc
 
 * Non-4K filesystem data block size (should work if recompiled)
 * Non-equal hash (SUM) and filesystem data block (CLONE) sizes (probably never will work)
-* btrfs read-only snapshots (never tested, probably wouldn't work well)
-* btrfs send/receive (receive is probably OK, but send requires RO snapshots.  See above)
+* btrfs send/receive (receive is probably OK, but send could be confused?)
 * btrfs qgroups (never tested, no idea what might happen)
 * btrfs seed filesystems (does anyone even use those?)
 * btrfs autodefrag mount option (never tested, could fight with Bees)
-* btrfs nodatacow inode attribute (needs datasum detection on extents, skipped for now)
-* btrfs nodatacow mount option (*could* work, but might not, skipped due to above note)
+* btrfs nodatacow/nodatasum inode attribute or mount option (bees skips all nodatasum files)
 * btrfs out-of-tree kernel patches (e.g. in-band dedup or encryption)
-* btrfs-convert from ext2/3/4 (never tested)
+* btrfs-convert from ext2/3/4 (never tested, might run out of space or ignore significant portions of the filesystem due to sanity checks)
 * btrfs mixed block groups (don't know a reason why it would *not* work, but never tested)
 * open(O_DIRECT)
 * Filesystems mounted *without* the flushoncommit option
@@ -190,7 +189,7 @@ Bees has not been tested with the following, and undesirable interactions may oc
 Other Caveats
 -------------
 
-* btrfs balance will invalidate parts of the dedup table.  Bees will
+* btrfs balance will invalidate parts of the dedup hash table.  Bees will
   happily rebuild the table, but it will have to scan all the blocks
   again.
 
@@ -201,17 +200,35 @@ Other Caveats
 
 * Bees creates temporary files (with O_TMPFILE) and uses them to split
   and combine extents elsewhere in btrfs.  These will take up to 2GB
-  during normal operation.
+  of disk space per thread during normal operation.
 
 * Like all deduplicators, Bees will replace data blocks with metadata
-  references.  It is a good idea to ensure there are several GB of
-  unallocated space (see `btrfs fi df`) on the filesystem before running
-  Bees for the first time.  Use
+  references.  It is a good idea to ensure there is sufficient unallocated
+  space (see `btrfs fi usage`) on the filesystem to allow the metadata
+  to multiply in size by the number of snapshots before running Bees
+  for the first time.  Use
 
-        btrfs balance start -dusage=100,limit=1 /your/filesystem
+        btrfs balance start -dusage=100,limit=N /your/filesystem
 
-  If possible, raise the `limit` parameter to the current size of metadata
-  usage (from `btrfs fi df`) plus 1.
+  where the `limit` parameter 'N' should be calculated as follows:
+
+	* start with the current size of metadata usage (from `btrfs fi
+	  df`) in GB, plus 1
+
+	* multiply by the proportion of disk space in subvols with
+	  snapshots (i.e. if there are no snapshots, multiply by 0;
+	  if all of the data is shared between at least one origin
+	  and one snapshot subvol, multiply by 1)
+
+	* multiply by the number of snapshots (i.e. if there is only
+	  one subvol, multiply by 0; if there are 3 snapshots and one
+	  origin subvol, multiply by 3)
+
+  `limit = GB_metadata * (disk_space_in_snapshots / total_disk_space) * number_of_snapshots`
+
+  Monitor unallocated space to ensure that the filesystem never runs out
+  of metadata space (whether Bees is running or not--this is a general
+  btrfs requirement).
 
 
 A Brief List Of Btrfs Kernel Bugs
@@ -224,18 +241,27 @@ Missing features (usually not available in older LTS kernels):
 * 3.16: `SEARCH_V2` ioctl added.  Bees could use `SEARCH` instead.
 * 4.2: `FILE_EXTENT_SAME` no longer updates mtime, can be used at EOF.
 
+Future features (kernel features Bees does not yet use, but may rely on
+in the future):
+
+* 4.14: `LOGICAL_INO_V2` allows userspace to create forward and backward
+  reference maps to entire physical extents with a single ioctl call,
+  and raises the limit of 2730 references per extent.  Bees has not yet
+  been rewritten to take full advantage of these features.
+
 Bug fixes (sometimes included in older LTS kernels):
 
+* Bugs fixed prior to 4.4.3 are not listed here.
 * 4.5: hang in the `INO_PATHS` ioctl used by Bees.
 * 4.5: use-after-free in the `FILE_EXTENT_SAME` ioctl used by Bees.
 * 4.6: lost inodes after a rename, crash, and log tree replay
   (triggered by the fsync() while writing `beescrawl.dat`).
 * 4.7: *slow backref* bug no longer triggers a softlockup panic.  It still
-  too long to resolve a block address to a root/inode/offset triple.
+  takes too long to resolve a block address to a root/inode/offset triple.
 * 4.10: reduced CPU time cost of the LOGICAL_INO ioctl and dedup
   backref processing in general.
-* 4.13 integration trees: 053582a7d423 btrfs: add cond_resched() calls
-  when resolving backrefs
+* 4.11: yet another dedup deadlock case is fixed.
+* 4.14: backref performance improvements make LOGICAL_INO even faster.
 
 Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
 
@@ -246,7 +272,7 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   measuring the time the kernel spends performing certain operations
   and permanently blacklisting any extent or hash where the kernel
   starts to get slow.  Inside Bees, such blocks are marked as 'toxic'
-  hash/block addresses.
+  hash/block addresses.  *Needs to be retested after v4.14.*
 
 * `LOGICAL_INO` output is arbitrarily limited to 2730 references
   even if more buffer space is provided for results.  Once this number
@@ -257,6 +283,7 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   This places an obvious limit on dedup efficiency for extremely common
   blocks or filesystems with many snapshots (although this limit is
   far greater than the effective limit imposed by the *slow backref* bug).
+  *Fixed in v4.14.*
 
 * `LOGICAL_INO` on compressed extents returns a list of root/inode/offset
   tuples matching the extent bytenr of its argument.  On uncompressed
@@ -266,7 +293,7 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   references requires calling `LOGICAL_INO` for every single block of
   the extent.  This is undesirable behavior for Bees, which wants a
   list of all extent refs referencing a data extent (i.e. Bees wants
-  the compressed-extent behavior in all cases).
+  the compressed-extent behavior in all cases).  *Fixed in v4.14.*
 
 * `LOGICAL_INO` is only called from one thread at any time per process.
   This means at most one core is irretrievably stuck in this ioctl.
@@ -275,13 +302,6 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   128MB which is the maximum extent size that can be created by defrag
   or prealloc.  Bees avoids feedback loops this can generate while
   attempting to replace extents over 16MB in length.
-
-* `DEFRAG_RANGE` is useless.  The ioctl attempts to implement `btrfs
-  fi defrag` in the kernel, and will arbitrarily defragment more or
-  less than the range requested to match the behavior expected from the
-  userspace tool.  Bees implements its own defrag instead, copying data
-  to a temporary file and using the `FILE_EXTENT_SAME` ioctl to replace
-  precisely the specified range of offending fragmented blocks.
 
 * If the `fsync()` in `BeesTempFile::make_copy` is removed, the filesystem
   hangs within a few hours, requiring a reboot to recover.  On the other
