@@ -64,7 +64,6 @@ MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((64*AL16M))}"
-LOG_SHORT_PATH="${LOG_SHORT_PATH:-N}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
@@ -116,14 +115,4 @@ fi
 
 MNT_DIR="${MNT_DIR//\/\//\/}"
 
-filter_path(){
-    if YN $LOG_SHORT_PATH; then
-        sed -e "s#$MNT_DIR##g"
-    else
-        cat
-    fi
-}
-
-@LIBEXEC_PREFIX@/bees ${ARGUMENTS[@]} $OPTIONS "$MNT_DIR" 3>&1 2>&1 | filter_path
-
-exit 0
+cd $MNT_DIR && exec @LIBEXEC_PREFIX@/bees ${ARGUMENTS[@]} $OPTIONS "$MNT_DIR"
