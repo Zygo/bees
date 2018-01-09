@@ -1,5 +1,6 @@
 [Unit]
-Description=Bees - Best-Effort Extent-Same, a btrfs deduplicator daemon: %i
+Description=Bees (%i)
+Documentation=https://github.com/Zygo/bees
 After=sysinit.target
 
 [Service]
