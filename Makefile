@@ -40,7 +40,7 @@ install: lib src test
 	install -Dm755 bin/bees	$(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
-install_scripts:
+install_scripts: scripts
 	install -Dm755 scripts/beesd $(PREFIX)/usr/sbin/beesd
 	install -Dm644 scripts/beesd.conf.sample $(PREFIX)/etc/bees/beesd.conf.sample
 	install -Dm644 scripts/beesd@.service $(PREFIX)/lib/systemd/system/beesd@.service
