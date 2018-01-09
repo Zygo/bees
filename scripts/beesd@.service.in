@@ -1,6 +1,6 @@
 [Unit]
 Description=Bees - Best-Effort Extent-Same, a btrfs deduplicator daemon: %i
-After=local-fs.target
+After=sysinit.target
 
 [Service]
 Type=simple
