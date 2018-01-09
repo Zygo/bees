@@ -21,4 +21,4 @@ CPUAccounting=true
 MemoryAccounting=true
 
 [Install]
-WantedBy=local-fs.target
+WantedBy=basic.target
