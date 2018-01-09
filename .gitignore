@@ -12,3 +12,4 @@ make.log
 make.log.new
 localconf
 scripts/beesd
+scripts/beesd@.service
