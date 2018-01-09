@@ -115,4 +115,5 @@ fi
 
 MNT_DIR="${MNT_DIR//\/\//\/}"
 
-cd $MNT_DIR && exec @LIBEXEC_PREFIX@/bees ${ARGUMENTS[@]} $OPTIONS "$MNT_DIR"
+cd "$MNT_DIR"
+@LIBEXEC_PREFIX@/bees "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
