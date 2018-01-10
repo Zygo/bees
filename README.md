@@ -322,8 +322,8 @@ Not really a bug, but a gotcha nonetheless:
   To limit this delay, Bees closes all FDs in its file FD cache every
   15 minutes.
 
-Build
------
+Build from source
+-----------------
 
 Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`,
 which must be copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH`
