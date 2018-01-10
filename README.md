@@ -327,6 +327,13 @@ Installation
 
 Bees can be installed by following one these instructions:
 
+Arch package
+------------
+
+Bees is availabe Arch Linux AUR. Install with:
+
+`$ pacaur -S bees-git`
+
 Build from source
 -----------------
 
