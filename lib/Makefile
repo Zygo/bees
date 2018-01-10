@@ -33,4 +33,4 @@ depends.mk: *.cc
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 libcrucible.so: $(OBJS) Makefile
-	$(CXX) $(LDFLAGS) -o $@ $(OBJS) -shared -luuid
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS) -shared -Wl,-soname,$@ -luuid

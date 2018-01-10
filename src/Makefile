@@ -8,7 +8,7 @@ all: $(PROGRAMS) depends.mk
 include ../makeflags
 
 LIBS = -lcrucible -lpthread
-LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
+LDFLAGS = -L../lib
 
 depends.mk: Makefile *.cc
 	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
