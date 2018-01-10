@@ -381,6 +381,9 @@ Dependencies
 Setup
 -----
 
+If you don't want to use the helper script `scripts/beesd` to setup and
+configure bees, here's how you manually setup bees.
+
 Create a directory for bees state files:
 
         export BEESHOME=/some/path
