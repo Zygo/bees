@@ -1,5 +1,9 @@
 PREFIX ?= /
-LIBEXEC_PREFIX ?= $(PREFIX)/usr/lib/bees
+LIBDIR ?= lib
+USR_PREFIX ?= $(PREFIX)/usr
+USRLIB_PREFIX ?= $(USR_PREFIX)/$(LIBDIR)
+SYSTEMD_LIB_PREFIX ?= $(PREFIX)/lib/systemd
+LIBEXEC_PREFIX ?= $(USRLIB_PREFIX)/bees
 
 MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null))
 MARKDOWN ?= markdown
@@ -36,14 +40,14 @@ README.html: README.md
 
 install_bees: ## Install bees + libs
 install_bees: lib src test
-	install -Dm644 lib/libcrucible.so $(DESTDIR)$(PREFIX)/usr/lib/libcrucible.so
+	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
 install_scripts: scripts
-	install -Dm755 scripts/beesd $(DESTDIR)$(PREFIX)/usr/sbin/beesd
+	install -Dm755 scripts/beesd $(DESTDIR)$(USR_PREFIX)/sbin/beesd
 	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(PREFIX)/etc/bees/beesd.conf.sample
-	install -Dm644 scripts/beesd@.service $(DESTDIR)$(PREFIX)/lib/systemd/system/beesd@.service
+	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_LIB_PREFIX)/system/beesd@.service
 
 install: ## Install distribution
 install: install_bees install_scripts
