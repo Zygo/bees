@@ -334,6 +334,11 @@ Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`,
 which must be copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH`
 on the target system respectively.
 
+It will also generate `scripts/beesd@.service` for systemd users. This
+service makes use of a helper script `scripts/beesd` to boot the service.
+Both of the latter use the filesystem UUID to mount the root subvolume
+within a temporary runtime directory.
+
 ### Ubuntu 16.04 - 17.04:
 `$ apt -y install build-essential btrfs-tools uuid-dev markdown && make`
 
