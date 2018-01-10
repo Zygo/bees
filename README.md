@@ -372,6 +372,8 @@ Dependencies
 
 * markdown
 
+* util-linux version that provides `blkid` command for the helper
+  script `scripts/beesd` to work
 
 Setup
 -----
