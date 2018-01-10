@@ -50,3 +50,6 @@ install: install_bees install_scripts
 
 help: ## Show help
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/\t/'
+
+bees: all
+fly: install
