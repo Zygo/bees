@@ -322,6 +322,11 @@ Not really a bug, but a gotcha nonetheless:
   To limit this delay, Bees closes all FDs in its file FD cache every
   15 minutes.
 
+Installation
+============
+
+Bees can be installed by following one these instructions:
+
 Build from source
 -----------------
 
