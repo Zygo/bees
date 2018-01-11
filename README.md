@@ -330,9 +330,20 @@ Bees can be installed by following one these instructions:
 Arch package
 ------------
 
-Bees is availabe Arch Linux AUR. Install with:
+Bees is availabe in Arch Linux AUR. Install with:
 
 `$ pacaur -S bees-git`
+
+Gentoo ebuild
+-------------
+
+Bees is available as a Gentoo ebuild. Just copy `bees-9999.ebuild` from
+`contrib/gentoo` including the `files` subdirectory to your local
+overlay category `sys-fs`.
+
+You can copy the ebuild to match a Bees version number, and it will
+build that tagged version. It is partly supported since v0.5,
+previous versions won't work.
 
 Build from source
 -----------------
