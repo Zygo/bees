@@ -432,18 +432,24 @@ private:
 	uint64_t		m_buckets;
 	uint64_t		m_extents;
 	uint64_t		m_cells;
-	set<uint64_t>		m_buckets_dirty;
-	set<uint64_t>		m_buckets_missing;
 	BeesThread  		m_writeback_thread;
 	BeesThread	        m_prefetch_thread;
 	RateLimiter		m_flush_rate_limit;
-	mutex			m_extent_mutex;
-	mutex			m_bucket_mutex;
-	condition_variable	m_condvar;
 	set<HashType>		m_toxic_hashes;
 	BeesStringFile		m_stats_file;
 
-	LockSet<uint64_t> 	m_extent_lock_set;
+	// Mutex/condvar for the writeback thread
+	mutex			m_dirty_mutex;
+	condition_variable	m_dirty_condvar;
+
+	// Per-extent structures
+	struct ExtentMetaData {
+		shared_ptr<mutex> m_mutex_ptr;		// Access serializer
+		bool	m_dirty = false;	// Needs to be written back to disk
+		bool	m_missing = true;	// Needs to be read from disk
+		ExtentMetaData();
+	};
+	vector<ExtentMetaData>	m_extent_metadata;
 
 	void open_file();
 	void writeback_loop();
@@ -451,10 +457,16 @@ private:
 	void try_mmap_flags(int flags);
 	pair<Cell *, Cell *> get_cell_range(HashType hash);
 	pair<uint8_t *, uint8_t *> get_extent_range(HashType hash);
-	void fetch_missing_extent(HashType hash);
-	void set_extent_dirty(HashType hash);
+	void fetch_missing_extent_by_hash(HashType hash);
+	void fetch_missing_extent_by_index(uint64_t extent_index);
+	void set_extent_dirty_locked(uint64_t extent_index);
 	void flush_dirty_extents();
+	bool flush_dirty_extent(uint64_t extent_index);
 	bool is_toxic_hash(HashType h) const;
+
+	size_t			hash_to_extent_index(HashType ht);
+	unique_lock<mutex>	lock_extent_by_hash(HashType ht);
+	unique_lock<mutex>	lock_extent_by_index(uint64_t extent_index);
 
 	BeesHashTable(const BeesHashTable &) = delete;
 	BeesHashTable &operator=(const BeesHashTable &) = delete;

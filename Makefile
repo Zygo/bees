@@ -1,5 +1,9 @@
 PREFIX ?= /
-LIBEXEC_PREFIX ?= $(PREFIX)/usr/lib/bees
+LIBDIR ?= lib
+USR_PREFIX ?= $(PREFIX)/usr
+USRLIB_PREFIX ?= $(USR_PREFIX)/$(LIBDIR)
+SYSTEMD_LIB_PREFIX ?= $(PREFIX)/lib/systemd
+LIBEXEC_PREFIX ?= $(USRLIB_PREFIX)/bees
 
 MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null))
 MARKDOWN ?= markdown
@@ -7,10 +11,10 @@ MARKDOWN ?= markdown
 # allow local configuration to override above variables
 -include localconf
 
-default all: lib src test README.html
+default all: lib src scripts test README.html
 
 clean: ## Cleanup
-	git clean -dfx
+	git clean -dfx -e localconf
 
 .PHONY: lib src test
 
@@ -25,10 +29,7 @@ test: ## Run tests
 test: lib src
 	$(MAKE) -C test
 
-scripts/beesd: scripts/beesd.in
-	sed -e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#' -e's#@PREFIX@#$(PREFIX)#' "$<" >"$@"
-
-scripts/beesd@.service: scripts/beesd@.service.in
+scripts/%: scripts/%.in
 	sed -e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#' -e's#@PREFIX@#$(PREFIX)#' "$<" >"$@"
 
 scripts: scripts/beesd scripts/beesd@.service
@@ -37,16 +38,22 @@ README.html: README.md
 	$(MARKDOWN) README.md > README.html.new
 	mv -f README.html.new README.html
 
-install: ## Install bees + libs
-install: lib src test
-	install -Dm644 lib/libcrucible.so $(PREFIX)/usr/lib/libcrucible.so
-	install -Dm755 bin/bees	$(LIBEXEC_PREFIX)/bees
+install_bees: ## Install bees + libs
+install_bees: lib src test
+	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
+	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
-install_scripts:
-	install -Dm755 scripts/beesd $(PREFIX)/usr/sbin/beesd
-	install -Dm644 scripts/beesd.conf.sample $(PREFIX)/etc/bees/beesd.conf.sample
-	install -Dm644 scripts/beesd@.service $(PREFIX)/lib/systemd/system/beesd@.service
+install_scripts: scripts
+	install -Dm755 scripts/beesd $(DESTDIR)$(USR_PREFIX)/sbin/beesd
+	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(PREFIX)/etc/bees/beesd.conf.sample
+	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_LIB_PREFIX)/system/beesd@.service
+
+install: ## Install distribution
+install: install_bees install_scripts
 
 help: ## Show help
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/\t/'
+
+bees: all
+fly: install
