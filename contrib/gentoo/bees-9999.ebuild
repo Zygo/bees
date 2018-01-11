@@ -12,9 +12,7 @@ if [[ ${PV} == "9999" ]] ; then
 	EGIT_REPO_URI="https://github.com/kakra/bees.git"
 	EGIT_BRANCH="integration"
 else
-	IUSE=""
-
-	SRC_URI="https://github.com/Zygo/bees/archive/v${PV}.tar.gz -> bees-${PV}.tar.gz"
+	SRC_URI="https://github.com/Zygo/bees/archive/v${PV}.tar.gz -> ${P}.tar.gz"
 fi
 
 PATCHES="
