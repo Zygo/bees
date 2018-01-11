@@ -636,11 +636,6 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	m_flush_rate_limit(BEES_FLUSH_RATE),
 	m_stats_file(m_ctx->home_fd(), "beesstats.txt")
 {
-	// Reduce disk thrashing at startup:  one reader at a time
-	// m_extent_lock_set.max_size(1);
-	// OK maybe a little faster
-	m_extent_lock_set.max_size(bees_worker_thread_count());
-
 	// Sanity checks to protect the implementation from its weaknesses
 	THROW_CHECK2(invalid_argument, BLOCK_SIZE_HASHTAB_BUCKET, BLOCK_SIZE_HASHTAB_EXTENT, (BLOCK_SIZE_HASHTAB_EXTENT % BLOCK_SIZE_HASHTAB_BUCKET) == 0);
 
