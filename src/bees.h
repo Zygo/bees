@@ -75,14 +75,25 @@ const int BEES_PROGRESS_INTERVAL = BEES_STATS_INTERVAL;
 // Status is output every freakin second.  Use a ramdisk.
 const int BEES_STATUS_INTERVAL = 1;
 
-// Number of FDs to open (not counting 100 roots)
-const size_t BEES_FD_CACHE_SIZE = 384;
+// Number of file FDs to cache when not in active use
+const size_t BEES_FILE_FD_CACHE_SIZE = 4096;
+
+// Number of root FDs to cache when not in active use
+const size_t BEES_ROOT_FD_CACHE_SIZE = 1024;
+
+// Number of FDs to open (rlimit)
+const size_t BEES_OPEN_FILE_LIMIT = (BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACHE_SIZE) * 2 + 100;
+
+// Worker thread limit (more threads may be created, but only this number will be active concurrently)
+const size_t BEES_WORKER_THREAD_LIMIT = 128;
 
 // Log warnings when an operation takes too long
 const double BEES_TOO_LONG = 2.5;
 
 // Avoid any extent where LOGICAL_INO takes this long
-const double BEES_TOXIC_DURATION = 9.9;
+// const double BEES_TOXIC_DURATION = 9.9;
+// EXPERIMENT:  Kernel v4.14+ may let us ignore toxicity
+const double BEES_TOXIC_DURATION = BEES_COMMIT_INTERVAL;
 
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;

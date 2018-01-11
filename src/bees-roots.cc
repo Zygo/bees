@@ -302,7 +302,8 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_writeback_thread("crawl_writeback")
 {
-	m_lock_set.max_size(bees_worker_thread_count());
+	// This is a sanity check to prevent us from running out of FDs
+	m_lock_set.max_size(BEES_WORKER_THREAD_LIMIT);
 
 	catch_all([&]() {
 		state_load();
