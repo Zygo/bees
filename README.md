@@ -322,8 +322,31 @@ Not really a bug, but a gotcha nonetheless:
   To limit this delay, Bees closes all FDs in its file FD cache every
   15 minutes.
 
-Build
------
+Installation
+============
+
+Bees can be installed by following one these instructions:
+
+Arch package
+------------
+
+Bees is availabe in Arch Linux AUR. Install with:
+
+`$ pacaur -S bees-git`
+
+Gentoo ebuild
+-------------
+
+Bees is available as a Gentoo ebuild. Just copy `bees-9999.ebuild` from
+`contrib/gentoo` including the `files` subdirectory to your local
+overlay category `sys-fs`.
+
+You can copy the ebuild to match a Bees version number, and it will
+build that tagged version. It is partly supported since v0.5,
+previous versions won't work.
+
+Build from source
+-----------------
 
 Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`,
 which must be copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH`
@@ -360,6 +383,8 @@ Dependencies
 
 * markdown
 
+* util-linux version that provides `blkid` command for the helper
+  script `scripts/beesd` to work
 
 Setup
 -----
