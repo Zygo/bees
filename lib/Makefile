@@ -1,3 +1,5 @@
+TAG := $(shell git describe --always --dirty || echo UNKNOWN)
+
 default: libcrucible.so
 
 OBJS = \
@@ -22,7 +24,7 @@ depends.mk: *.cc
 	mv -fv depends.mk.new depends.mk
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
-	echo "namespace crucible { const char *VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\"; }" > .version.new.cc
+	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > .version.new.cc
 	mv -f .version.new.cc .version.cc
 
 -include depends.mk
