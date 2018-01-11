@@ -24,12 +24,16 @@ SLOT="0"
 KEYWORDS=""
 IUSE=""
 
-DEPEND="
+COMMON_DEPEND="
 	>=sys-apps/util-linux-2.30.2
 	>=sys-devel/gcc-4.9
 	>=sys-fs/btrfs-progs-4.1
 "
-RDEPEND="${DEPEND}"
+DEPEND="
+	${COMMON_DEPEND}
+	|| ( dev-python/markdown dev-python/markdown2 )
+"
+RDEPEND="${COMMON_DEPEND}"
 
 DOCS="README.md COPYING"
 HTML_DOCS="README.html"
