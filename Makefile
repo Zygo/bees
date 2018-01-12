@@ -5,8 +5,7 @@ USRLIB_PREFIX ?= $(USR_PREFIX)/$(LIBDIR)
 SYSTEMD_LIB_PREFIX ?= $(PREFIX)/lib/systemd
 LIBEXEC_PREFIX ?= $(USRLIB_PREFIX)/bees
 
-MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null))
-MARKDOWN ?= markdown
+MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null || echo markdown))
 
 # allow local configuration to override above variables
 -include localconf
