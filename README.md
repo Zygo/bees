@@ -417,7 +417,7 @@ Dependencies
 * btrfs-progs (tested with 4.1..4.15.1)
 
   Needed for btrfs.h and ctree.h during compile.
-  Not needed at runtime.
+  Also needed by the service wrapper script.
 
 * libuuid-dev
 
