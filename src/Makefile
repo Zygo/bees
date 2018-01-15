@@ -18,7 +18,7 @@ bees-version.c: Makefile *.cc *.h
 	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
 	mv -f bees-version.new.c bees-version.c
 
--include depends.mk
+include depends.mk
 
 %.o: %.cc %.h
 	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"

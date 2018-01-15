@@ -29,7 +29,7 @@ depends.mk: *.cc
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > .version.new.cc
 	mv -f .version.new.cc .version.cc
 
--include depends.mk
+include depends.mk
 
 %.o: %.cc ../include/crucible/%.h
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
