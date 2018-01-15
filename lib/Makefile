@@ -31,7 +31,7 @@ depends.mk: *.cc
 
 include depends.mk
 
-%.o: %.cc ../include/crucible/%.h
+%.o: %.cc ../makeflags
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
 
 libcrucible.so: $(OBJS) Makefile
