@@ -29,8 +29,8 @@ depends.mk: *.cc
 	mv -fv $@.new $@
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
-	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > .version.new.cc
-	mv -f .version.new.cc .version.cc
+	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
+	mv -f $@.new $@
 
 include depends.mk
 
