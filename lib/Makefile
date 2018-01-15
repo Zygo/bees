@@ -26,7 +26,7 @@ include ../makeflags
 
 depends.mk: *.cc
 	for x in $^; do $(CXX) $(CXXFLAGS) -M -MG -MT "$${x/%.cc/.o}" "$$x"; done > $@.new
-	mv -fv $@.new $@
+	mv -f $@.new $@
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
