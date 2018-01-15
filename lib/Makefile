@@ -25,8 +25,8 @@ libcrucible.so: $(CRUCIBLE_OBJS)
 include ../makeflags
 
 depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
-	mv -fv depends.mk.new depends.mk
+	for x in $^; do $(CXX) $(CXXFLAGS) -M -MG -MT "$${x/%.cc/.o}" "$$x"; done > $@.new
+	mv -fv $@.new $@
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > .version.new.cc
