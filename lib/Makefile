@@ -3,7 +3,7 @@ TAG := $(shell git describe --always --dirty || echo UNKNOWN)
 default: libcrucible.so
 %.so: Makefile
 
-OBJS = \
+CRUCIBLE_OBJS = \
 	chatter.o \
 	cleanup.o \
 	crc64.o \
@@ -20,7 +20,7 @@ OBJS = \
 	uuid.o \
 	.version.o \
 
-libcrucible.so: $(OBJS)
+libcrucible.so: $(CRUCIBLE_OBJS)
 
 include ../makeflags
 
