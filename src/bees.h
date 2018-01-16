@@ -82,8 +82,8 @@ const size_t BEES_ROOT_FD_CACHE_SIZE = 1024;
 // Number of FDs to open (rlimit)
 const size_t BEES_OPEN_FILE_LIMIT = (BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACHE_SIZE) * 2 + 100;
 
-// Worker thread limit (more threads may be created, but only this number will be active concurrently)
-const size_t BEES_WORKER_THREAD_LIMIT = 128;
+// Worker thread factor (multiplied by detected number of CPU cores)
+const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
 
 // Log warnings when an operation takes too long
 const double BEES_TOO_LONG = 2.5;
@@ -516,7 +516,7 @@ public:
 	void set_state(const BeesCrawlState &bcs);
 };
 
-class BeesRoots {
+class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
 	BeesStringFile				m_crawl_state_file;
@@ -677,6 +677,8 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 
 	Timer						m_total_timer;
 
+	LockSet<uint64_t>				m_extent_lock_set;
+
 	void set_root_fd(Fd fd);
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
@@ -714,6 +716,7 @@ public:
 	shared_ptr<BeesTempFile> tmpfile();
 
 	const Timer &total_timer() const { return m_total_timer; }
+	LockSet<uint64_t> &extent_lock_set() { return m_extent_lock_set; }
 
 	// TODO: move the rest of the FD cache methods here
 	void insert_root_ino(Fd fd);

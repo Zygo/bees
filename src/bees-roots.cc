@@ -2,6 +2,7 @@
 
 #include "crucible/cache.h"
 #include "crucible/string.h"
+#include "crucible/task.h"
 
 #include <fstream>
 #include <tuple>
@@ -197,16 +198,16 @@ BeesRoots::crawl_roots()
 	BEESNOTE("Crawling roots");
 
 	unique_lock<mutex> lock(m_mutex);
-	if (m_root_crawl_map.empty()) {
-		BEESNOTE("idle, crawl map is empty");
-		m_condvar.wait(lock);
-		// Don't count the time we were waiting as part of the crawl time
-		m_crawl_timer.reset();
-	}
-
 	// Work from a copy because BeesCrawl might change the world under us
 	auto crawl_map_copy = m_root_crawl_map;
 	lock.unlock();
+
+	// Nothing to crawl?  Seems suspicious...
+	if (m_root_crawl_map.empty()) {
+		BEESLOG("idle: crawl map is empty!");
+	}
+
+	auto ctx_copy = m_ctx;
 
 #if 0
 	// Scan the same inode/offset tuple in each subvol (good for snapshots)
@@ -224,10 +225,13 @@ BeesRoots::crawl_roots()
 	}
 
 	if (first_range) {
-		catch_all([&]() {
+		Task([ctx_copy, first_range]() {
 			// BEESINFO("scan_forward " << first_range);
-			m_ctx->scan_forward(first_range);
-		});
+			ctx_copy->scan_forward(first_range);
+		},
+		[first_range](ostream &os) -> ostream & {
+			return os << "scan_forward " << first_range;
+		}).run();
 		BEESCOUNT(crawl_scan);
 		m_crawl_current = first_crawl->get_state();
 		auto first_range_popped = first_crawl->pop_front();
@@ -241,10 +245,13 @@ BeesRoots::crawl_roots()
 		auto this_crawl = i.second;
 		auto this_range = this_crawl->peek_front();
 		if (this_range) {
-			catch_all([&]() {
+			Task([ctx_copy, this_range]() {
 				// BEESINFO("scan_forward " << this_range);
-				m_ctx->scan_forward(this_range);
-			});
+				ctx_copy->scan_forward(this_range);
+			},
+			[this_range](ostream &os) -> ostream & {
+				return os << "scan_forward " << this_range;
+			}).run();
 			crawled = true;
 			BEESCOUNT(crawl_scan);
 			m_crawl_current = this_crawl->get_state();
@@ -269,12 +276,23 @@ BeesRoots::crawl_roots()
 void
 BeesRoots::crawl_thread()
 {
+	// TODO:  get rid of the thread.  For now it is a convenient
+	// way to avoid the weird things that happen when you try to
+	// shared_from_this() in a constructor.
 	BEESNOTE("crawling");
-	while (1) {
-		catch_all([&]() {
-			crawl_roots();
-		});
-	}
+	auto shared_this = shared_from_this();
+	Task([shared_this]() {
+		auto tqs = TaskMaster::get_queue_count();
+		while (tqs < BEES_MAX_QUEUE_SIZE) {
+			// BEESLOG("Task queue size " << tqs << ", crawling...");
+			catch_all([&]() {
+				shared_this->crawl_roots();
+			});
+			tqs = TaskMaster::get_queue_count();
+		}
+		BEESLOG("Task queue size " << tqs << ", paused");
+		Task::current_task().run();
+	}, [](ostream &os) -> ostream& { return os << "crawl task"; }).run();
 }
 
 void

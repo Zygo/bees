@@ -488,6 +488,28 @@ of information about the contents of the filesystem through the log file.
 There are also some shell wrappers in the `scripts/` directory.
 
 
+
+Command Line Options
+--------------------
+
+* --thread-count (-c) COUNT
+  * Specify number of worker threads for scanning.  Overrides --thread-factor (-C)
+    and default/autodetected values.
+* --thread-factor (-C) FACTOR
+  * Specify ratio of worker threads to CPU cores.  Overridden by --thread-count (-c).
+    Default is 1.0, i.e. 1 worker thread per detected CPU.  Use values
+    below 1.0 to leave some cores idle, or above 1.0 if there are more
+    disks than CPUs in the filesystem.
+* --timestamps (-t)
+  * Enable timestamps in log output.
+* --notimestamps (-T)
+  * Disable timestamps in log output.
+* --absolute-paths (-p)
+  * Paths in log output will be absolute.
+* --relative-paths (-P)
+  * Paths in log output will be relative to the working directory at Bees startup.
+
+
 Bug Reports and Contributions
 -----------------------------
 

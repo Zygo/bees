@@ -2,6 +2,7 @@
 
 #include "crucible/limits.h"
 #include "crucible/string.h"
+#include "crucible/task.h"
 
 #include <fstream>
 #include <iostream>
@@ -94,10 +95,18 @@ BeesContext::dump_status()
 		ofs << "RATES:\n";
 		ofs << "\t" << avg_rates << "\n";
 
-		ofs << "THREADS:\n";
+		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " tasks):\n";
 		for (auto t : BeesNote::get_status()) {	
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}
+
+#if 0
+		// Huge amount of data, not a lot of information (yet)
+		ofs << "WORKERS:\n";
+		TaskMaster::print_workers(ofs);
+		ofs << "QUEUE:\n";
+		TaskMaster::print_queue(ofs);
+#endif
 
 		ofs.close();
 
@@ -719,6 +728,9 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 			e = ew.current();
 
 			catch_all([&]() {
+				uint64_t extent_bytenr = e.bytenr();
+				BEESNOTE("waiting for extent bytenr " << to_hex(extent_bytenr));
+				auto extent_lock = m_extent_lock_set.make_lock(extent_bytenr);
 				Timer one_extent_timer;
 				return_bfr = scan_one_extent(bfr, e);
 				BEESCOUNTADD(scanf_extent_ms, one_extent_timer.age() * 1000);
@@ -810,7 +822,8 @@ BeesContext::set_root_fd(Fd fd)
 	m_root_uuid = fsinfo.uuid();
 	BEESLOG("Filesystem UUID is " << m_root_uuid);
 
-	// 65536 is big enough for two max-sized extents
+	// 65536 is big enough for two max-sized extents.
+	// Need enough total space in the cache for the maximum number of active threads.
 	m_resolve_cache.max_size(65536);
 	m_resolve_cache.func([&](BeesAddress addr) -> BeesResolveAddrResult {
 		return resolve_addr_uncached(addr);

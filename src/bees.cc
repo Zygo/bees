@@ -3,6 +3,7 @@
 #include "crucible/limits.h"
 #include "crucible/process.h"
 #include "crucible/string.h"
+#include "crucible/task.h"
 
 #include <cctype>
 #include <cmath>
@@ -39,6 +40,8 @@ do_cmd_help(char *argv[])
 		"\n"
 		"Options:\n"
 		"\t-h, --help\t\tShow this help\n"
+		"\t-c, --thread-count\tWorker thread count (default CPU count * factor)\n"
+		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --notimestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
@@ -613,25 +616,35 @@ bees_main(int argc, char *argv[])
 
 	// Defaults
 	bool chatter_prefix_timestamp = true;
+	double thread_factor = 0;
+	unsigned thread_count = 0;
 
 	// Parse options
 	int c;
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{ "timestamps",     no_argument, NULL, 't' },
-			{ "notimestamps",   no_argument, NULL, 'T' },
-			{ "absolute-paths", no_argument, NULL, 'p' },
-			{ "relative-paths", no_argument, NULL, 'P' },
-			{ "help",           no_argument, NULL, 'h' }
+			{ "thread-count",   required_argument, NULL, 'c' },
+			{ "thread-factor",  required_argument, NULL, 'C' },
+			{ "timestamps",     no_argument,       NULL, 't' },
+			{ "notimestamps",   no_argument,       NULL, 'T' },
+			{ "absolute-paths", no_argument,       NULL, 'p' },
+			{ "relative-paths", no_argument,       NULL, 'P' },
+			{ "help",           no_argument,       NULL, 'h' }
 		};
 
-		c = getopt_long(argc, argv, "TtPph", long_options, &option_index);
+		c = getopt_long(argc, argv, "c:C:TtPph", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
 
 		switch (c) {
+			case 'c':
+				thread_count = stoul(optarg);
+				break;
+			case 'C':
+				thread_factor = stod(optarg);
+				break;
 			case 'T':
 				chatter_prefix_timestamp = false;
 				break;
@@ -667,6 +680,17 @@ bees_main(int argc, char *argv[])
 	if (rv) {
 		BEESLOG("setrlimit(RLIMIT_NOFILE, { " << lim.rlim_cur << " }): " << strerror(errno));
 	};
+
+	// Set up worker thread pool
+	THROW_CHECK1(out_of_range, thread_factor, thread_factor >= 0);
+	if (thread_count < 1) {
+		if (thread_factor == 0) {
+			thread_factor = BEES_DEFAULT_THREAD_FACTOR;
+		}
+		thread_count = max(1U, static_cast<unsigned>(ceil(thread::hardware_concurrency() * thread_factor)));
+	}
+
+	TaskMaster::set_thread_count(thread_count);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
