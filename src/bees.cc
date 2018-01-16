@@ -416,6 +416,12 @@ BeesStringFile::write(string contents)
 		// This triggers too many btrfs bugs.  I wish I was kidding.
 		// Forget snapshots, balance, compression, and dedup:
 		// the system call you have to fear on btrfs is fsync().
+		// Also note that when bees renames a temporary over an
+		// existing file, it flushes the temporary, so we get
+		// the right behavior if we just do nothing here
+		// (except when the file is first created; however,
+		// in that case the result is the same as if the file
+		// did not exist, was empty, or was filled with garbage).
 		BEESNOTE("fsyncing " << tmpname << " in " << name_fd(m_dir_fd));
 		DIE_IF_NON_ZERO(fsync(ofd));
 #endif

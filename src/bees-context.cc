@@ -173,13 +173,6 @@ BeesContext::dedup(const BeesRangePair &brp)
 	brp.first.fd(shared_from_this());
 	brp.second.fd(shared_from_this());
 
-#if 0
-	// This avoids some sort of kernel race condition;
-	// however, it also doubles our dedup times.
-	// Is avoiding a crash every few weeks worth it?
-	bees_sync(brp.first.fd());
-#endif
-
 	BEESTOOLONG("dedup " << brp);
 
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
