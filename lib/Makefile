@@ -14,6 +14,7 @@ OBJS = \
 	path.o \
 	process.o \
 	string.o \
+	task.o \
 	time.o \
 	uuid.o \
 	.version.o \
