@@ -738,7 +738,6 @@ BeesCrawl::fetch_extents()
 
 		BEESTRACE("i = " << i);
 
-#if 1
 		// We need the "+ 1" and objectid rollover that next_min does.
 		auto new_state = get_state();
 		new_state.m_objectid = sk.min_objectid;
@@ -750,7 +749,6 @@ BeesCrawl::fetch_extents()
 		// is a lot of metadata we can't process.  Favor forward
 		// progress over losing search results.
 		set_state(new_state);
-#endif
 
 		// Ignore things that aren't EXTENT_DATA_KEY
 		if (i.type != BTRFS_EXTENT_DATA_KEY) {
@@ -858,12 +856,6 @@ BeesCrawl::pop_front()
 	}
 	auto rv = *m_extents.begin();
 	m_extents.erase(m_extents.begin());
-#if 0
-	auto state = get_state();
-	state.m_objectid = rv.fid().ino();
-	state.m_offset = rv.begin();
-	set_state(state);
-#endif
 	return rv;
 }
 
