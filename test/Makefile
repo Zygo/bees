@@ -13,7 +13,7 @@ test: $(PROGRAMS)
 
 include ../makeflags
 
-LIBS = -lcrucible
+LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
 depends.mk: *.cc
