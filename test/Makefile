@@ -17,9 +17,13 @@ include ../makeflags
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
-depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
-	mv -fv depends.mk.new depends.mk
+.depends/%.dep: %.cc
+	@mkdir -p .depends
+	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+
+depends.mk: $(PROGRAMS:%=.depends/%.dep)
+	cat $^ > $@.new
+	mv -f $@.new $@
 
 include depends.mk
 

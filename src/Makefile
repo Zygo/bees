@@ -10,23 +10,6 @@ include ../makeflags
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib
 
-depends.mk: Makefile *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
-	mv -fv depends.mk.new depends.mk
-
-bees-version.c: Makefile *.cc *.h
-	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
-	mv -f bees-version.new.c bees-version.c
-
-include depends.mk
-
-%.o: %.cc %.h
-	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
-
-../bin/%: %.o
-	@echo Implicit bin rule "$<" '->' "$@"
-	$(CXX) $(CXXFLAGS) -o "$@" "$<" $(LDFLAGS) $(LIBS)
-
 BEES_OBJS = \
 	bees.o \
 	bees-context.o \
@@ -35,10 +18,30 @@ BEES_OBJS = \
 	bees-roots.o \
 	bees-thread.o \
 	bees-types.o \
-	bees-version.o \
 
-../bin/bees: $(BEES_OBJS)
-	$(CXX) $(CXXFLAGS) -o "$@" $(BEES_OBJS) $(LDFLAGS) $(LIBS)
+bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
+	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
+	mv -f bees-version.new.c bees-version.c
+
+.depends/%.dep: %.cc Makefile
+	@mkdir -p .depends
+	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+
+depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
+	cat $^ > $@.new
+	mv -f $@.new $@
+
+include depends.mk
+
+%.o: %.cc %.h
+	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+
+../bin/%: %.o
+	@echo Implicit bin rule "$<" '->' "$@"
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) -o $@ $<
+
+../bin/bees: $(BEES_OBJS) bees-version.o
+	$(CXX) $(CXXFLAGS) -o "$@" $^ $(LDFLAGS) $(LIBS)
 
 clean:
 	-rm -fv bees-version.h

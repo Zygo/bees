@@ -24,8 +24,12 @@ libcrucible.so: $(CRUCIBLE_OBJS)
 
 include ../makeflags
 
-depends.mk: *.cc
-	for x in $^; do $(CXX) $(CXXFLAGS) -M -MG -MT "$${x/%.cc/.o}" "$$x"; done > $@.new
+.depends/%.dep: %.cc Makefile
+	@mkdir -p .depends
+	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+
+depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
+	cat $^ > $@.new
 	mv -f $@.new $@
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
