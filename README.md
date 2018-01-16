@@ -260,8 +260,10 @@ Bug fixes (sometimes included in older LTS kernels):
   takes too long to resolve a block address to a root/inode/offset triple.
 * 4.10: reduced CPU time cost of the LOGICAL_INO ioctl and dedup
   backref processing in general.
-* 4.11: yet another dedup deadlock case is fixed.
-* 4.14: backref performance improvements make LOGICAL_INO even faster.
+* 4.11: yet another dedup deadlock case is fixed.  Alas, it is not the
+  last one.
+* 4.14: backref performance improvements make LOGICAL_INO even faster
+  in the worst cases (but possibly slower in the best cases?).
 
 Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
 
@@ -272,7 +274,7 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   measuring the time the kernel spends performing certain operations
   and permanently blacklisting any extent or hash where the kernel
   starts to get slow.  Inside Bees, such blocks are marked as 'toxic'
-  hash/block addresses.  *Needs to be retested after v4.14.*
+  hash/block addresses.
 
 * `LOGICAL_INO` output is arbitrarily limited to 2730 references
   even if more buffer space is provided for results.  Once this number
@@ -295,8 +297,9 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   list of all extent refs referencing a data extent (i.e. Bees wants
   the compressed-extent behavior in all cases).  *Fixed in v4.14.*
 
-* `LOGICAL_INO` is only called from one thread at any time per process.
-  This means at most one core is irretrievably stuck in this ioctl.
+* `LOGICAL_INO` was only called from one thread at any time per process.
+  This means at most one core was irretrievably stuck in this ioctl.
+  *Workaround removed in recent bees versions.*
 
 * `FILE_EXTENT_SAME` is arbitrarily limited to 16MB.  This is less than
   128MB which is the maximum extent size that can be created by defrag
@@ -381,10 +384,15 @@ Dependencies
   This library is only required for a feature that was removed after v0.1.
   The lingering support code can be removed.
 
-* Linux kernel 4.4.3 or later
+* Minimum Linux kernel version: 4.4.3
 
   Don't bother trying to make Bees work with older kernels.
   It won't end well.
+
+* Minimum *recommended* Linux kernel version: 4.11
+
+  Earlier kernels are usable with bees, but a few performance bugs
+  and hangs in dedup-related functions remain.
 
 * markdown
 
