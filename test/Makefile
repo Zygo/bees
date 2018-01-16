@@ -17,7 +17,7 @@ LIBS = -lcrucible
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
 depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done >> depends.mk.new
+	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
 	mv -fv depends.mk.new depends.mk
 
 -include depends.mk

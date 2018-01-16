@@ -21,7 +21,7 @@ OBJS = \
 include ../makeflags
 
 depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done >> depends.mk.new
+	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
 	mv -fv depends.mk.new depends.mk
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
