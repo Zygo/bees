@@ -1,6 +1,7 @@
 #include "bees.h"
 
 #include "crucible/cache.h"
+#include "crucible/ntoa.h"
 #include "crucible/string.h"
 #include "crucible/task.h"
 
@@ -9,6 +10,8 @@
 
 using namespace crucible;
 using namespace std;
+
+BeesRoots::ScanMode BeesRoots::s_scan_mode = BeesRoots::SCAN_MODE_ZERO;
 
 string
 format_time(time_t t)
@@ -45,6 +48,26 @@ BeesCrawlState::operator<(const BeesCrawlState &that) const
 {
 	return tie(m_objectid, m_offset, m_root, m_min_transid, m_max_transid)
 		< tie(that.m_objectid, that.m_offset, that.m_root, that.m_min_transid, that.m_max_transid);
+}
+
+string
+BeesRoots::scan_mode_ntoa(BeesRoots::ScanMode mode)
+{
+	static const bits_ntoa_table table[] = {
+		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ZERO),
+		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ONE),
+		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_COUNT),
+		NTOA_TABLE_ENTRY_END()
+	};
+	return bits_ntoa(mode, table);
+}
+
+void
+BeesRoots::set_scan_mode(ScanMode mode)
+{
+	THROW_CHECK1(invalid_argument, mode, mode < SCAN_MODE_COUNT);
+	s_scan_mode = mode;
+	BEESLOG("Scan mode set to " << mode << " (" << scan_mode_ntoa(mode) << ")");
 }
 
 string
@@ -209,59 +232,75 @@ BeesRoots::crawl_roots()
 
 	auto ctx_copy = m_ctx;
 
-#if 0
-	// Scan the same inode/offset tuple in each subvol (good for snapshots)
-	BeesFileRange first_range;
-	shared_ptr<BeesCrawl> first_crawl;
-	for (auto i : crawl_map_copy) {
-		auto this_crawl = i.second;
-		auto this_range = this_crawl->peek_front();
-		if (this_range) {
-			if (!first_range || this_range < first_range) {
-				first_crawl = this_crawl;
-				first_range = this_range;
+	switch (s_scan_mode) {
+		case SCAN_MODE_ZERO: {
+			// Scan the same inode/offset tuple in each subvol (good for snapshots)
+			BeesFileRange first_range;
+			shared_ptr<BeesCrawl> first_crawl;
+			for (auto i : crawl_map_copy) {
+				auto this_crawl = i.second;
+				auto this_range = this_crawl->peek_front();
+				if (this_range) {
+					if (!first_range || this_range < first_range) {
+						first_crawl = this_crawl;
+						first_range = this_range;
+					}
+				}
 			}
-		}
-	}
 
-	if (first_range) {
-		Task([ctx_copy, first_range]() {
-			// BEESINFO("scan_forward " << first_range);
-			ctx_copy->scan_forward(first_range);
-		},
-		[first_range](ostream &os) -> ostream & {
-			return os << "scan_forward " << first_range;
-		}).run();
-		BEESCOUNT(crawl_scan);
-		m_crawl_current = first_crawl->get_state();
-		auto first_range_popped = first_crawl->pop_front();
-		THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
-		return;
-	}
-#else
-	// Scan each subvol one extent at a time (good for continuous forward progress)
-	bool crawled = false;
-	for (auto i : crawl_map_copy) {
-		auto this_crawl = i.second;
-		auto this_range = this_crawl->peek_front();
-		if (this_range) {
-			Task([ctx_copy, this_range]() {
-				// BEESINFO("scan_forward " << this_range);
-				ctx_copy->scan_forward(this_range);
-			},
-			[this_range](ostream &os) -> ostream & {
-				return os << "scan_forward " << this_range;
-			}).run();
-			crawled = true;
-			BEESCOUNT(crawl_scan);
-			m_crawl_current = this_crawl->get_state();
-			auto this_range_popped = this_crawl->pop_front();
-			THROW_CHECK2(runtime_error, this_range, this_range_popped, this_range == this_range_popped);
-		}
-	}
+			size_t batch_count = 0;
+			while (first_range && batch_count < BEES_MAX_CRAWL_BATCH) {
+				Task([ctx_copy, first_range]() {
+					BEESNOTE("scan_forward " << first_range);
+					ctx_copy->scan_forward(first_range);
+				},
+				[first_range](ostream &os) -> ostream & {
+					return os << "scan_forward " << first_range;
+				}).run();
+				BEESCOUNT(crawl_scan);
+				m_crawl_current = first_crawl->get_state();
+				auto first_range_popped = first_crawl->pop_front();
+				THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
+				first_range = first_crawl->peek_front();
+				++batch_count;
+			}
 
-	if (crawled) return;
-#endif
+			if (first_range || batch_count) {
+				return;
+			}
+
+			break;
+		}
+		case SCAN_MODE_ONE: {
+			// Scan each subvol one extent at a time (good for continuous forward progress)
+			bool crawled = false;
+			for (auto i : crawl_map_copy) {
+				auto this_crawl = i.second;
+				auto this_range = this_crawl->peek_front();
+				size_t batch_count = 0;
+				while (this_range && batch_count < BEES_MAX_CRAWL_BATCH) {
+					Task([ctx_copy, this_range]() {
+						BEESNOTE("scan_forward " << this_range);
+						ctx_copy->scan_forward(this_range);
+					},
+					[this_range](ostream &os) -> ostream & {
+						return os << "scan_forward " << this_range;
+					}).run();
+					crawled = true;
+					BEESCOUNT(crawl_scan);
+					m_crawl_current = this_crawl->get_state();
+					auto this_range_popped = this_crawl->pop_front();
+					THROW_CHECK2(runtime_error, this_range, this_range_popped, this_range == this_range_popped);
+					this_range = this_crawl->peek_front();
+					++batch_count;
+				}
+			}
+
+			if (crawled) return;
+			break;
+		}
+		case SCAN_MODE_COUNT: assert(false); break;
+	}
 
 	BEESLOG("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
 	BEESCOUNT(crawl_done);
@@ -283,14 +322,13 @@ BeesRoots::crawl_thread()
 	auto shared_this = shared_from_this();
 	Task([shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
+		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
 		while (tqs < BEES_MAX_QUEUE_SIZE) {
-			// BEESLOG("Task queue size " << tqs << ", crawling...");
 			catch_all([&]() {
 				shared_this->crawl_roots();
 			});
 			tqs = TaskMaster::get_queue_count();
 		}
-		BEESLOG("Task queue size " << tqs << ", paused");
 		Task::current_task().run();
 	}, [](ostream &os) -> ostream& { return os << "crawl task"; }).run();
 }

@@ -86,7 +86,7 @@ const size_t BEES_OPEN_FILE_LIMIT = (BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACH
 const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
 
 // Log warnings when an operation takes too long
-const double BEES_TOO_LONG = 2.5;
+const double BEES_TOO_LONG = 5.0;
 
 // Avoid any extent where LOGICAL_INO takes this long
 // const double BEES_TOXIC_DURATION = 9.9;
@@ -100,11 +100,14 @@ const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 const double BEES_INFO_RATE = 10.0;
 const double BEES_INFO_BURST = 1.0;
 
-// After we have this many events queued, wait
-const size_t BEES_MAX_QUEUE_SIZE = 1024;
+// Stop growing the work queue after we have this many tasks queued
+const size_t BEES_MAX_QUEUE_SIZE = 128;
 
 // Read this many items at a time in SEARCHv2
-const size_t BEES_MAX_CRAWL_SIZE = 4096;
+const size_t BEES_MAX_CRAWL_SIZE = 1024;
+
+// Insert this many items before switching to a new subvol
+const size_t BEES_MAX_CRAWL_BATCH = 128;
 
 // If an extent has this many refs, pretend it does not exist
 // to avoid a crippling btrfs performance bug
@@ -555,6 +558,21 @@ public:
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
+
+	// TODO:  think of better names for these.
+	// or TODO:  do extent-tree scans instead
+	enum ScanMode {
+		SCAN_MODE_ZERO,
+		SCAN_MODE_ONE,
+		SCAN_MODE_COUNT, // must be last
+	};
+
+	static void set_scan_mode(ScanMode new_mode);
+
+private:
+	static ScanMode s_scan_mode;
+	static string scan_mode_ntoa(ScanMode new_mode);
+
 };
 
 struct BeesHash {

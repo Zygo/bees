@@ -42,6 +42,7 @@ do_cmd_help(char *argv[])
 		"\t-h, --help\t\tShow this help\n"
 		"\t-c, --thread-count\tWorker thread count (default CPU count * factor)\n"
 		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
+		"\t-m, --scan-mode\tScanning mode (0..1, default 0)\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --notimestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
@@ -626,6 +627,7 @@ bees_main(int argc, char *argv[])
 		static struct option long_options[] = {
 			{ "thread-count",   required_argument, NULL, 'c' },
 			{ "thread-factor",  required_argument, NULL, 'C' },
+			{ "scan-mode", 	    required_argument, NULL, 'm' },
 			{ "timestamps",     no_argument,       NULL, 't' },
 			{ "notimestamps",   no_argument,       NULL, 'T' },
 			{ "absolute-paths", no_argument,       NULL, 'p' },
@@ -633,7 +635,7 @@ bees_main(int argc, char *argv[])
 			{ "help",           no_argument,       NULL, 'h' }
 		};
 
-		c = getopt_long(argc, argv, "c:C:TtPph", long_options, &option_index);
+		c = getopt_long(argc, argv, "c:C:m:TtPph", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
@@ -644,6 +646,9 @@ bees_main(int argc, char *argv[])
 				break;
 			case 'C':
 				thread_factor = stod(optarg);
+				break;
+			case 'm':
+				BeesRoots::set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
 				break;
 			case 'T':
 				chatter_prefix_timestamp = false;
