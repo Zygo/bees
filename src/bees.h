@@ -9,8 +9,6 @@
 #include "crucible/fs.h"
 #include "crucible/lockset.h"
 #include "crucible/time.h"
-#include "crucible/timequeue.h"
-#include "crucible/workqueue.h"
 
 #include <array>
 #include <functional>
