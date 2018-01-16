@@ -29,13 +29,14 @@ BeesFdCache::BeesFdCache()
 		BEESCOUNTADD(open_root_ms, open_timer.age() * 1000);
 		return rv;
 	});
+	m_root_cache.max_size(BEES_ROOT_FD_CACHE_SIZE);
 	m_file_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino) -> Fd {
 		Timer open_timer;
 		auto rv = ctx->roots()->open_root_ino_nocache(root, ino);
 		BEESCOUNTADD(open_ino_ms, open_timer.age() * 1000);
 		return rv;
 	});
-	m_file_cache.max_size(BEES_FD_CACHE_SIZE);
+	m_file_cache.max_size(BEES_FILE_FD_CACHE_SIZE);
 }
 
 Fd

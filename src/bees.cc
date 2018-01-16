@@ -19,6 +19,10 @@
 #include <linux/fs.h>
 #include <sys/ioctl.h>
 
+// setrlimit
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include <getopt.h>
 
 using namespace crucible;
@@ -646,6 +650,17 @@ bees_main(int argc, char *argv[])
 	if (!relative_path().empty()) {
 		BEESLOG("using relative path " << relative_path() << "\n");
 	}
+
+	BEESLOG("setting rlimit NOFILE to " << BEES_OPEN_FILE_LIMIT);
+
+	struct rlimit lim = {
+		.rlim_cur = BEES_OPEN_FILE_LIMIT,
+		.rlim_max = BEES_OPEN_FILE_LIMIT,
+	};
+	int rv = setrlimit(RLIMIT_NOFILE, &lim);
+	if (rv) {
+		BEESLOG("setrlimit(RLIMIT_NOFILE, { " << lim.rlim_cur << " }): " << strerror(errno));
+	};
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
