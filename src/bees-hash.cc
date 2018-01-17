@@ -298,7 +298,7 @@ BeesHashTable::prefetch_loop()
 		auto avg_rates = thisStats / m_ctx->total_timer().age();
 		graph_blob << "\t" << avg_rates << "\n";
 
-		BEESLOG(graph_blob.str());
+		BEESLOGINFO(graph_blob.str());
 		catch_all([&]() {
 			m_stats_file.write(graph_blob.str());
 		});
@@ -306,13 +306,13 @@ BeesHashTable::prefetch_loop()
 		if (not_locked) {
 			// Always do the mlock, whether shared or not
 			THROW_CHECK1(runtime_error, m_size, m_size > 0);
-			BEESLOG("mlock(" << pretty(m_size) << ")...");
+			BEESLOGINFO("mlock(" << pretty(m_size) << ")...");
 			Timer lock_time;
 			catch_all([&]() {
 				BEESNOTE("mlock " << pretty(m_size));
 				DIE_IF_NON_ZERO(mlock(m_byte_ptr, m_size));
 			});
-			BEESLOG("mlock(" << pretty(m_size) << ") done in " << lock_time << " sec");
+			BEESLOGINFO("mlock(" << pretty(m_size) << ") done in " << lock_time << " sec");
 			not_locked = false;
 		}
 
@@ -591,9 +591,9 @@ BeesHashTable::try_mmap_flags(int flags)
 		THROW_CHECK1(out_of_range, m_size, m_size > 0);
 		Timer map_time;
 		catch_all([&]() {
-			BEESLOG("mapping hash table size " << m_size << " with flags " << mmap_flags_ntoa(flags));
+			BEESLOGINFO("mapping hash table size " << m_size << " with flags " << mmap_flags_ntoa(flags));
 			void *ptr = mmap_or_die(nullptr, m_size, PROT_READ | PROT_WRITE, flags, flags & MAP_ANONYMOUS ? -1 : int(m_fd), 0);
-			BEESLOG("mmap done in " << map_time << " sec");
+			BEESLOGINFO("mmap done in " << map_time << " sec");
 			m_cell_ptr = static_cast<Cell *>(ptr);
 			void *ptr_end = static_cast<uint8_t *>(ptr) + m_size;
 			m_cell_ptr_end = static_cast<Cell *>(ptr_end);
@@ -662,13 +662,13 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	BEESTRACE("hash table bucket size " << BLOCK_SIZE_HASHTAB_BUCKET);
 	BEESTRACE("hash table extent size " << BLOCK_SIZE_HASHTAB_EXTENT);
 
-	BEESLOG("opened hash table filename '" << filename << "' length " << m_size);
+	BEESLOGINFO("opened hash table filename '" << filename << "' length " << m_size);
 	m_buckets = m_size / BLOCK_SIZE_HASHTAB_BUCKET;
 	m_cells = m_buckets * c_cells_per_bucket;
 	m_extents = (m_size + BLOCK_SIZE_HASHTAB_EXTENT - 1) / BLOCK_SIZE_HASHTAB_EXTENT;
-	BEESLOG("\tcells " << m_cells << ", buckets " << m_buckets << ", extents " << m_extents);
+	BEESLOGINFO("\tcells " << m_cells << ", buckets " << m_buckets << ", extents " << m_extents);
 
-	BEESLOG("\tflush rate limit " << BEES_FLUSH_RATE);
+	BEESLOGINFO("\tflush rate limit " << BEES_FLUSH_RATE);
 
 	// Try to mmap that much memory
 	try_mmap_flags(MAP_PRIVATE | MAP_ANONYMOUS);
@@ -696,7 +696,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	for (auto fp = madv_flags; fp->value; ++fp) {
 		BEESTOOLONG("madvise(" << fp->name << ")");
 		if (madvise(m_byte_ptr, m_size, fp->value)) {
-			BEESLOG("madvise(..., " << fp->name << "): " << strerror(errno) << " (ignored)");
+			BEESLOGWARN("madvise(..., " << fp->name << "): " << strerror(errno) << " (ignored)");
 		}
 	}
 

@@ -67,7 +67,7 @@ BeesRoots::set_scan_mode(ScanMode mode)
 {
 	THROW_CHECK1(invalid_argument, mode, mode < SCAN_MODE_COUNT);
 	s_scan_mode = mode;
-	BEESLOG("Scan mode set to " << mode << " (" << scan_mode_ntoa(mode) << ")");
+	BEESLOGINFO("Scan mode set to " << mode << " (" << scan_mode_ntoa(mode) << ")");
 }
 
 string
@@ -96,7 +96,7 @@ BeesRoots::state_save()
 	insert_new_crawl();
 
 	BEESNOTE("saving crawl state");
-	BEESLOG("Saving crawl state");
+	BEESLOGINFO("Saving crawl state");
 	BEESTOOLONG("Saving crawl state");
 
 	Timer save_time;
@@ -107,7 +107,7 @@ BeesRoots::state_save()
 	ostringstream ofs;
 
 	if (!m_crawl_dirty) {
-		BEESLOG("Nothing to save");
+		BEESLOGINFO("Nothing to save");
 		return;
 	}
 
@@ -125,7 +125,7 @@ BeesRoots::state_save()
 	}
 
 	if (ofs.str().empty()) {
-		BEESLOG("Crawl state empty!");
+		BEESLOGWARN("Crawl state empty!");
 		m_crawl_dirty = false;
 		return;
 	}
@@ -144,7 +144,7 @@ BeesRoots::state_save()
 	lock.lock();
 	// Not really correct but probably close enough
 	m_crawl_dirty = false;
-	BEESLOG("Saved crawl state in " << save_time << "s");
+	BEESLOGINFO("Saved crawl state in " << save_time << "s");
 }
 
 BeesCrawlState
@@ -227,7 +227,7 @@ BeesRoots::crawl_roots()
 
 	// Nothing to crawl?  Seems suspicious...
 	if (m_root_crawl_map.empty()) {
-		BEESLOG("idle: crawl map is empty!");
+		BEESLOGINFO("idle: crawl map is empty!");
 	}
 
 	auto ctx_copy = m_ctx;
@@ -302,7 +302,7 @@ BeesRoots::crawl_roots()
 		case SCAN_MODE_COUNT: assert(false); break;
 	}
 
-	BEESLOG("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
+	BEESLOGINFO("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
 	BEESCOUNT(crawl_done);
 	BEESNOTE("idle, waiting for more data");
 	lock.lock();
@@ -400,12 +400,12 @@ void
 BeesRoots::state_load()
 {
 	BEESNOTE("loading crawl state");
-	BEESLOG("loading crawl state");
+	BEESLOGINFO("loading crawl state");
 
 	string crawl_data = m_crawl_state_file.read();
 
 	for (auto line : split("\n", crawl_data)) {
-		BEESLOG("Read line: " << line);
+		BEESLOGDEBUG("Read line: " << line);
 		map<string, uint64_t> d;
 		auto words = split(" ", line);
 		for (auto it = words.begin(); it < words.end(); ++it) {
@@ -427,7 +427,7 @@ BeesRoots::state_load()
 		if (d.count("started")) {
 			loaded_state.m_started = d.at("started");
 		}
-		BEESLOG("loaded_state " << loaded_state);
+		BEESLOGDEBUG("loaded_state " << loaded_state);
 		insert_root(loaded_state);
 	}
 }
@@ -605,7 +605,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	BEESTRACE("searching paths for root " << root << " ino " << ino);
 	Fd rv;
 	if (ipa.m_paths.empty()) {
-		BEESLOG("No paths for root " << root << " ino " << ino);
+		BEESLOGWARN("No paths for root " << root << " ino " << ino);
 	}
 	for (auto file_path : ipa.m_paths) {
 		BEESTRACE("Looking up root " << root << " ino " << ino << " in dir " << name_fd(root_fd) << " path " << file_path);
@@ -617,7 +617,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			BEESCOUNT(open_fail);
 			// errno == ENOENT is common during snapshot delete, ignore it
 			if (errno != ENOENT) {
-				BEESLOG("Could not open path '" << file_path << "' at root " << root << " " << name_fd(root_fd) << ": " << strerror(errno));
+				BEESLOGWARN("Could not open path '" << file_path << "' at root " << root << " " << name_fd(root_fd) << ": " << strerror(errno));
 				BEESNOTE("ipa" << ipa);
 			}
 			continue;
@@ -626,7 +626,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		// Correct inode?
 		Stat file_stat(rv);
 		if (file_stat.st_ino != ino) {
-			BEESLOG("Opening " << name_fd(root_fd) << "/" << file_path << " found wrong inode " << file_stat.st_ino << " instead of " << ino);
+			BEESLOGWARN("Opening " << name_fd(root_fd) << "/" << file_path << " found wrong inode " << file_stat.st_ino << " instead of " << ino);
 			rv = Fd();
 			BEESCOUNT(open_wrong_ino);
 			break;
@@ -635,7 +635,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		// Correct root?
 		auto file_root = btrfs_get_root_id(rv);
 		if (file_root != root) {
-			BEESLOG("Opening " << name_fd(root_fd) << "/" << file_path << " found wrong root " << file_root << " instead of " << root);
+			BEESLOGWARN("Opening " << name_fd(root_fd) << "/" << file_path << " found wrong root " << file_root << " instead of " << root);
 			rv = Fd();
 			BEESCOUNT(open_wrong_root);
 			break;
@@ -644,7 +644,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		// Same filesystem?
 		Stat root_stat(root_fd);
 		if (root_stat.st_dev != file_stat.st_dev) {
-			BEESLOG("Opening root " << name_fd(root_fd) << " path " << file_path << " found path st_dev " << file_stat.st_dev << " but root st_dev is " << root_stat.st_dev);
+			BEESLOGWARN("Opening root " << name_fd(root_fd) << " path " << file_path << " found path st_dev " << file_stat.st_dev << " but root st_dev is " << root_stat.st_dev);
 			rv = Fd();
 			BEESCOUNT(open_wrong_dev);
 			break;
@@ -665,7 +665,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		// create temporary files with the right flags somehow.
 		int attr = ioctl_iflags_get(rv);
 		if (attr & FS_NOCOW_FL) {
-			BEESLOG("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
+			BEESLOGWARN("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
 			rv = Fd();
 			BEESCOUNT(open_wrong_flags);
 			break;
@@ -702,7 +702,7 @@ BeesCrawl::next_transid()
 	auto elapsed_time = current_time - crawl_state.m_started;
 	if (elapsed_time < BEES_COMMIT_INTERVAL) {
 		if (!m_deferred) {
-			BEESLOG("Deferring next transid in " << get_state());
+			BEESLOGINFO("Deferring next transid in " << get_state());
 		}
 		m_deferred = true;
 		BEESCOUNT(crawl_defer);
@@ -710,7 +710,7 @@ BeesCrawl::next_transid()
 	}
 
 	// Log performance stats from the old crawl
-	BEESLOG("Next transid in " << get_state());
+	BEESLOGINFO("Next transid in " << get_state());
 
 	// Start new crawl
 	m_deferred = false;
@@ -720,7 +720,7 @@ BeesCrawl::next_transid()
 	crawl_state.m_objectid = 0;
 	crawl_state.m_offset = 0;
 	crawl_state.m_started = current_time;
-	BEESLOG("Restarting crawl " << get_state());
+	BEESLOGINFO("Restarting crawl " << get_state());
 	BEESCOUNT(crawl_restart);
 	set_state(crawl_state);
 	return true;
@@ -738,7 +738,7 @@ BeesCrawl::fetch_extents()
 	}
 
 	BEESNOTE("crawling " << get_state());
-	BEESLOG("Crawling " << get_state());
+	BEESLOGINFO("Crawling " << get_state());
 
 	Timer crawl_timer;
 
@@ -767,17 +767,17 @@ BeesCrawl::fetch_extents()
 	if (ioctl_ok) {
 		BEESCOUNT(crawl_search);
 	} else {
-		BEESLOG("Search ioctl failed: " << strerror(errno));
+		BEESLOGWARN("Search ioctl failed: " << strerror(errno));
 		BEESCOUNT(crawl_fail);
 	}
 
 	if (!ioctl_ok || sk.m_result.empty()) {
 		BEESCOUNT(crawl_empty);
-		BEESLOG("Crawl empty " << get_state());
+		BEESLOGINFO("Crawl empty " << get_state());
 		return next_transid();
 	}
 
-	BEESLOG("Crawling " << sk.m_result.size() << " results from " << get_state());
+	BEESLOGINFO("Crawling " << sk.m_result.size() << " results from " << get_state());
 	auto results_left = sk.m_result.size();
 	BEESNOTE("crawling " << results_left << " results from " << get_state());
 	size_t count_other = 0;
@@ -873,7 +873,7 @@ BeesCrawl::fetch_extents()
 			}
 		}
 	}
-	BEESLOG("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
+	BEESLOGINFO("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
 
 	return true;
 }

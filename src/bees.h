@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 
+#include <syslog.h>
 #include <endian.h>
 
 using namespace crucible;
@@ -127,21 +128,25 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 
 // macros ----------------------------------------
 
-#define BEESLOG(x)      do { Chatter c(BeesNote::get_name()); c << x; } while (0)
-#define BEESLOGTRACE(x) do { BEESLOG(x); BeesTracer::trace_now(); } while (0)
+#define BEESLOG(lv,x)   do { Chatter c(lv, BeesNote::get_name()); c << x; } while (0)
+#define BEESLOGTRACE(x) do { BEESLOG(LOG_DEBUG, x); BeesTracer::trace_now(); } while (0)
 
-#define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(x);   })
+#define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x);   })
 #define BEESTOOLONG(x) BeesTooLong SRSLY_WTF_C(beesTooLong_, __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 #define BEESNOTE(x)    BeesNote    SRSLY_WTF_C(beesNote_,    __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 #define BEESINFO(x) do { \
 	if (bees_info_rate_limit.is_ready()) { \
 		bees_info_rate_limit.borrow(1); \
-		Chatter c(BeesNote::get_name()); \
+		Chatter c(LOG_INFO, BeesNote::get_name()); \
 		c << x; \
 	} \
 } while (0)
 
-#define BEESLOGNOTE(x) BEESLOG(x); BEESNOTE(x)
+#define BEESLOGERR(x)   BEESLOG(LOG_ERR, x)
+#define BEESLOGWARN(x)  BEESLOG(LOG_WARNING, x)
+#define BEESLOGNOTE(x)  BEESLOG(LOG_NOTICE, x); BEESNOTE(x)
+#define BEESLOGINFO(x)  BEESLOG(LOG_INFO, x)
+#define BEESLOGDEBUG(x) BEESLOG(LOG_DEBUG, x)
 
 #define BEESCOUNT(stat) do { \
 	BeesStats::s_global.add_count(#stat); \
@@ -189,7 +194,7 @@ class BeesBlockData;
 class BeesTracer {
 	function<void()> m_func;
 	BeesTracer *m_next_tracer = 0;
-	
+
 	thread_local static BeesTracer *tl_next_tracer;
 public:
 	BeesTracer(function<void()> f);
@@ -584,7 +589,7 @@ struct BeesHash {
 	BeesHash& operator=(const Type that) { m_hash = that; return *this; }
 private:
 	Type	m_hash;
-	
+
 };
 
 ostream & operator<<(ostream &os, const BeesHash &bh);

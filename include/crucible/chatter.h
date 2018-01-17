@@ -8,6 +8,8 @@
 #include <string>
 #include <typeinfo>
 
+#include <syslog.h>
+
   /** \brief Chatter wraps a std::ostream reference with a destructor that
       writes a newline, and inserts timestamp, pid, and tid prefixes on output.
 
@@ -33,12 +35,13 @@ namespace crucible {
 	using namespace std;
 
 	class Chatter {
+		int m_loglevel;
 		string m_name;
 		ostream &m_os;
 		ostringstream m_oss;
 
 	public:
-		Chatter(string name, ostream &os = cerr);
+		Chatter(int loglevel, string name, ostream &os = cerr);
 		Chatter(Chatter &&c);
 		ostream &get_os() { return m_oss; }
 
@@ -103,7 +106,7 @@ namespace crucible {
 
 		template <class T> Chatter operator<<(const T &t)
 		{
-			Chatter c(m_pretty_function, m_os);
+			Chatter c(LOG_NOTICE, m_pretty_function, m_os);
 			c << t;
 			return c;
 		}

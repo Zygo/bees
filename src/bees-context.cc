@@ -80,7 +80,7 @@ BeesContext::dump_status()
 	auto status_charp = getenv("BEESSTATUS");
 	if (!status_charp) return;
 	string status_file(status_charp);
-	BEESLOG("Writing status to file '" << status_file << "' every " << BEES_STATUS_INTERVAL << " sec");
+	BEESLOGINFO("Writing status to file '" << status_file << "' every " << BEES_STATUS_INTERVAL << " sec");
 	while (1) {
 		BEESNOTE("waiting " << BEES_STATUS_INTERVAL);
 		sleep(BEES_STATUS_INTERVAL);
@@ -96,7 +96,7 @@ BeesContext::dump_status()
 		ofs << "\t" << avg_rates << "\n";
 
 		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " tasks):\n";
-		for (auto t : BeesNote::get_status()) {	
+		for (auto t : BeesNote::get_status()) {
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}
 
@@ -129,24 +129,24 @@ BeesContext::show_progress()
 
 			auto thisStats = BeesStats::s_global;
 			auto avg_rates = lastStats / BEES_STATS_INTERVAL;
-			BEESLOG("TOTAL: " << thisStats);
-			BEESLOG("RATES: " << avg_rates);
+			BEESLOGINFO("TOTAL: " << thisStats);
+			BEESLOGINFO("RATES: " << avg_rates);
 			lastStats = thisStats;
 		}
 
-		BEESLOG("ACTIVITY:");
+		BEESLOGINFO("ACTIVITY:");
 
 		auto thisStats = BeesStats::s_global;
 		auto deltaStats = thisStats - lastProgressStats;
 		if (deltaStats) {
-			BEESLOG("\t" << deltaStats / BEES_PROGRESS_INTERVAL);
+			BEESLOGINFO("\t" << deltaStats / BEES_PROGRESS_INTERVAL);
 		};
 		lastProgressStats = thisStats;
 
-		BEESLOG("THREADS:");
+		BEESLOGINFO("THREADS:");
 
-		for (auto t : BeesNote::get_status()) {	
-			BEESLOG("\ttid " << t.first << ": " << t.second);
+		for (auto t : BeesNote::get_status()) {
+			BEESLOGINFO("\ttid " << t.first << ": " << t.second);
 		}
 	}
 }
@@ -187,8 +187,8 @@ BeesContext::dedup(const BeesRangePair &brp)
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
 
-	BEESLOG("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()));
-	BEESLOG("       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
+	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()));
+	BEESLOGINFO("       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
 
 	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
 		BEESLOGTRACE("equal physical addresses in dedup");
@@ -213,7 +213,7 @@ BeesContext::dedup(const BeesRangePair &brp)
 		}
 	} else {
 		BEESCOUNT(dedup_miss);
-		BEESLOG("NO Dedup! " << brp);
+		BEESLOGWARN("NO Dedup! " << brp);
 	}
 
 	return rv;
@@ -289,7 +289,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		Extent::OBSCURED | Extent::PREALLOC
 	)) {
 		BEESCOUNT(scan_interesting);
-		BEESLOG("Interesting extent flags " << e << " from fd " << name_fd(bfr.fd()));
+		BEESLOGWARN("Interesting extent flags " << e << " from fd " << name_fd(bfr.fd()));
 	}
 
 	if (e.flags() & Extent::HOLE) {
@@ -301,7 +301,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	if (e.flags() & Extent::PREALLOC) {
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
-		BEESLOG("prealloc extent " << e);
+		BEESLOGINFO("prealloc extent " << e);
 		BeesFileRange prealloc_bfr(m_ctx->tmpfile()->make_hole(e.size()));
 		BeesRangePair brp(prealloc_bfr, bfr);
 		// Raw dedup here - nothing else to do with this extent, nothing to merge with
@@ -375,7 +375,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				// Do not attempt to lookup hash of zero block
 				continue;
 			} else {
-				BEESLOG("zero bbd " << bbd << "\n\tin extent " << e);
+				BEESLOGINFO("zero bbd " << bbd << "\n\tin extent " << e);
 				BEESCOUNT(scan_zero_uncompressed);
 				rewrite_extent = true;
 				break;
@@ -514,7 +514,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 						// FIXME:  we will thrash if we let multiple references to identical blocks
 						// exist in the hash table.  Erase all but the last one.
 						if (last_replaced_addr) {
-							BEESLOG("Erasing redundant hash " << hash << " addr " << last_replaced_addr);
+							BEESLOGINFO("Erasing redundant hash " << hash << " addr " << last_replaced_addr);
 							hash_table->erase_hash_addr(hash, last_replaced_addr);
 							BEESCOUNT(scan_erase_redundant);
 						}
@@ -676,7 +676,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 	// Visualize
 	if (bar != string(block_count, '.')) {
-		BEESLOG("scan: " << pretty(e.size()) << " " << to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end()) << ' ' << name_fd(bfr.fd()));
+		BEESLOGINFO("scan: " << pretty(e.size()) << " " << to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end()) << ' ' << name_fd(bfr.fd()));
 	}
 
 	return bfr;
@@ -713,7 +713,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 
 	// Sanity check
 	if (bfr.begin() >= bfr.file_size()) {
-		BEESLOG("past EOF: " << bfr);
+		BEESLOGWARN("past EOF: " << bfr);
 		BEESCOUNT(scan_eof);
 		return bfr;
 	}
@@ -786,7 +786,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	if (rt_age < BEES_TOXIC_DURATION && log_ino.m_iors.size() < BEES_MAX_EXTENT_REF_COUNT) {
 		rv.m_is_toxic = false;
 	} else {
-		BEESLOG("WORKAROUND: toxic address " << addr << " in " << root_path() << " with " << log_ino.m_iors.size() << " refs took " << rt_age << "s in LOGICAL_INO");
+		BEESLOGWARN("WORKAROUND: toxic address " << addr << " in " << root_path() << " with " << log_ino.m_iors.size() << " refs took " << rt_age << "s in LOGICAL_INO");
 		BEESCOUNT(resolve_toxic);
 		rv.m_is_toxic = true;
 	}
@@ -811,7 +811,7 @@ void
 BeesContext::set_root_fd(Fd fd)
 {
 	uint64_t root_fd_treeid = btrfs_get_root_id(fd);
-	BEESLOG("set_root_fd " << name_fd(fd));
+	BEESLOGINFO("set_root_fd " << name_fd(fd));
 	BEESTRACE("set_root_fd " << name_fd(fd));
 	THROW_CHECK1(invalid_argument, root_fd_treeid, root_fd_treeid == BTRFS_FS_TREE_OBJECTID);
 	Stat st(fd);
@@ -820,7 +820,7 @@ BeesContext::set_root_fd(Fd fd)
 	BtrfsIoctlFsInfoArgs fsinfo;
 	fsinfo.do_ioctl(fd);
 	m_root_uuid = fsinfo.uuid();
-	BEESLOG("Filesystem UUID is " << m_root_uuid);
+	BEESLOGINFO("Filesystem UUID is " << m_root_uuid);
 
 	// 65536 is big enough for two max-sized extents.
 	// Need enough total space in the cache for the maximum number of active threads.
@@ -832,13 +832,13 @@ BeesContext::set_root_fd(Fd fd)
 	// Start queue producers
 	roots();
 
-	BEESLOG("returning from set_root_fd in " << name_fd(fd));
+	BEESLOGINFO("returning from set_root_fd in " << name_fd(fd));
 }
 
 void
 BeesContext::blacklist_add(const BeesFileId &fid)
 {
-	BEESLOG("Adding " << fid << " to blacklist");
+	BEESLOGDEBUG("Adding " << fid << " to blacklist");
 	unique_lock<mutex> lock(m_blacklist_mutex);
 	m_blacklist.insert(fid);
 }
@@ -907,7 +907,7 @@ BeesContext::hash_table()
 void
 BeesContext::set_root_path(string path)
 {
-	BEESLOG("set_root_path " << path);
+	BEESLOGINFO("set_root_path " << path);
 	m_root_path = path;
 	set_root_fd(open_or_die(m_root_path, FLAGS_OPEN_DIR));
 }

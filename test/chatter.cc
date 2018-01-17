@@ -32,7 +32,7 @@ void
 test_chatter_three()
 {
 	cerr << endl;
-	Chatter c("tct");
+	Chatter c(0, "tct");
 	c << "More complicated";
 	c << "\ncase with\n";
 	c << "some \\ns";

@@ -44,8 +44,8 @@ namespace crucible {
 		}
 	}
 
-	Chatter::Chatter(string name, ostream &os)
-		: m_name(name), m_os(os)
+	Chatter::Chatter(int loglevel, string name, ostream &os)
+		: m_loglevel(loglevel), m_name(name), m_os(os)
 	{
 	}
 
@@ -69,9 +69,9 @@ namespace crucible {
 			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &ltm));
 
 			header_stream << buf;
-			header_stream << " " << getpid() << "." << gettid();
+			header_stream << " " << getpid() << "." << gettid() << "<" << m_loglevel << ">";
 		} else {
-			header_stream << "tid " << gettid();
+			header_stream << "<" << m_loglevel << ">tid " << gettid();
 		}
 
 		if (!m_name.empty()) {
@@ -98,7 +98,7 @@ namespace crucible {
 	}
 
 	Chatter::Chatter(Chatter &&c)
-		: m_name(c.m_name), m_os(c.m_os), m_oss(c.m_oss.str())
+		: m_loglevel(c.m_loglevel), m_name(c.m_name), m_os(c.m_os), m_oss(c.m_oss.str())
 	{
 		c.m_oss.str("");
 	}

@@ -71,12 +71,12 @@ BeesTracer::~BeesTracer()
 		try {
 			m_func();
 		} catch (exception &e) {
-			BEESLOG("Nested exception: " << e.what());
+			BEESLOGERR("Nested exception: " << e.what());
 		} catch (...) {
-			BEESLOG("Nested exception ...");
+			BEESLOGERR("Nested exception ...");
 		}
 		if (!m_next_tracer) {
-			BEESLOG("---  END  TRACE --- exception ---");
+			BEESLOGERR("---  END  TRACE --- exception ---");
 		}
 	}
 	tl_next_tracer = m_next_tracer;
@@ -93,12 +93,12 @@ void
 BeesTracer::trace_now()
 {
 	BeesTracer *tp = tl_next_tracer;
-	BEESLOG("--- BEGIN TRACE ---");
+	BEESLOGERR("--- BEGIN TRACE ---");
 	while (tp) {
 		tp->m_func();
 		tp = tp->m_next_tracer;
 	}
-	BEESLOG("---  END  TRACE ---");
+	BEESLOGERR("---  END  TRACE ---");
 }
 
 thread_local BeesNote *BeesNote::tl_next = nullptr;
@@ -336,7 +336,7 @@ BeesTooLong::check() const
 	if (age() > m_limit) {
 		ostringstream oss;
 		m_func(oss);
-		BEESLOG("PERFORMANCE: " << *this << " sec: " << oss.str());
+		BEESLOGWARN("PERFORMANCE: " << *this << " sec: " << oss.str());
 	}
 }
 
@@ -368,7 +368,7 @@ BeesStringFile::BeesStringFile(Fd dir_fd, string name, size_t limit) :
 	m_name(name),
 	m_limit(limit)
 {
-	BEESLOG("BeesStringFile " << name_fd(m_dir_fd) << "/" << m_name << " max size " << pretty(m_limit));
+	BEESLOGINFO("BeesStringFile " << name_fd(m_dir_fd) << "/" << m_name << " max size " << pretty(m_limit));
 }
 
 void
@@ -501,7 +501,7 @@ void
 BeesTempFile::realign()
 {
 	if (m_end_offset > BLOCK_SIZE_MAX_TEMP_FILE) {
-		BEESLOG("temporary file size " << to_hex(m_end_offset) << " > max " << BLOCK_SIZE_MAX_TEMP_FILE);
+		BEESLOGINFO("temporary file size " << to_hex(m_end_offset) << " > max " << BLOCK_SIZE_MAX_TEMP_FILE);
 		BEESCOUNT(tmp_trunc);
 		return create();
 	}
@@ -535,7 +535,7 @@ BeesTempFile::make_hole(off_t count)
 BeesFileRange
 BeesTempFile::make_copy(const BeesFileRange &src)
 {
-	BEESLOG("copy: " << src);
+	BEESLOGINFO("copy: " << src);
 	BEESNOTE("Copying " << src);
 	BEESTRACE("Copying " << src);
 
@@ -601,7 +601,7 @@ int
 bees_main(int argc, char *argv[])
 {
 	set_catch_explainer([&](string s) {
-		BEESLOG("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
+		BEESLOGERR("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
 		BEESCOUNT(exception_caught);
 	});
 
@@ -672,10 +672,10 @@ bees_main(int argc, char *argv[])
 	Chatter::enable_timestamp(chatter_prefix_timestamp);
 
 	if (!relative_path().empty()) {
-		BEESLOG("using relative path " << relative_path() << "\n");
+		BEESLOGINFO("using relative path " << relative_path() << "\n");
 	}
 
-	BEESLOG("setting rlimit NOFILE to " << BEES_OPEN_FILE_LIMIT);
+	BEESLOGINFO("setting rlimit NOFILE to " << BEES_OPEN_FILE_LIMIT);
 
 	struct rlimit lim = {
 		.rlim_cur = BEES_OPEN_FILE_LIMIT,
@@ -683,7 +683,7 @@ bees_main(int argc, char *argv[])
 	};
 	int rv = setrlimit(RLIMIT_NOFILE, &lim);
 	if (rv) {
-		BEESLOG("setrlimit(RLIMIT_NOFILE, { " << lim.rlim_cur << " }): " << strerror(errno));
+		BEESLOGINFO("setrlimit(RLIMIT_NOFILE, { " << lim.rlim_cur << " }): " << strerror(errno));
 	};
 
 	// Set up worker thread pool
@@ -708,7 +708,7 @@ bees_main(int argc, char *argv[])
 	}
 
 	if (!did_subscription) {
-		BEESLOG("WARNING: no filesystems added");
+		BEESLOGWARN("WARNING: no filesystems added");
 	}
 
 	BeesThread status_thread("status", [&]() {

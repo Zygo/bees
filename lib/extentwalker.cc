@@ -6,7 +6,6 @@
 #include "crucible/limits.h"
 #include "crucible/string.h"
 
-
 namespace crucible {
 	using namespace std;
 

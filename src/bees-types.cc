@@ -428,7 +428,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 		if (!first_addr.is_magic()) {
 			auto first_resolved = ctx->resolve_addr(first_addr);
 			if (first_resolved.is_toxic()) {
-				BEESLOG("WORKAROUND: not growing matching pair backward because src addr is toxic:\n" << *this);
+				BEESLOGWARN("WORKAROUND: not growing matching pair backward because src addr is toxic:\n" << *this);
 				BEESCOUNT(pairbackward_toxic_addr);
 				break;
 			}
@@ -484,7 +484,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 			}
 		}
 		if (found_toxic) {
-			BEESLOG("WORKAROUND: found toxic hash in " << first_bbd << " while extending backward:\n" << *this);
+			BEESLOGWARN("WORKAROUND: found toxic hash in " << first_bbd << " while extending backward:\n" << *this);
 			BEESCOUNT(pairbackward_toxic_hash);
 			break;
 		}
@@ -529,7 +529,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 		if (!first_addr.is_magic()) {
 			auto first_resolved = ctx->resolve_addr(first_addr);
 			if (first_resolved.is_toxic()) {
-				BEESLOG("WORKAROUND: not growing matching pair forward because src is toxic:\n" << *this);
+				BEESLOGWARN("WORKAROUND: not growing matching pair forward because src is toxic:\n" << *this);
 				BEESCOUNT(pairforward_toxic);
 				break;
 			}
@@ -593,7 +593,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 			}
 		}
 		if (found_toxic) {
-			BEESLOG("WORKAROUND: found toxic hash in " << first_bbd << " while extending forward:\n" << *this);
+			BEESLOGWARN("WORKAROUND: found toxic hash in " << first_bbd << " while extending forward:\n" << *this);
 			BEESCOUNT(pairforward_toxic_hash);
 			break;
 		}
