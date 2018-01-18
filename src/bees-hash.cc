@@ -185,14 +185,8 @@ percent(size_t num, size_t den)
 void
 BeesHashTable::prefetch_loop()
 {
-	// Always do the mlock, whether shared or not
-	THROW_CHECK1(runtime_error, m_size, m_size > 0);
-	catch_all([&]() {
-		BEESNOTE("mlock " << pretty(m_size));
-		DIE_IF_NON_ZERO(mlock(m_byte_ptr, m_size));
-	});
-
-	while (1) {
+	bool not_locked = true;
+	while (true) {
 		size_t width = 64;
 		vector<size_t> occupancy(width, 0);
 		size_t occupied_count = 0;
@@ -203,11 +197,11 @@ BeesHashTable::prefetch_loop()
 		size_t unaligned_eof_count = 0;
 
 		for (uint64_t ext = 0; ext < m_extents; ++ext) {
-			BEESNOTE("prefetching hash table extent " << ext << " of " << m_extents);
+			BEESNOTE("prefetching hash table extent #" << ext << " of " << m_extents);
 			catch_all([&]() {
 				fetch_missing_extent_by_index(ext);
 
-				BEESNOTE("analyzing hash table extent " << ext << " of " << m_extents);
+				BEESNOTE("analyzing hash table extent #" << ext << " of " << m_extents);
 				bool duplicate_bugs_found = false;
 				auto lock = lock_extent_by_index(ext);
 				for (Bucket *bucket = m_extent_ptr[ext].p_buckets; bucket < m_extent_ptr[ext + 1].p_buckets; ++bucket) {
@@ -308,6 +302,19 @@ BeesHashTable::prefetch_loop()
 		catch_all([&]() {
 			m_stats_file.write(graph_blob.str());
 		});
+
+		if (not_locked) {
+			// Always do the mlock, whether shared or not
+			THROW_CHECK1(runtime_error, m_size, m_size > 0);
+			BEESLOG("mlock(" << pretty(m_size) << ")...");
+			Timer lock_time;
+			catch_all([&]() {
+				BEESNOTE("mlock " << pretty(m_size));
+				DIE_IF_NON_ZERO(mlock(m_byte_ptr, m_size));
+			});
+			BEESLOG("mlock(" << pretty(m_size) << ") done in " << lock_time << " sec");
+			not_locked = false;
+		}
 
 		BEESNOTE("idle " << BEES_HASH_TABLE_ANALYZE_INTERVAL << "s");
 		nanosleep(BEES_HASH_TABLE_ANALYZE_INTERVAL);
