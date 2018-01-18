@@ -500,6 +500,11 @@ Command Line Options
     Default is 1.0, i.e. 1 worker thread per detected CPU.  Use values
     below 1.0 to leave some cores idle, or above 1.0 if there are more
     disks than CPUs in the filesystem.
+* --scan-mode (-m) MODE
+  * Specify extent scanning algorithm.  Default mode is 0.
+    _EXPERIMENTAL_ feature that may go away.
+    * Mode 0: scan extents in ascending order of (inode, subvol, offset).
+    * Mode 1: scan extents in round-robin order from each subvol.
 * --timestamps (-t)
   * Enable timestamps in log output.
 * --notimestamps (-T)
