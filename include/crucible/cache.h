@@ -18,17 +18,27 @@ namespace crucible {
 	public:
 		using Key = tuple<Arguments...>;
 		using Func = function<Return(Arguments...)>;
-		using Time = size_t;
-		using Value = pair<Time, Return>;
 	private:
+		struct Value {
+			Value *fp = nullptr;
+			Value *bp = nullptr;
+			Key key;
+			Return ret;
+			Value(Key k, Return r) : key(k), ret(r) { }
+			// Crash early!
+			~Value() { fp = bp = nullptr; };
+		};
+
 		Func		m_fn;
-		Time		m_ctr;
 		map<Key, Value>	m_map;
 		LockSet<Key>	m_lockset;
 		size_t		m_max_size;
 		mutex		m_mutex;
+		Value		*m_last = nullptr;
 
-		bool check_overflow();
+		void check_overflow();
+		void move_to_front(Value *vp);
+		void erase_one(Value *vp);
 	public:
 		LRUCache(Func f = Func(), size_t max_size = 100);
 
@@ -46,30 +56,82 @@ namespace crucible {
 	template <class Return, class... Arguments>
 	LRUCache<Return, Arguments...>::LRUCache(Func f, size_t max_size) :
 		m_fn(f),
-		m_ctr(0),
 		m_max_size(max_size)
 	{
 	}
 
 	template <class Return, class... Arguments>
-	bool
+	void
+	LRUCache<Return, Arguments...>::erase_one(Value *vp)
+	{
+		THROW_CHECK0(invalid_argument, vp);
+		Value *vp_bp = vp->bp;
+		THROW_CHECK0(runtime_error, vp_bp);
+		Value *vp_fp = vp->fp;
+		THROW_CHECK0(runtime_error, vp_fp);
+		vp_fp->bp = vp_bp;
+		vp_bp->fp = vp_fp;
+		// If we delete the head of the list then advance the head by one
+		if (vp == m_last) {
+			// If the head of the list is also the tail of the list then clear m_last
+			if (vp_fp == m_last) {
+				m_last = nullptr;
+			} else {
+				m_last = vp_fp;
+			}
+		}
+		m_map.erase(vp->key);
+		if (!m_last) {
+			THROW_CHECK0(runtime_error, m_map.empty());
+		} else {
+			THROW_CHECK0(runtime_error, !m_map.empty());
+		}
+	}
+
+	template <class Return, class... Arguments>
+	void
 	LRUCache<Return, Arguments...>::check_overflow()
 	{
-		if (m_map.size() <= m_max_size) {
-			return false;
+		while (m_map.size() >= m_max_size) {
+			THROW_CHECK0(runtime_error, m_last);
+			THROW_CHECK0(runtime_error, m_last->bp);
+			erase_one(m_last->bp);
 		}
-		vector<pair<Key, Time>> key_times;
-		key_times.reserve(m_map.size());
-		for (auto i : m_map) {
-			key_times.push_back(make_pair(i.first, i.second.first));
+	}
+
+	template <class Return, class... Arguments>
+	void
+	LRUCache<Return, Arguments...>::move_to_front(Value *vp)
+	{
+		if (!m_last) {
+			// Create new LRU list
+			m_last = vp->fp = vp->bp = vp;
+		} else if (m_last != vp) {
+			Value *vp_fp = vp->fp;
+			Value *vp_bp = vp->bp;
+			if (vp_fp && vp_bp) {
+				// There are at least two and we are removing one that isn't m_last
+				// Connect adjacent nodes to each other (has no effect if vp is new), removing vp from list
+				vp_fp->bp = vp_bp;
+				vp_bp->fp = vp_fp;
+			} else {
+				// New insertion, both must be null
+				THROW_CHECK0(runtime_error, !vp_fp);
+				THROW_CHECK0(runtime_error, !vp_bp);
+			}
+			// Splice new node into list
+			Value *last_bp = m_last->bp;
+			THROW_CHECK0(runtime_error, last_bp);
+			// New elemnt points to both ends of list
+			vp->fp = m_last;
+			vp->bp = last_bp;
+			// Insert vp as fp from the end of the list
+			last_bp->fp = vp;
+			// Insert vp as bp from the second from the start of the list
+			m_last->bp = vp;
+			// Update start of list
+			m_last = vp;
 		}
-		sort(key_times.begin(), key_times.end(), [](const pair<Key, Time> &a, const pair<Key, Time> &b) {
-			return a.second < b.second;
-		});
-		for (size_t i = 0; i < key_times.size() / 2; ++i) {
-			m_map.erase(key_times[i].first);
-		}
-		return true;
 	}
 
 	template <class Return, class... Arguments>
@@ -78,6 +140,9 @@ namespace crucible {
 	{
 		unique_lock<mutex> lock(m_mutex);
 		m_max_size = new_max_size;
+		// FIXME:  this really reduces the cache size to new_max_size - 1
+		// because every other time we call this method, it is immediately
+		// followed by insert.
 		check_overflow();
 	}
 
@@ -95,6 +160,7 @@ namespace crucible {
 	{
 		unique_lock<mutex> lock(m_mutex);
 		m_map.clear();
+		m_last = nullptr;
 	}
 
 	template <class Return, class... Arguments>
@@ -104,8 +170,8 @@ namespace crucible {
 		unique_lock<mutex> lock(m_mutex);
 		for (auto it = m_map.begin(); it != m_map.end(); ) {
 			auto next_it = ++it;
-			if (pred(it.second.second)) {
-				m_map.erase(it);
+			if (pred(it.second.ret)) {
+				erase_one(&it.second);
 			}
 			it = next_it;
 		}
@@ -133,12 +199,18 @@ namespace crucible {
 
 				// No, we hold key and cache locks, but item not in cache.
 				// Release cache lock and call function
-				auto ctr_copy = m_ctr++;
 				lock.unlock();
-				Value v(ctr_copy, m_fn(args...));
+
+				// Create new value
+				Value v(k, m_fn(args...));
+
+				// Reacquire cache lock
+				lock.lock();
+
+				// Make room
+				check_overflow();
 
 				// Reacquire cache lock and insert return value
-				lock.lock();
 				tie(found, inserted) = m_map.insert(make_pair(k, v));
 
 				// We hold a lock on this key so we are the ones to insert it
@@ -147,23 +219,17 @@ namespace crucible {
 				// Release key lock, keep the cache lock
 				key_lock.unlock();
 
-				// Check to see if we have too many items and reduce if so.
-				if (check_overflow()) {
-					// Reset iterator
-					found = m_map.find(k);
-				}
 			}
 		}
 
 		// Item should be in cache now
 		THROW_CHECK0(runtime_error, found != m_map.end());
 
-		// We are using this object so update the timestamp
-		if (!inserted) {
-			found->second.first = m_ctr++;
-		}
+		// (Re)insert at head of LRU
+		move_to_front(&(found->second));
+
 		// Make copy before releasing lock
-		auto rv = found->second.second;
+		auto rv = found->second.ret;
 		return rv;
 	}
 
@@ -173,7 +239,10 @@ namespace crucible {
 	{
 		Key k(args...);
 		unique_lock<mutex> lock(m_mutex);
-		m_map.erase(k);
+		auto found = m_map.find(k);
+		if (found != m_map.end()) {
+			erase_one(&found->second);
+		}
 	}
 
 	template<class Return, class... Arguments>
@@ -204,33 +273,24 @@ namespace crucible {
 			found = m_map.find(k);
 			if (found == m_map.end()) {
 
+				// Make room
+				check_overflow();
+
 				// No, we hold key and cache locks, but item not in cache.
-				// Release cache lock and insert the provided return value
-				auto ctr_copy = m_ctr++;
-				Value v(ctr_copy, r);
+				// Insert the provided return value (no need to unlock here)
+				Value v(k, r);
 				tie(found, inserted) = m_map.insert(make_pair(k, v));
 
 				// We hold a lock on this key so we are the ones to insert it
 				THROW_CHECK0(runtime_error, inserted);
-
-				// Release key lock and clean out overflow
-				key_lock.unlock();
-
-				// Check to see if we have too many items and reduce if so.
-				if (check_overflow()) {
-					// Reset iterator
-					found = m_map.find(k);
-				}
 			}
 		}
 
 		// Item should be in cache now
 		THROW_CHECK0(runtime_error, found != m_map.end());
 
-		// We are using this object so update the timestamp
-		if (!inserted) {
-			found->second.first = m_ctr++;
-		}
+		// (Re)insert at head of LRU
+		move_to_front(&(found->second));
 	}
 }
 
