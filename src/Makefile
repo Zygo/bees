@@ -34,15 +34,14 @@ depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
 include depends.mk
 
 %.o: %.cc %.h
-	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 ../bin/%: %.o
 	@echo Implicit bin rule "$<" '->' "$@"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
 ../bin/bees: $(BEES_OBJS) bees-version.o
-	$(CXX) $(CXXFLAGS) -o "$@" $^ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	-rm -fv bees-version.h
-	-rm -fv *.o bees-version.c
+	rm -fv *.o bees-version.c

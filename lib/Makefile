@@ -20,7 +20,7 @@ CRUCIBLE_OBJS = \
 	uuid.o \
 	.version.o \
 
-libcrucible.so: $(CRUCIBLE_OBJS)
+libcrucible.so: $(CRUCIBLE_OBJS) -luuid
 
 include ../makeflags
 
@@ -42,4 +42,4 @@ include depends.mk
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
 
 %.so:
-	$(CXX) $(LDFLAGS) -fPIC -o $@ $^ -shared -Wl,-soname,$@ -luuid
+	$(CXX) $(LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^

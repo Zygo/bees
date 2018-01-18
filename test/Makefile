@@ -28,12 +28,12 @@ depends.mk: $(PROGRAMS:%=.depends/%.dep)
 include depends.mk
 
 %.o: %.cc %.h ../makeflags
-	-echo "Implicit rule %.o: %.cc" >&2
-	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+	@echo "Implicit rule %.o: %.cc"
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 %: %.o ../makeflags
-	-echo "Implicit rule %: %.o" >&2
-	$(CXX) $(CXXFLAGS) -o "$@" "$<" $(LDFLAGS) $(LIBS)
+	@echo "Implicit rule %: %.o"
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) -o $@ $<
 
 clean:
-	-rm -fv *.o
+	rm -fv *.o
