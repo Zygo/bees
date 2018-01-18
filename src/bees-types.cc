@@ -368,6 +368,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 	BEESTOOLONG("grow constrained = " << constrained << " *this = " << *this);
 	BEESTRACE("grow constrained = " << constrained << " *this = " << *this);
 	bool rv = false;
+	Timer grow_backward_timer;
 
 	THROW_CHECK1(invalid_argument, first.begin(), (first.begin() & BLOCK_MASK_CLONE) == 0);
 	THROW_CHECK1(invalid_argument, second.begin(), (second.begin() & BLOCK_MASK_CLONE) == 0);
@@ -496,9 +497,11 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 		BEESCOUNT(pairbackward_hit);
 	}
 	BEESCOUNT(pairbackward_stop);
+	BEESCOUNTADD(pairbackward_ms, grow_backward_timer.age() * 1000);
 
 	// Look forward
 	BEESTRACE("grow_forward " << *this);
+	Timer grow_forward_timer;
 	while (first.size() < BLOCK_SIZE_MAX_EXTENT) {
 		if (second.end() >= e_second.end()) {
 			if (constrained) {
@@ -612,6 +615,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 	}
 
 	BEESCOUNT(pairforward_stop);
+	BEESCOUNTADD(pairforward_ms, grow_forward_timer.age() * 1000);
 	return rv;
 }
 
