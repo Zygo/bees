@@ -17,7 +17,7 @@ include ../makeflags
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
-.depends/%.dep: %.cc
+.depends/%.dep: %.cc tests.h Makefile
 	@mkdir -p .depends
 	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 

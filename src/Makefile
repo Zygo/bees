@@ -3,7 +3,7 @@ PROGRAMS = \
 	../bin/fiemap \
 	../bin/fiewalk \
 
-all: $(PROGRAMS) depends.mk
+all: $(PROGRAMS)
 
 include ../makeflags
 
