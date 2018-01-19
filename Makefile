@@ -12,6 +12,10 @@ MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null
 
 DEFAULT_MAKE_TARGET ?= reallyall
 
+ifeq ($(DEFAULT_MAKE_TARGET),reallyall)
+	RUN_INSTALL_TESTS = test
+endif
+
 default: $(DEFAULT_MAKE_TARGET)
 
 all: lib src scripts README.html
@@ -43,7 +47,7 @@ README.html: README.md
 	mv -f README.html.new README.html
 
 install_bees: ## Install bees + libs
-install_bees: lib src test
+install_bees: lib src $(RUN_INSTALL_TESTS)
 	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
