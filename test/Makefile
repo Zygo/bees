@@ -33,7 +33,7 @@ include depends.mk
 
 %: %.o ../makeflags
 	@echo "Implicit rule %: %.o"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
 clean:
 	rm -fv *.o
