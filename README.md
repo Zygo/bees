@@ -102,7 +102,7 @@ and some metadata bits).  Each entry represents a minimum of 4K on disk.
 
 To change the size of the hash table, use 'truncate' to change the hash
 table size, delete `beescrawl.dat` so that bees will start over with a
-fresh full-filesystem rescan, and restart `bees'.
+fresh full-filesystem rescan, and restart `bees`.
 
 Things You Might Expect That Bees Doesn't Have
 ----------------------------------------------
