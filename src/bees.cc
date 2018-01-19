@@ -45,7 +45,7 @@ do_cmd_help(char *argv[])
 		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
 		"\t-m, --scan-mode\tScanning mode (0..1, default 0)\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
-		"\t-T, --notimestamps\tOmit timestamps in log output\n"
+		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
 		"\t-P, --relative-paths\tShow paths relative to $CWD\n"
 		"\n"
@@ -657,7 +657,7 @@ bees_main(int argc, char *argv[])
 			{ "thread-factor",  required_argument, NULL, 'C' },
 			{ "scan-mode", 	    required_argument, NULL, 'm' },
 			{ "timestamps",     no_argument,       NULL, 't' },
-			{ "notimestamps",   no_argument,       NULL, 'T' },
+			{ "no-timestamps",  no_argument,       NULL, 'T' },
 			{ "absolute-paths", no_argument,       NULL, 'p' },
 			{ "relative-paths", no_argument,       NULL, 'P' },
 			{ "help",           no_argument,       NULL, 'h' }

@@ -514,7 +514,7 @@ Command Line Options
       read performance for spinning media.  Maximizes temporary space usage.
 * --timestamps (-t)
   * Enable timestamps in log output.
-* --notimestamps (-T)
+* --no-timestamps (-T)
   * Disable timestamps in log output.
 * --absolute-paths (-p)
   * Paths in log output will be absolute.
