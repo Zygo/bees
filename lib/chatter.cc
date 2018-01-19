@@ -70,13 +70,15 @@ namespace crucible {
 
 			header_stream << buf;
 			header_stream << " " << getpid() << "." << gettid() << "<" << m_loglevel << ">";
+			if (!m_name.empty()) {
+				header_stream << " " << m_name;
+			}
 		} else {
-			header_stream << "<" << m_loglevel << ">tid " << gettid();
+			header_stream << "<" << m_loglevel << ">";
+			header_stream << (m_name.empty() ? "thread" : m_name);
+			header_stream << "[" << gettid() << "]";
 		}
 
-		if (!m_name.empty()) {
-			header_stream << " " << m_name;
-		}
 		header_stream << ": ";
 
 		string out = m_oss.str();
