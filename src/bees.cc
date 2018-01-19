@@ -43,7 +43,7 @@ do_cmd_help(char *argv[])
 		"\t-h, --help\t\tShow this help\n"
 		"\t-c, --thread-count\tWorker thread count (default CPU count * factor)\n"
 		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
-		"\t-m, --scan-mode\tScanning mode (0..1, default 0)\n"
+		"\t-m, --scan-mode\t\tScanning mode (0..1, default 0)\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
