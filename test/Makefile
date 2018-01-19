@@ -9,7 +9,7 @@ PROGRAMS = \
 
 all: test
 
-test: $(PROGRAMS)
+test: $(PROGRAMS) Makefile
 	set -x; for prog in $(PROGRAMS); do ./$$prog || exit 1; done
 
 include ../makeflags
@@ -27,11 +27,11 @@ depends.mk: $(PROGRAMS:%=.depends/%.dep)
 
 include depends.mk
 
-%.o: %.cc %.h ../makeflags
+%.o: %.cc %.h ../makeflags Makefile
 	@echo "Implicit rule %.o: %.cc"
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-%: %.o ../makeflags
+%: %.o ../makeflags Makefile
 	@echo "Implicit rule %: %.o"
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
