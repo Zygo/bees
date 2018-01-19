@@ -46,9 +46,11 @@ README.html: README.md
 	$(MARKDOWN) README.md > README.html.new
 	mv -f README.html.new README.html
 
-install_bees: ## Install bees + libs
-install_bees: lib src $(RUN_INSTALL_TESTS)
+install_libs: lib
 	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
+
+install_bees: ## Install bees + libs
+install_bees: install_libs src $(RUN_INSTALL_TESTS)
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
