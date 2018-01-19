@@ -49,6 +49,11 @@ README.html: README.md
 install_libs: lib
 	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
 
+install_tools: ## Install support tools + libs
+install_tools: install_libs src
+	install -Dm755 bin/fiemap $(DESTDIR)$(USR_PREFIX)/bin/fiemap
+	install -Dm755 bin/fiewalk $(DESTDIR)$(USR_PREFIX)/sbin/fiewalk
+
 install_bees: ## Install bees + libs
 install_bees: install_libs src $(RUN_INSTALL_TESTS)
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
@@ -60,7 +65,7 @@ install_scripts: scripts
 	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_LIB_PREFIX)/system/beesd@.service
 
 install: ## Install distribution
-install: install_bees install_scripts
+install: install_bees install_scripts $(OPTIONAL_INSTALL_TARGETS)
 
 help: ## Show help
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/\t/'

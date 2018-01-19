@@ -22,7 +22,7 @@ PATCHES="
 LICENSE="GPL-3"
 SLOT="0"
 KEYWORDS=""
-IUSE=""
+IUSE="tools"
 
 COMMON_DEPEND="
 	>=sys-apps/util-linux-2.30.2
@@ -41,4 +41,9 @@ HTML_DOCS="README.html"
 src_prepare() {
 	default
 	echo LIBDIR=$(get_libdir) >>${S}/localconf
+	localconf=${S}/localconf
+	if use tools; then
+		einfo "Building with support tools fiemap and fiewalk."
+		echo OPTIONAL_INSTALL_TARGETS=install_tools >>${localconf} || die
+	fi
 }
