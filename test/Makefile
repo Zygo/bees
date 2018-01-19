@@ -10,7 +10,6 @@ PROGRAMS = \
 all: test
 
 test: $(PROGRAMS) Makefile
-	set -x; for prog in $(PROGRAMS); do ./$$prog || exit 1; done
 
 include ../makeflags
 
@@ -31,9 +30,10 @@ include depends.mk
 	@echo "Implicit rule %.o: %.cc"
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-%: %.o ../makeflags Makefile
+$(PROGRAMS): %: %.o ../makeflags Makefile
 	@echo "Implicit rule %: %.o"
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+	./$@
 
 clean:
-	rm -fv *.o
+	rm -fv $(PROGRAMS:%=%.o) $(PROGRAMS)
