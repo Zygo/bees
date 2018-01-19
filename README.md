@@ -445,7 +445,7 @@ be the name of a subvol):
 Configuration
 -------------
 
-The only runtime configurable options are environment variables:
+There are some runtime configurable options using environment variables:
 
 * BEESHOME: Directory containing Bees state files:
  * beeshash.dat  | persistent hash table.  Must be a multiple of 16M.
@@ -461,7 +461,7 @@ The only runtime configurable options are environment variables:
 	watch -n1 cat $BEESSTATUS
 
 Other options (e.g. interval between filesystem crawls) can be configured
-in src/bees.h.
+in src/bees.h or on the cmdline (see 'Command Line Options' below).
 
 Running
 -------
