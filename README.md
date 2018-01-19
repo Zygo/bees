@@ -368,6 +368,16 @@ within a temporary runtime directory.
 ### Ubuntu 14.04:
 You can try to carry on the work done here: https://gist.github.com/dagelf/99ee07f5638b346adb8c058ab3d57492
 
+Packaging
+---------
+
+See 'Dependencies' below. Package maintainers can pick ideas for building and
+configuring the source package from the Gentoo ebuild in `contrib/gentoo`.
+You can configure some build options by creating a file `localconf` and
+adjust settings for your distribution environment there.
+
+Please also review the Makefile for additional hints.
+
 Dependencies
 ------------
 
