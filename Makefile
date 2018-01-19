@@ -10,7 +10,12 @@ MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null
 # allow local configuration to override above variables
 -include localconf
 
-default all: lib src scripts test README.html
+DEFAULT_MAKE_TARGET ?= reallyall
+
+default: $(DEFAULT_MAKE_TARGET)
+
+all: lib src scripts README.html
+reallyall: all test
 
 clean: ## Cleanup
 	git clean -dfx -e localconf
