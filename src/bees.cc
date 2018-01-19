@@ -47,7 +47,7 @@ do_cmd_help(char *argv[])
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
-		"\t-P, --relative-paths\tShow paths relative to $CWD\n"
+		"\t-P, --strip-paths\tStrip $CWD from beginning of all paths in the log\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -659,7 +659,7 @@ bees_main(int argc, char *argv[])
 			{ "timestamps",     no_argument,       NULL, 't' },
 			{ "no-timestamps",  no_argument,       NULL, 'T' },
 			{ "absolute-paths", no_argument,       NULL, 'p' },
-			{ "relative-paths", no_argument,       NULL, 'P' },
+			{ "strip-paths",    no_argument,       NULL, 'P' },
 			{ "help",           no_argument,       NULL, 'h' }
 		};
 

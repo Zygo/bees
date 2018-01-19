@@ -518,8 +518,9 @@ Command Line Options
   * Disable timestamps in log output.
 * --absolute-paths (-p)
   * Paths in log output will be absolute.
-* --relative-paths (-P)
-  * Paths in log output will be relative to the working directory at Bees startup.
+* --strip-paths (-P)
+  * Paths in log output will have the working directory at Bees startup
+    stripped.
 
 
 Bug Reports and Contributions
