@@ -720,9 +720,9 @@ BeesCrawl::next_transid()
 	crawl_state.m_objectid = 0;
 	crawl_state.m_offset = 0;
 	crawl_state.m_started = current_time;
-	BEESLOGINFO("Restarting crawl " << get_state());
 	BEESCOUNT(crawl_restart);
 	set_state(crawl_state);
+	BEESLOGINFO("Restarted crawl " << get_state());
 	return true;
 }
 
@@ -738,7 +738,7 @@ BeesCrawl::fetch_extents()
 	}
 
 	BEESNOTE("crawling " << get_state());
-	BEESLOGINFO("Crawling " << get_state());
+	// BEESLOGINFO("Crawling " << get_state());
 
 	Timer crawl_timer;
 
@@ -773,11 +773,11 @@ BeesCrawl::fetch_extents()
 
 	if (!ioctl_ok || sk.m_result.empty()) {
 		BEESCOUNT(crawl_empty);
-		BEESLOGINFO("Crawl empty " << get_state());
+		// BEESLOGINFO("Crawl empty " << get_state());
 		return next_transid();
 	}
 
-	BEESLOGINFO("Crawling " << sk.m_result.size() << " results from " << get_state());
+	// BEESLOGINFO("Crawling " << sk.m_result.size() << " results from " << get_state());
 	auto results_left = sk.m_result.size();
 	BEESNOTE("crawling " << results_left << " results from " << get_state());
 	size_t count_other = 0;
@@ -873,7 +873,7 @@ BeesCrawl::fetch_extents()
 			}
 		}
 	}
-	BEESLOGINFO("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
+	// BEESLOGINFO("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state() << " in " << crawl_timer << "s");
 
 	return true;
 }
