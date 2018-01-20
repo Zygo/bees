@@ -32,12 +32,21 @@ namespace crucible {
 		// schedule Task before other queued tasks
 		void run_earlier() const;
 
+		// describe Task as text
+		ostream &print(ostream &os) const;
+
 		// Returns currently executing task if called from exec_fn.
 		// Usually used to reschedule the currently executing Task.
 		static Task current_task();
 
+		// Ordering for containers
 		bool operator<(const Task &that) const;
+
+		// Null test
+		operator bool() const;
 	};
+
+	ostream &operator<<(ostream &os, const Task &task);
 
 	class TaskMaster {
 	public:

@@ -15,7 +15,7 @@
 namespace crucible {
 	using namespace std;
 
-	static thread_local weak_ptr<TaskState> s_current_task_wp;
+	static thread_local weak_ptr<TaskState> tl_current_task_wp;
 
 	class TaskState : public enable_shared_from_this<TaskState> {
 		const function<void()> 			m_exec_fn;
@@ -28,7 +28,7 @@ namespace crucible {
 
 		void exec();
 		ostream &print(ostream &os);
-		TaskId id();
+		TaskId id() const;
 	};
 
 	atomic<TaskId> TaskState::s_next_id;
@@ -87,9 +87,9 @@ namespace crucible {
 		THROW_CHECK0(invalid_argument, m_exec_fn);
 		weak_ptr<TaskState> this_task_wp = shared_from_this();
 		Cleanup cleaner([&]() {
-			swap(this_task_wp, s_current_task_wp);
+			swap(this_task_wp, tl_current_task_wp);
 		});
-		swap(this_task_wp, s_current_task_wp);
+		swap(this_task_wp, tl_current_task_wp);
 		m_exec_fn();
 	}
 
@@ -101,7 +101,7 @@ namespace crucible {
 	}
 
 	TaskId
-	TaskState::id()
+	TaskState::id() const
 	{
 		return m_id;
 	}
@@ -126,7 +126,6 @@ namespace crucible {
 	void
 	TaskMasterState::push_back(shared_ptr<TaskState> task)
 	{
-		assert(task);
 		THROW_CHECK0(runtime_error, task);
 		s_tms->start_stop_threads();
 		unique_lock<mutex> lock(s_tms->m_mutex);
@@ -137,7 +136,6 @@ namespace crucible {
 	void
 	TaskMasterState::push_front(shared_ptr<TaskState> task)
 	{
-		assert(task);
 		THROW_CHECK0(runtime_error, task);
 		s_tms->start_stop_threads();
 		unique_lock<mutex> lock(s_tms->m_mutex);
@@ -224,48 +222,62 @@ namespace crucible {
 	Task::Task(shared_ptr<TaskState> pts) :
 		m_task_state(pts)
 	{
-		assert(m_task_state);
 	}
 
 	Task::Task(function<void()> exec_fn, function<ostream&(ostream &)> print_fn) :
 		m_task_state(make_shared<TaskState>(exec_fn, print_fn))
 	{
-		assert(m_task_state);
 	}
 
 	void
 	Task::run() const
 	{
-		assert(m_task_state);
+		THROW_CHECK0(runtime_error, m_task_state);
 		TaskMasterState::push_back(m_task_state);
 	}
 
 	void
 	Task::run_earlier() const
 	{
-		assert(m_task_state);
+		THROW_CHECK0(runtime_error, m_task_state);
 		TaskMasterState::push_front(m_task_state);
 	}
 
 	Task
 	Task::current_task()
 	{
-		return Task(s_current_task_wp.lock());
+		return Task(tl_current_task_wp.lock());
 	}
+
+	ostream &
+	Task::print(ostream &os) const
+	{
+		THROW_CHECK0(runtime_error, m_task_state);
+		return m_task_state->print(os);
+	}
+
+	ostream &
+	operator<<(ostream &os, const Task &task)
+	{
+		return task.print(os);
+	};
 
 	TaskId
 	Task::id() const
 	{
-		if (m_task_state) {
-			return m_task_state->id();
-		}
-		return 0;
+		THROW_CHECK0(runtime_error, m_task_state);
+		return m_task_state->id();
 	}
 
 	bool
 	Task::operator<(const Task &that) const
 	{
 		return id() < that.id();
+	}
+
+	Task::operator bool() const
+	{
+		return !!m_task_state;
 	}
 
 	shared_ptr<TaskState>
