@@ -250,12 +250,13 @@ BeesRoots::crawl_roots()
 
 			size_t batch_count = 0;
 			while (first_range && batch_count < BEES_MAX_CRAWL_BATCH) {
+				auto subvol = first_crawl->get_state().m_root;
 				Task([ctx_copy, first_range]() {
 					BEESNOTE("scan_forward " << first_range);
 					ctx_copy->scan_forward(first_range);
 				},
-				[first_range](ostream &os) -> ostream & {
-					return os << "scan_forward " << first_range;
+				[first_range, subvol](ostream &os) -> ostream & {
+					return os << "crawl_" << subvol;
 				}).run();
 				BEESCOUNT(crawl_scan);
 				m_crawl_current = first_crawl->get_state();
@@ -279,12 +280,13 @@ BeesRoots::crawl_roots()
 				auto this_range = this_crawl->peek_front();
 				size_t batch_count = 0;
 				while (this_range && batch_count < BEES_MAX_CRAWL_BATCH) {
+					auto subvol = this_crawl->get_state().m_root;
 					Task([ctx_copy, this_range]() {
 						BEESNOTE("scan_forward " << this_range);
 						ctx_copy->scan_forward(this_range);
 					},
-					[this_range](ostream &os) -> ostream & {
-						return os << "scan_forward " << this_range;
+					[this_range, subvol](ostream &os) -> ostream & {
+						return os << "crawl_" << subvol;
 					}).run();
 					crawled = true;
 					BEESCOUNT(crawl_scan);
@@ -330,7 +332,7 @@ BeesRoots::crawl_thread()
 			tqs = TaskMaster::get_queue_count();
 		}
 		Task::current_task().run();
-	}, [](ostream &os) -> ostream& { return os << "crawl task"; }).run();
+	}, [](ostream &os) -> ostream& { return os << "crawl"; }).run();
 }
 
 void
