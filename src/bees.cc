@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 // PRIx64
 #include <inttypes.h>
@@ -136,16 +137,33 @@ BeesNote::set_name(const string &name)
 string
 BeesNote::get_name()
 {
-	if (tl_name.empty()) {
-		char buf[100];
-		memset(buf, '\0', sizeof(buf));
-		pthread_getname_np(pthread_self(), buf, sizeof(buf));
-		buf[sizeof(buf) - 1] = '\0';
-		tl_name = buf;
-		if (tl_name.empty()) {
-			tl_name = "bees";
-		}
+	if (!tl_name.empty()) {
+		return tl_name;
 	}
+
+	// Try a Task name.  If there is one, return it, but do not
+	// remember it.  Each output message may be a different Task.
+	// The current task is thread_local so we don't need to worry
+	// about it being destroyed under us.
+	auto current_task = Task::current_task();
+	if (current_task) {
+		ostringstream oss;
+		oss << current_task;
+		return oss.str();
+	}
+
+	// OK try the pthread name next.
+	char buf[100];
+	memset(buf, '\0', sizeof(buf));
+	pthread_getname_np(pthread_self(), buf, sizeof(buf));
+	buf[sizeof(buf) - 1] = '\0';
+	tl_name = buf;
+
+	// Give up and use a generic name.
+	if (tl_name.empty()) {
+		tl_name = "bees";
+	}
+
 	return tl_name;
 }
 
