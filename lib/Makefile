@@ -1,8 +1,9 @@
 TAG := $(shell git describe --always --dirty || echo UNKNOWN)
 
 default: libcrucible.so
+%.so: Makefile
 
-OBJS = \
+CRUCIBLE_OBJS = \
 	chatter.o \
 	cleanup.o \
 	crc64.o \
@@ -19,20 +20,26 @@ OBJS = \
 	uuid.o \
 	.version.o \
 
+libcrucible.so: $(CRUCIBLE_OBJS) -luuid
+
 include ../makeflags
 
-depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
-	mv -fv depends.mk.new depends.mk
+.depends/%.dep: %.cc Makefile
+	@mkdir -p .depends
+	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+
+depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
+	cat $^ > $@.new
+	mv -f $@.new $@
 
 .version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
-	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > .version.new.cc
-	mv -f .version.new.cc .version.cc
+	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
+	mv -f $@.new $@
 
--include depends.mk
+include depends.mk
 
-%.o: %.cc ../include/crucible/%.h
+%.o: %.cc ../makeflags
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
 
-libcrucible.so: $(OBJS) Makefile
-	$(CXX) $(LDFLAGS) -fPIC -o $@ $(OBJS) -shared -Wl,-soname,$@ -luuid
+%.so:
+	$(CXX) $(LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^

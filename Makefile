@@ -29,7 +29,7 @@ test: lib src
 	$(MAKE) -C test
 
 scripts/%: scripts/%.in
-	sed -e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#' -e's#@PREFIX@#$(PREFIX)#' "$<" >"$@"
+	sed -e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#' -e's#@PREFIX@#$(PREFIX)#' $< >$@
 
 scripts: scripts/beesd scripts/beesd@.service
 

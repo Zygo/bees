@@ -17,19 +17,23 @@ include ../makeflags
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
 
-depends.mk: *.cc
-	for x in *.cc; do $(CXX) $(CXXFLAGS) -M "$$x"; done > depends.mk.new
-	mv -fv depends.mk.new depends.mk
+.depends/%.dep: %.cc tests.h Makefile
+	@mkdir -p .depends
+	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
--include depends.mk
+depends.mk: $(PROGRAMS:%=.depends/%.dep)
+	cat $^ > $@.new
+	mv -f $@.new $@
+
+include depends.mk
 
 %.o: %.cc %.h ../makeflags
-	-echo "Implicit rule %.o: %.cc" >&2
-	$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+	@echo "Implicit rule %.o: %.cc"
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 %: %.o ../makeflags
-	-echo "Implicit rule %: %.o" >&2
-	$(CXX) $(CXXFLAGS) -o "$@" "$<" $(LDFLAGS) $(LIBS)
+	@echo "Implicit rule %: %.o"
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) -o $@ $<
 
 clean:
-	-rm -fv *.o
+	rm -fv *.o
