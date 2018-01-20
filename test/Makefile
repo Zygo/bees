@@ -9,7 +9,8 @@ PROGRAMS = \
 
 all: test
 
-test: $(PROGRAMS) Makefile
+test: $(PROGRAMS:%=%.txt) Makefile
+FORCE:
 
 include ../makeflags
 
@@ -33,7 +34,9 @@ include depends.mk
 $(PROGRAMS): %: %.o ../makeflags Makefile
 	@echo "Implicit rule %: %.o"
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
-	./$@
+
+%.txt: % Makefile FORCE
+	./$< >$@ 2>&1 || (RC=$$?; cat $@; exit $$RC)
 
 clean:
-	rm -fv $(PROGRAMS:%=%.o) $(PROGRAMS)
+	rm -fv $(PROGRAMS:%=%.o) $(PROGRAMS:%=%.txt) $(PROGRAMS)
