@@ -120,7 +120,7 @@ BeesNote::~BeesNote()
 BeesNote::BeesNote(function<void(ostream &os)> f) :
 	m_func(f)
 {
-	m_name = tl_name;
+	m_name = get_name();
 	m_prev = tl_next;
 	tl_next = this;
 	unique_lock<mutex> lock(s_mutex);
@@ -137,10 +137,16 @@ string
 BeesNote::get_name()
 {
 	if (tl_name.empty()) {
-		return "bees";
-	} else {
-		return tl_name;
+		char buf[100];
+		memset(buf, '\0', sizeof(buf));
+		pthread_getname_np(pthread_self(), buf, sizeof(buf));
+		buf[sizeof(buf) - 1] = '\0';
+		tl_name = buf;
+		if (tl_name.empty()) {
+			tl_name = "bees";
+		}
 	}
+	return tl_name;
 }
 
 BeesNote::ThreadStatusMap
