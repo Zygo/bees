@@ -12,7 +12,7 @@ export CONFIG_FILE
 export UUID AL16M
 
 readonly AL16M="$((16*1024*1024))"
-readonly CONFIG_DIR=@PREFIX@/etc/bees/
+readonly CONFIG_DIR=@ETC_PREFIX@/bees/
 
 ## Pre checks
 {

@@ -1,8 +1,10 @@
-PREFIX ?= /
+PREFIX ?= /usr
+ETC_PREFIX ?= /etc
 LIBDIR ?= lib
-USR_PREFIX ?= $(PREFIX)/usr
-USRLIB_PREFIX ?= $(USR_PREFIX)/$(LIBDIR)
-LIBEXEC_PREFIX ?= $(USRLIB_PREFIX)/bees
+
+LIB_PREFIX ?= $(PREFIX)/$(LIBDIR)
+LIBEXEC_PREFIX ?= $(LIB_PREFIX)/bees
+
 SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemunitdir)
 
 MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null || echo markdown))
@@ -38,7 +40,10 @@ test: lib src
 	$(MAKE) -C test
 
 scripts/%: scripts/%.in
-	sed -e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#' -e's#@PREFIX@#$(PREFIX)#' $< >$@
+	sed $< >$@ \
+		-e's#@PREFIX@#$(PREFIX)#' \
+		-e's#@ETC_PREFIX@#$(ETC_PREFIX)#' \
+		-e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#'
 
 scripts: scripts/beesd scripts/beesd@.service
 
@@ -47,12 +52,12 @@ README.html: README.md
 	mv -f README.html.new README.html
 
 install_libs: lib
-	install -Dm644 lib/libcrucible.so $(DESTDIR)$(USRLIB_PREFIX)/libcrucible.so
+	install -Dm644 lib/libcrucible.so $(DESTDIR)$(LIB_PREFIX)/libcrucible.so
 
 install_tools: ## Install support tools + libs
 install_tools: install_libs src
-	install -Dm755 bin/fiemap $(DESTDIR)$(USR_PREFIX)/bin/fiemap
-	install -Dm755 bin/fiewalk $(DESTDIR)$(USR_PREFIX)/sbin/fiewalk
+	install -Dm755 bin/fiemap $(DESTDIR)$(PREFIX)/bin/fiemap
+	install -Dm755 bin/fiewalk $(DESTDIR)$(PREFIX)/sbin/fiewalk
 
 install_bees: ## Install bees + libs
 install_bees: install_libs src $(RUN_INSTALL_TESTS)
@@ -60,8 +65,8 @@ install_bees: install_libs src $(RUN_INSTALL_TESTS)
 
 install_scripts: ## Install scipts
 install_scripts: scripts
-	install -Dm755 scripts/beesd $(DESTDIR)$(USR_PREFIX)/sbin/beesd
-	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(PREFIX)/etc/bees/beesd.conf.sample
+	install -Dm755 scripts/beesd $(DESTDIR)$(PREFIX)/sbin/beesd
+	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)/$(ETC_PREFIX)/bees/beesd.conf.sample
 ifneq (SYSTEMD_SYSTEM_UNIT_DIR,)
 	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_SYSTEM_UNIT_DIR)/beesd@.service
 endif
