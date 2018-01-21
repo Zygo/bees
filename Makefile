@@ -18,6 +18,8 @@ ifeq ($(DEFAULT_MAKE_TARGET),reallyall)
 	RUN_INSTALL_TESTS = test
 endif
 
+include Defines.mk
+
 default: $(DEFAULT_MAKE_TARGET)
 
 all: lib src scripts README.html
@@ -40,10 +42,7 @@ test: lib src
 	$(MAKE) -C test
 
 scripts/%: scripts/%.in
-	sed $< >$@ \
-		-e's#@PREFIX@#$(PREFIX)#' \
-		-e's#@ETC_PREFIX@#$(ETC_PREFIX)#' \
-		-e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#'
+	$(TEMPLATE_COMPILER)
 
 scripts: scripts/beesd scripts/beesd@.service
 
