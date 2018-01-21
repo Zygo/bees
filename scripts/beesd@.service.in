@@ -5,7 +5,7 @@ After=sysinit.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/beesd %i
+ExecStart=@PREFIX@/usr/sbin/beesd %i
 Nice=19
 KillMode=control-group
 KillSignal=SIGTERM
