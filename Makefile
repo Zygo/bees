@@ -2,8 +2,8 @@ PREFIX ?= /
 LIBDIR ?= lib
 USR_PREFIX ?= $(PREFIX)/usr
 USRLIB_PREFIX ?= $(USR_PREFIX)/$(LIBDIR)
-SYSTEMD_LIB_PREFIX ?= $(PREFIX)/lib/systemd
 LIBEXEC_PREFIX ?= $(USRLIB_PREFIX)/bees
+SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemunitdir)
 
 MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null || echo markdown))
 
@@ -62,7 +62,9 @@ install_scripts: ## Install scipts
 install_scripts: scripts
 	install -Dm755 scripts/beesd $(DESTDIR)$(USR_PREFIX)/sbin/beesd
 	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(PREFIX)/etc/bees/beesd.conf.sample
-	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_LIB_PREFIX)/system/beesd@.service
+ifneq (SYSTEMD_SYSTEM_UNIT_DIR,)
+	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_SYSTEM_UNIT_DIR)/beesd@.service
+endif
 
 install: ## Install distribution
 install: install_bees install_scripts $(OPTIONAL_INSTALL_TARGETS)
