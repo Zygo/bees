@@ -23,8 +23,12 @@ CRUCIBLE_OBJS = \
 libcrucible.so: $(CRUCIBLE_OBJS) -luuid
 
 include ../makeflags
+include ../Defines.mk
 
-.depends/%.dep: %.cc Makefile
+configure.h: configure.h.in
+	$(TEMPLATE_COMPILER)
+
+.depends/%.dep: %.cc configure.h Makefile
 	@mkdir -p .depends
 	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
@@ -32,7 +36,7 @@ depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
 	cat $^ > $@.new
 	mv -f $@.new $@
 
-.version.cc: Makefile ../makeflags *.cc ../include/crucible/*.h
+.version.cc: configure.h Makefile ../makeflags *.cc ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
 	mv -f $@.new $@
 

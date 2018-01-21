@@ -12,5 +12,6 @@ latex/
 make.log
 make.log.new
 localconf
+lib/configure.h
 scripts/beesd
 scripts/beesd@.service

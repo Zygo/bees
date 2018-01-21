@@ -1,0 +1,6 @@
+#ifndef _CONFIGURE_H
+
+#define ETC_PREFIX "@ETC_PREFIX@"
+
+#define _CONFIGURE_H
+#endif
