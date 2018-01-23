@@ -877,6 +877,9 @@ operator<<(ostream &os, const BeesBlockData &bbd)
 		os << ", hash = " << bbd.m_hash;
 	}
 	if (!bbd.m_data.empty()) {
+// Turn this on to debug BeesBlockData, but leave it off otherwise.
+// It's a massive data leak that is only interesting to developers.
+#if 0
 		os << ", data[" << bbd.m_data.size() << "] = '";
 
 		size_t max_print = 12;
@@ -893,6 +896,9 @@ operator<<(ostream &os, const BeesBlockData &bbd)
 			}
 		}
 		os << "...'";
+#else
+		os << ", data[" << bbd.m_data.size() << "]";
+#endif
 	}
 	return os << " }";
 }
