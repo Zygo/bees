@@ -132,11 +132,15 @@ void
 BeesNote::set_name(const string &name)
 {
 	tl_name = name;
+	catch_all([&]() {
+		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), name.c_str()));
+	});
 }
 
 string
 BeesNote::get_name()
 {
+	// Use explicit name if given
 	if (!tl_name.empty()) {
 		return tl_name;
 	}
@@ -145,26 +149,27 @@ BeesNote::get_name()
 	// remember it.  Each output message may be a different Task.
 	// The current task is thread_local so we don't need to worry
 	// about it being destroyed under us.
-	auto current_task = Task::current_task();
-	if (current_task) {
-		ostringstream oss;
-		oss << current_task;
-		return oss.str();
-	}
+        auto current_task = Task::current_task();
+        if (current_task) {
+                ostringstream oss;
+                oss << current_task;
+                return oss.str();
+        }
 
-	// OK try the pthread name next.
-	char buf[100];
+        // OK try the pthread name next.
+	char buf[24];
 	memset(buf, '\0', sizeof(buf));
-	pthread_getname_np(pthread_self(), buf, sizeof(buf));
-	buf[sizeof(buf) - 1] = '\0';
-	tl_name = buf;
-
-	// Give up and use a generic name.
-	if (tl_name.empty()) {
-		tl_name = "bees";
+	int err = pthread_getname_np(pthread_self(), buf, sizeof(buf));
+	if (err) {
+		return string("pthread_getname_np: ") + strerror(err);
 	}
+	buf[sizeof(buf) - 1] = '\0';
 
-	return tl_name;
+	// thread_getname_np returns process name
+	// ...by default?  ...for the main thread?
+	// ...except during exception handling?
+	// ...randomly?
+	return buf;
 }
 
 BeesNote::ThreadStatusMap
@@ -629,8 +634,11 @@ bees_main(int argc, char *argv[])
 		BEESCOUNT(exception_caught);
 	});
 
+	// The thread name for the main function is also what the kernel
+	// Oops messages call the entire process.  So even though this
+	// thread's proper title is "main", let's call it "bees".
+	BeesNote::set_name("bees");
 	BEESNOTE("main");
-	BeesNote::set_name("main");
 
 	list<shared_ptr<BeesContext>> all_contexts;
 	shared_ptr<BeesContext> bc;

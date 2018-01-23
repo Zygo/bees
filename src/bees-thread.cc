@@ -15,13 +15,10 @@ BeesThread::exec(function<void()> func)
 	m_timer.reset();
 	BEESLOGDEBUG("BeesThread exec " << m_name);
 	m_thread_ptr = make_shared<thread>([=]() {
-		BEESLOGDEBUG("Starting thread " << m_name);
 		BeesNote::set_name(m_name);
+		BEESLOGDEBUG("Starting thread " << m_name);
 		BEESNOTE("thread function");
 		Timer thread_time;
-		catch_all([&]() {
-			DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_name.c_str()));
-		});
 		catch_all([&]() {
 			func();
 		});

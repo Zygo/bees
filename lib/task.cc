@@ -85,11 +85,25 @@ namespace crucible {
 	TaskState::exec()
 	{
 		THROW_CHECK0(invalid_argument, m_exec_fn);
+		THROW_CHECK0(invalid_argument, m_print_fn);
+
+		char buf[24];
+		memset(buf, '\0', sizeof(buf));
+		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
+		Cleanup pthread_name_cleaner([&]() {
+			pthread_setname_np(pthread_self(), buf);
+		});
+		ostringstream oss;
+		m_print_fn(oss);
+		auto thread_name = oss.str();
+		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), thread_name.c_str()));
+
 		weak_ptr<TaskState> this_task_wp = shared_from_this();
-		Cleanup cleaner([&]() {
+		Cleanup current_task_cleaner([&]() {
 			swap(this_task_wp, tl_current_task_wp);
 		});
 		swap(this_task_wp, tl_current_task_wp);
+
 		m_exec_fn();
 	}
 
