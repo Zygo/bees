@@ -92,9 +92,6 @@ BeesRoots::crawl_state_filename() const
 void
 BeesRoots::state_save()
 {
-	// Make sure we have a full complement of crawlers
-	insert_new_crawl();
-
 	BEESNOTE("saving crawl state");
 	BEESLOGINFO("Saving crawl state");
 	BEESTOOLONG("Saving crawl state");
@@ -212,6 +209,8 @@ BeesRoots::transid_max()
 			});
 		}
 	} while (root);
+	m_transid_re.update(rv);
+	// BEESLOGDEBUG("RateEstimator transid_max update: " << m_transid_re);
 	return rv;
 }
 
@@ -304,11 +303,12 @@ BeesRoots::crawl_roots()
 		case SCAN_MODE_COUNT: assert(false); break;
 	}
 
-	BEESLOGINFO("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for more...");
 	BEESCOUNT(crawl_done);
-	BEESNOTE("idle, waiting for more data");
-	lock.lock();
-	m_condvar.wait(lock);
+
+	auto want_transid = m_transid_re.count() + 1;
+	BEESLOGINFO("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for transid " << want_transid << "...");
+	BEESNOTE("idle, waiting for transid " << want_transid << ": " << m_transid_re);
+	m_transid_re.wait_until(want_transid);
 
 	// Don't count the time we were waiting as part of the crawl time
 	m_crawl_timer.reset();
@@ -317,10 +317,9 @@ BeesRoots::crawl_roots()
 void
 BeesRoots::crawl_thread()
 {
-	// TODO:  get rid of the thread.  For now it is a convenient
-	// way to avoid the weird things that happen when you try to
-	// shared_from_this() in a constructor.
-	BEESNOTE("crawling");
+	BEESNOTE("creating crawl task");
+
+	// Start the Task that does the crawling
 	auto shared_this = shared_from_this();
 	Task("crawl", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
@@ -333,12 +332,25 @@ BeesRoots::crawl_thread()
 		}
 		Task::current_task().run();
 	}).run();
+
+	// Monitor transid_max and wake up roots when it changes
+	BEESNOTE("tracking transids");
+	while (true) {
+		// Make sure we have a full complement of crawlers
+		// Calls transid_max() which updates m_transid_re
+		insert_new_crawl();
+
+		BEESNOTE("waiting for next transid " << m_transid_re);
+		// We don't use wait_for here because somebody needs to
+		// be updating m_transid_re from time to time.
+		nanosleep(m_transid_re.eta_rel(1));
+	}
 }
 
 void
 BeesRoots::writeback_thread()
 {
-	while (1) {
+	while (true) {
 		BEESNOTE(m_crawl_current << (m_crawl_dirty ? " (dirty)" : ""));
 
 		catch_all([&]() {
@@ -347,7 +359,6 @@ BeesRoots::writeback_thread()
 		});
 
 		nanosleep(BEES_WRITEBACK_INTERVAL);
-
 	}
 }
 
@@ -393,9 +404,7 @@ BeesRoots::insert_new_crawl()
 		crawl_state_erase(new_bcs);
 	}
 
-	// Wake up crawl_roots if sleeping
-	lock.lock();
-	m_condvar.notify_all();
+	// transid_max updates m_transid_re which wakes up crawl_roots()
 }
 
 void
@@ -437,7 +446,7 @@ BeesRoots::state_load()
 BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
-	m_crawl_thread("crawl"),
+	m_crawl_thread("crawl_transid"),
 	m_writeback_thread("crawl_writeback")
 {
 	m_crawl_thread.exec([&]() {
@@ -695,6 +704,12 @@ BeesRoots::open_root_ino(uint64_t root, uint64_t ino)
 	return m_ctx->fd_cache()->open_root_ino(m_ctx, root, ino);
 }
 
+RateEstimator &
+BeesRoots::transid_re()
+{
+	return m_transid_re;
+}
+
 BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) :
 	m_ctx(ctx),
 	m_state(initial_state)
@@ -705,12 +720,14 @@ bool
 BeesCrawl::next_transid()
 {
 	// If this crawl is recently empty, quickly and _silently_ bail out
+	auto roots = m_ctx->roots();
 	auto current_time = time(NULL);
 	auto crawl_state = get_state();
 	auto elapsed_time = current_time - crawl_state.m_started;
-	if (elapsed_time < BEES_COMMIT_INTERVAL) {
+	auto transid_delta = roots->transid_re().eta_abs(crawl_state.m_max_transid + 1);
+	if (elapsed_time < transid_delta) {
 		if (!m_deferred) {
-			BEESLOGINFO("Deferring next transid in " << get_state());
+			BEESLOGINFO("Deferring next transid " << transid_delta << "s in " << get_state());
 		}
 		m_deferred = true;
 		BEESCOUNT(crawl_defer);
@@ -722,7 +739,6 @@ BeesCrawl::next_transid()
 
 	// Start new crawl
 	m_deferred = false;
-	auto roots = m_ctx->roots();
 	crawl_state.m_min_transid = crawl_state.m_max_transid;
 	crawl_state.m_max_transid = roots->transid_max();
 	crawl_state.m_objectid = 0;
