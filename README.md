@@ -264,6 +264,8 @@ Bug fixes (sometimes included in older LTS kernels):
   last one.
 * 4.14: backref performance improvements make LOGICAL_INO even faster
   in the worst cases (but possibly slower in the best cases?).
+* (unmerged): WARN_ON(ref->count < 0) in fs/btrfs/backref.c triggers
+  almost once per second.  The WARN_ON is incorrect and can be removed.
 
 Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
 
@@ -386,13 +388,13 @@ Dependencies
 
 * Minimum Linux kernel version: 4.4.3
 
-  Don't bother trying to make Bees work with older kernels.
-  It won't end well.
+  Don't bother trying to make Bees work with older kernels.  It won't
+  end well:  there are too many missing features and bugs to work around.
 
 * Minimum *recommended* Linux kernel version: 4.11
 
-  Earlier kernels are usable with bees, but a few performance bugs
-  and hangs in dedup-related functions remain.
+  Earlier kernels are usable with bees, but bees can trigger a few
+  performance bugs and hangs in dedup-related functions.
 
 * markdown
 
