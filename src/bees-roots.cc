@@ -620,7 +620,6 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			// errno == ENOENT is common during snapshot delete, ignore it
 			if (errno != ENOENT) {
 				BEESLOGWARN("Could not open path '" << file_path << "' at root " << root << " " << name_fd(root_fd) << ": " << strerror(errno));
-				BEESNOTE("ipa" << ipa);
 			}
 			continue;
 		}
@@ -652,19 +651,28 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			break;
 		}
 
-		// As of 4.12 the kernel rejects dedup requests with
-		// src and dst that have different datasum flags.
+		// The kernel rejects dedup requests with
+		// src and dst that have different datasum flags
+		// (datasum is a flag in the inode).
 		//
-		// We can't detect those from userspace reliably, but
-		// we can detect the common case where one file is
-		// marked with the nodatasum (which implies nodatacow)
-		// on a filesystem that is mounted with datacow.
-		// These are arguably out of scope for dedup.
+		// We can detect the common case where a file is
+		// marked with nodatacow (which implies nodatasum).
+		// nodatacow files are arguably out of scope for dedup,
+		// since dedup would just make them datacow again.
+		// To handle these we pretend we couldn't open them.
 		//
-		// To fix this properly, we have to keep track of which
-		// pairs of inodes failed to dedup, guess that the reason
-		// for failure was a mismatch of datasum flags, and
-		// create temporary files with the right flags somehow.
+		// A less common case is nodatasum + datacow files.
+		// Those are availble for dedup but we have to solve
+		// some other problems before we can dedup them.  They
+		// require a separate hash table namespace from datasum
+		// + datacow files, and we have to create nodatasum
+		// temporary files when we rewrite extents.
+		//
+		// FIXME:  the datasum flag is scooped up by
+		// TREE_SEARCH_V2 during crawls.  We throw the inode
+		// items away when we should be examining them for the
+		// nodatasum flag.
+
 		int attr = ioctl_iflags_get(rv);
 		if (attr & FS_NOCOW_FL) {
 			BEESLOGWARN("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
@@ -673,8 +681,6 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			break;
 		}
 
-		BEESTRACE("mapped " << BeesFileId(root, ino));
-		BEESTRACE("\tto " << name_fd(rv));
 		BEESCOUNT(open_hit);
 		return rv;
 	}
