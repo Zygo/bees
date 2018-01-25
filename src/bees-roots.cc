@@ -335,10 +335,21 @@ BeesRoots::crawl_thread()
 
 	// Monitor transid_max and wake up roots when it changes
 	BEESNOTE("tracking transids");
+	auto last_count = m_transid_re.count();
 	while (true) {
 		// Make sure we have a full complement of crawlers
 		// Calls transid_max() which updates m_transid_re
 		insert_new_crawl();
+
+		// Don't hold root FDs open too long.
+		// The open FDs prevent snapshots from being deleted.
+		// cleaner_kthread just keeps skipping over the open dir and all its children.
+		// Even open files are a problem if they're big enough.
+		auto new_count = m_transid_re.count();
+		if (new_count != last_count) {
+			m_ctx->fd_cache()->clear();
+		}
+		last_count = new_count;
 
 		BEESNOTE("waiting for next transid " << m_transid_re);
 		// We don't use wait_for here because somebody needs to

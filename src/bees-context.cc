@@ -40,30 +40,26 @@ BeesFdCache::BeesFdCache()
 	m_file_cache.max_size(BEES_FILE_FD_CACHE_SIZE);
 }
 
+void
+BeesFdCache::clear()
+{
+	BEESNOTE("Clearing root FD cache to enable subvol delete");
+	m_root_cache.clear();
+	BEESCOUNT(root_clear);
+	BEESNOTE("Clearing open FD cache to enable file delete");
+	m_file_cache.clear();
+	BEESCOUNT(open_clear);
+}
+
 Fd
 BeesFdCache::open_root(shared_ptr<BeesContext> ctx, uint64_t root)
 {
-	// Don't hold root FDs open too long.
-	// The open FDs prevent snapshots from being deleted.
-	// cleaner_kthread just keeps skipping over the open dir and all its children.
-	if (m_root_cache_timer.age() > BEES_COMMIT_INTERVAL) {
-		BEESLOGINFO("Clearing root FD cache to enable subvol delete");
-		m_root_cache.clear();
-		m_root_cache_timer.reset();
-		BEESCOUNT(root_clear);
-	}
 	return m_root_cache(ctx, root);
 }
 
 Fd
 BeesFdCache::open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino)
 {
-	if (m_file_cache_timer.age() > BEES_COMMIT_INTERVAL) {
-		BEESLOGINFO("Clearing open FD cache to enable file delete");
-		m_file_cache.clear();
-		m_file_cache_timer.reset();
-		BEESCOUNT(open_clear);
-	}
 	return m_file_cache(ctx, root, ino);
 }
 

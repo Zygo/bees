@@ -59,11 +59,8 @@ const off_t BLOCK_SIZE_HASHTAB_EXTENT = 16 * 1024 * 1024;
 // Bytes per second we want to flush (8GB every two hours)
 const double BEES_FLUSH_RATE = 8.0 * 1024 * 1024 * 1024 / 7200.0;
 
-// How long we should wait for new btrfs transactions
-const double BEES_COMMIT_INTERVAL = 900;
-
-// Interval between writing non-hash-table things to disk, and starting new subvol crawlers
-const int BEES_WRITEBACK_INTERVAL = BEES_COMMIT_INTERVAL;
+// Interval between writing crawl state to disk
+const int BEES_WRITEBACK_INTERVAL = 900;
 
 // Statistics reports while scanning
 const int BEES_STATS_INTERVAL = 3600;
@@ -92,7 +89,7 @@ const double BEES_TOO_LONG = 5.0;
 // Avoid any extent where LOGICAL_INO takes this long
 // const double BEES_TOXIC_DURATION = 9.9;
 // EXPERIMENT:  Kernel v4.14+ may let us ignore toxicity
-const double BEES_TOXIC_DURATION = BEES_COMMIT_INTERVAL;
+const double BEES_TOXIC_DURATION = 99.9;
 
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
@@ -657,6 +654,7 @@ public:
 	Fd open_root(shared_ptr<BeesContext> ctx, uint64_t root);
 	Fd open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino);
 	void insert_root_ino(shared_ptr<BeesContext> ctx, Fd fd);
+	void clear();
 };
 
 struct BeesResolveAddrResult {
