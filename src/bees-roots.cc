@@ -727,7 +727,7 @@ BeesCrawl::next_transid()
 	auto transid_delta = roots->transid_re().eta_abs(crawl_state.m_max_transid + 1);
 	if (elapsed_time < transid_delta) {
 		if (!m_deferred) {
-			BEESLOGINFO("Deferring next transid " << transid_delta << "s in " << get_state());
+			BEESLOGINFO("Deferring next transid (poll interval " << transid_delta << "s) in " << get_state());
 		}
 		m_deferred = true;
 		BEESCOUNT(crawl_defer);
@@ -735,18 +735,19 @@ BeesCrawl::next_transid()
 	}
 
 	// Log performance stats from the old crawl
-	BEESLOGINFO("Next transid in " << get_state());
+	auto next_transid = roots->transid_max();
+	BEESLOGINFO("Next transid " << next_transid << " in " << get_state());
 
 	// Start new crawl
 	m_deferred = false;
 	crawl_state.m_min_transid = crawl_state.m_max_transid;
-	crawl_state.m_max_transid = roots->transid_max();
+	crawl_state.m_max_transid = next_transid;
 	crawl_state.m_objectid = 0;
 	crawl_state.m_offset = 0;
 	crawl_state.m_started = current_time;
 	BEESCOUNT(crawl_restart);
 	set_state(crawl_state);
-	BEESLOGINFO("Restarted crawl " << get_state());
+	// BEESLOGINFO("Restarted crawl " << get_state());
 	return true;
 }
 
