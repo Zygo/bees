@@ -62,8 +62,6 @@ do_cmd_help(char *argv[])
 
 // tracing ----------------------------------------
 
-RateLimiter bees_info_rate_limit(BEES_INFO_RATE, BEES_INFO_BURST);
-
 thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 
 BeesTracer::~BeesTracer()

@@ -97,10 +97,6 @@ const double BEES_TOXIC_DURATION = BEES_COMMIT_INTERVAL;
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 
-// Rate limiting of informational messages
-const double BEES_INFO_RATE = 10.0;
-const double BEES_INFO_BURST = 1.0;
-
 // Stop growing the work queue after we have this many tasks queued
 const size_t BEES_MAX_QUEUE_SIZE = 128;
 
@@ -134,13 +130,6 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 #define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x);   })
 #define BEESTOOLONG(x) BeesTooLong SRSLY_WTF_C(beesTooLong_, __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 #define BEESNOTE(x)    BeesNote    SRSLY_WTF_C(beesNote_,    __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
-#define BEESINFO(x) do { \
-	if (bees_info_rate_limit.is_ready()) { \
-		bees_info_rate_limit.borrow(1); \
-		Chatter c(LOG_INFO, BeesNote::get_name()); \
-		c << x; \
-	} \
-} while (0)
 
 #define BEESLOGERR(x)   BEESLOG(LOG_ERR, x)
 #define BEESLOGWARN(x)  BEESLOG(LOG_WARNING, x)
@@ -824,7 +813,6 @@ public:
 // And now, a giant pile of extern declarations
 extern const char *BEES_VERSION;
 string pretty(double d);
-extern RateLimiter bees_info_rate_limit;
 void bees_sync(int fd);
 string format_time(time_t t);
 

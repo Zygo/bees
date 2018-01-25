@@ -46,7 +46,7 @@ verify_cell_range(BeesHashTable::Cell *p, BeesHashTable::Cell *q, bool clear_bug
 	for (BeesHashTable::Cell *cell = p; cell < q; ++cell) {
 		if (cell->e_addr && cell->e_addr < 0x1000) {
 			BEESCOUNT(bug_hash_magic_addr);
-			BEESINFO("Bad hash table address hash " << to_hex(cell->e_hash) << " addr " << to_hex(cell->e_addr));
+			BEESLOGDEBUG("Bad hash table address hash " << to_hex(cell->e_hash) << " addr " << to_hex(cell->e_addr));
 			if (clear_bugs) {
 				cell->e_addr = 0;
 				cell->e_hash = 0;
@@ -55,8 +55,8 @@ verify_cell_range(BeesHashTable::Cell *p, BeesHashTable::Cell *q, bool clear_bug
 		}
 		if (cell->e_addr && !seen_it.insert(*cell).second) {
 			BEESCOUNT(bug_hash_duplicate_cell);
-			// BEESLOG("Duplicate hash table entry:\nthis = " << *cell << "\nold = " << *seen_it.find(*cell));
-			BEESINFO("Duplicate hash table entry: " << *cell);
+			// BEESLOGDEBUG("Duplicate hash table entry:\nthis = " << *cell << "\nold = " << *seen_it.find(*cell));
+			BEESLOGDEBUG("Duplicate hash table entry: " << *cell);
 			if (clear_bugs) {
 				cell->e_addr = 0;
 				cell->e_hash = 0;
@@ -439,7 +439,7 @@ BeesHashTable::erase_hash_addr(HashType hash, AddrType addr)
 		BEESCOUNT(hash_erase);
 #if 0
 		if (verify_cell_range(er.first, er.second)) {
-			BEESINFO("while erasing hash " << hash << " addr " << addr);
+			BEESLOGDEBUG("while erasing hash " << hash << " addr " << addr);
 		}
 #endif
 	}
@@ -490,7 +490,7 @@ BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 	}
 #if 0
 	if (verify_cell_range(er.first, er.second)) {
-		BEESINFO("while push_fronting hash " << hash << " addr " << addr);
+		BEESLOGDEBUG("while push_fronting hash " << hash << " addr " << addr);
 	}
 #endif
 	return found;

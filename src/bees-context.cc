@@ -47,7 +47,7 @@ BeesFdCache::open_root(shared_ptr<BeesContext> ctx, uint64_t root)
 	// The open FDs prevent snapshots from being deleted.
 	// cleaner_kthread just keeps skipping over the open dir and all its children.
 	if (m_root_cache_timer.age() > BEES_COMMIT_INTERVAL) {
-		BEESINFO("Clearing root FD cache to enable subvol delete");
+		BEESLOGINFO("Clearing root FD cache to enable subvol delete");
 		m_root_cache.clear();
 		m_root_cache_timer.reset();
 		BEESCOUNT(root_clear);
@@ -59,7 +59,7 @@ Fd
 BeesFdCache::open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino)
 {
 	if (m_file_cache_timer.age() > BEES_COMMIT_INTERVAL) {
-		BEESINFO("Clearing open FD cache to enable file delete");
+		BEESLOGINFO("Clearing open FD cache to enable file delete");
 		m_file_cache.clear();
 		m_file_cache_timer.reset();
 		BEESCOUNT(open_clear);
@@ -432,7 +432,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 			// Hash is toxic
 			if (found_addr.is_toxic()) {
-				BEESINFO("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr);
+				BEESLOGWARN("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr);
 				// Don't push these back in because we'll never delete them.
 				// Extents may become non-toxic so give them a chance to expire.
 				// hash_table->push_front_hash_addr(hash, found_addr);
@@ -449,7 +449,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				BeesResolver resolved(m_ctx, found_addr);
 				// Toxic extents are really toxic
 				if (resolved.is_toxic()) {
-					BEESINFO("WORKAROUND: abandoned toxic match at found_addr " << found_addr << " matching bbd " << bbd);
+					BEESLOGWARN("WORKAROUND: abandoned toxic match at found_addr " << found_addr << " matching bbd " << bbd);
 					BEESCOUNT(scan_toxic_match);
 					// Make sure we never see this hash again.
 					// It has become toxic since it was inserted into the hash table.
@@ -503,7 +503,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 					if (it_copy.found_hash()) {
 						BEESCOUNT(scan_hash_hit);
 					} else {
-						// BEESINFO("erase src hash " << hash << " addr " << it_copy.addr());
+						// BEESLOGDEBUG("erase src hash " << hash << " addr " << it_copy.addr());
 						BEESCOUNT(scan_hash_miss);
 						hash_table->erase_hash_addr(hash, it_copy.addr());
 					}
@@ -706,7 +706,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 
 	// No FD?  Well, that was quick.
 	if (!bfr.fd()) {
-		BEESINFO("No FD in " << root_path() << " for " << bfr);
+		// BEESLOGINFO("No FD in " << root_path() << " for " << bfr);
 		BEESCOUNT(scan_no_fd);
 		return bfr;
 	}

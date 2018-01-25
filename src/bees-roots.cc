@@ -500,11 +500,11 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 					BEESTRACE("dirid " << dirid << " root " << rootid << " INO_PATH");
 					BtrfsIoctlInoPathArgs ino(dirid);
 					if (!ino.do_ioctl_nothrow(parent_fd)) {
-						BEESINFO("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd));
+						BEESLOGINFO("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd));
 						continue;
 					}
 					if (ino.m_paths.empty()) {
-						BEESINFO("dirid " << dirid << " inode has no paths in parent_fd " << name_fd(parent_fd));
+						BEESLOGINFO("dirid " << dirid << " inode has no paths in parent_fd " << name_fd(parent_fd));
 						continue;
 					}
 					BEESTRACE("dirid " << dirid << " path " << ino.m_paths.at(0));
@@ -528,12 +528,12 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				THROW_CHECK2(runtime_error, new_root_id, rootid, new_root_id == rootid);
 				Stat st(rv);
 				THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
-				// BEESINFO("open_root_nocache " << rootid << ": " << name_fd(rv));
+				// BEESLOGDEBUG("open_root_nocache " << rootid << ": " << name_fd(rv));
 				return rv;
 			}
 		}
 	}
-	BEESINFO("No path for rootid " << rootid);
+	BEESLOGDEBUG("No path for rootid " << rootid);
 	BEESCOUNT(root_notfound);
 	return Fd();
 }
@@ -600,7 +600,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	BEESTRACE("looking up ino " << ino);
 	BtrfsIoctlInoPathArgs ipa(ino);
 	if (!ipa.do_ioctl_nothrow(root_fd)) {
-		BEESINFO("Lookup root " << root << " ino " << ino << " failed: " << strerror(errno));
+		BEESLOGINFO("Lookup root " << root << " ino " << ino << " failed: " << strerror(errno));
 		return Fd();
 	}
 
@@ -832,13 +832,13 @@ BeesCrawl::fetch_extents()
 		auto type = call_btrfs_get(btrfs_stack_file_extent_type, i.m_data);
 		switch (type) {
 			default:
-				BEESINFO("Unhandled file extent type " << type << " in root " << get_state().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
+				BEESLOGDEBUG("Unhandled file extent type " << type << " in root " << get_state().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
 				++count_unknown;
 				BEESCOUNT(crawl_unknown);
 				break;
 			case BTRFS_FILE_EXTENT_INLINE:
 				// Ignore these for now.
-				// BEESINFO("Ignored file extent type INLINE in root " << get_state().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
+				// BEESLOGDEBUG("Ignored file extent type INLINE in root " << get_state().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
 				++count_inline;
 				// TODO:  replace with out-of-line dup extents
 				BEESCOUNT(crawl_inline);

@@ -197,7 +197,7 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 	Fd file_fd = m_ctx->roots()->open_root_ino(bior.m_root, bior.m_inum);
 	if (!file_fd) {
 		// Deleted snapshots generate craptons of these
-		// BEESINFO("No FD in chase_extent_ref " << bior);
+		// BEESLOGDEBUG("No FD in chase_extent_ref " << bior);
 		BEESCOUNT(chase_no_fd);
 		return BeesFileRange();
 	}
@@ -211,7 +211,7 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 
 	// ...or are we?
 	if (file_addr.is_magic()) {
-		BEESINFO("file_addr is magic: file_addr = " << file_addr << " bior = " << bior << " needle_bbd = " << needle_bbd);
+		BEESLOGDEBUG("file_addr is magic: file_addr = " << file_addr << " bior = " << bior << " needle_bbd = " << needle_bbd);
 		BEESCOUNT(chase_wrong_magic);
 		return BeesFileRange();
 	}
@@ -220,7 +220,7 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 	// Did we get the physical block we asked for?  The magic bits have to match too,
 	// but the compressed offset bits do not.
 	if (file_addr.get_physical_or_zero() != m_addr.get_physical_or_zero()) {
-		// BEESINFO("found addr " << file_addr << " at " << name_fd(file_fd) << " offset " << to_hex(bior.m_offset) << " but looking for " << m_addr);
+		// BEESLOGDEBUG("found addr " << file_addr << " at " << name_fd(file_fd) << " offset " << to_hex(bior.m_offset) << " but looking for " << m_addr);
 		// FIEMAP/resolve are working, but the data is old.
 		BEESCOUNT(chase_wrong_addr);
 		return BeesFileRange();
