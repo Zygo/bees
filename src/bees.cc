@@ -151,9 +151,7 @@ BeesNote::get_name()
 	// about it being destroyed under us.
         auto current_task = Task::current_task();
         if (current_task) {
-                ostringstream oss;
-                oss << current_task;
-                return oss.str();
+		return current_task.title();
         }
 
         // OK try the pthread name next.

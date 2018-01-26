@@ -28,12 +28,17 @@ test_tasks(size_t count)
 
 	// Run several tasks in parallel
 	for (size_t c = 0; c < count; ++c) {
-		Task t([c, &task_done, &mtx, &cv]() {
-			unique_lock<mutex> lock(mtx);
-			// cerr << "Task #" << c << endl;
-			task_done.at(c) = true;
-			cv.notify_one();
-		}, [=](ostream& os) -> ostream& { return os << "task #" << c; });
+		ostringstream oss;
+		oss << "task #" << c;
+		Task t(
+			oss.str(),
+			[c, &task_done, &mtx, &cv]() {
+				unique_lock<mutex> lock(mtx);
+				// cerr << "Task #" << c << endl;
+				task_done.at(c) = true;
+				cv.notify_one();
+			}
+		);
 		t.run();
 	}
 
@@ -56,20 +61,6 @@ test_tasks(size_t count)
 
 		cv.wait(lock);
 	}
-}
-
-#define TASK_MACRO(printer, body) Task( \
-	[=]() { body; }, \
-	[=](ostream &__os) -> ostream& { return __os << printer; } \
-)
-
-void
-test_macro()
-{
-	TASK_MACRO(
-		"A Task",
-		cerr << "Hello, World!" << endl;
-	).run();
 }
 
 void
@@ -104,12 +95,17 @@ test_barrier(size_t count)
 	// Run several tasks in parallel
 	for (size_t c = 0; c < count; ++c) {
 		auto bl = b->lock();
-		Task t([c, &task_done, &mtx, &cv, bl]() mutable {
-			// cerr << "Task #" << c << endl;
-			unique_lock<mutex> lock(mtx);
-			task_done.at(c) = true;
-			bl.release();
-		}, [=](ostream& os) -> ostream& { return os << "task #" << c; });
+		ostringstream oss;
+		oss << "task #" << c;
+		Task t(
+			oss.str(),
+			[c, &task_done, &mtx, &cv, bl]() mutable {
+				// cerr << "Task #" << c << endl;
+				unique_lock<mutex> lock(mtx);
+				task_done.at(c) = true;
+				bl.release();
+			}
+		);
 		t.run();
 	}
 
@@ -121,14 +117,12 @@ test_barrier(size_t count)
 	bool done_flag = false;
 
 	Task completed(
+		"Waiting for Barrier",
 		[&mtx, &cv, &done_flag]() {
 			unique_lock<mutex> lock(mtx);
 			// cerr << "Running cv notify" << endl;
 			done_flag = true;
 			cv.notify_all();
-		},
-		[](ostream &os) -> ostream& {
-			return os << "Waiting for Barrier";
 		}
 	);
 	b->insert_task(completed);
@@ -168,33 +162,36 @@ test_exclusion(size_t count)
 	// Run several tasks in parallel
 	for (size_t c = 0; c < count; ++c) {
 		auto bl = b->lock();
-		Task t([c, &only_one, &mtx, &excl, bl]() mutable {
-			// cerr << "Task #" << c << endl;
-			auto lock = excl.try_lock();
-			if (!lock) {
-				excl.insert_task(Task::current_task());
-				return;
+		ostringstream oss;
+		oss << "task #" << c;
+		Task t(
+			oss.str(),
+			[c, &only_one, &mtx, &excl, bl]() mutable {
+				// cerr << "Task #" << c << endl;
+				auto lock = excl.try_lock();
+				if (!lock) {
+					excl.insert_task(Task::current_task());
+					return;
+				}
+				bool locked = only_one.try_lock();
+				assert(locked);
+				nanosleep(0.0001);
+				only_one.unlock();
+				bl.release();
 			}
-			bool locked = only_one.try_lock();
-			assert(locked);
-			nanosleep(0.0001);
-			only_one.unlock();
-			bl.release();
-		}, [=](ostream& os) -> ostream& { return os << "task #" << c; });
+		);
 		t.run();
 	}
 
 	bool done_flag = false;
 
 	Task completed(
+		"Waiting for Barrier",
 		[&mtx, &cv, &done_flag]() {
 			unique_lock<mutex> lock(mtx);
 			// cerr << "Running cv notify" << endl;
 			done_flag = true;
 			cv.notify_all();
-		},
-		[](ostream &os) -> ostream& {
-			return os << "Waiting for Barrier";
 		}
 	);
 	b->insert_task(completed);
@@ -217,7 +214,6 @@ main(int, char**)
 	alarm(9);
 
 	RUN_A_TEST(test_tasks(256));
-	RUN_A_TEST(test_macro());
 	RUN_A_TEST(test_finish());
 	RUN_A_TEST(test_unfinish());
 	RUN_A_TEST(test_barrier(256));

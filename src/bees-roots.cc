@@ -251,12 +251,12 @@ BeesRoots::crawl_roots()
 			size_t batch_count = 0;
 			while (first_range && batch_count < BEES_MAX_CRAWL_BATCH) {
 				auto subvol = first_crawl->get_state().m_root;
-				Task([ctx_copy, first_range]() {
+				ostringstream oss;
+				oss << "crawl_" << subvol;
+				auto task_title = oss.str();
+				Task(task_title, [ctx_copy, first_range]() {
 					BEESNOTE("scan_forward " << first_range);
 					ctx_copy->scan_forward(first_range);
-				},
-				[first_range, subvol](ostream &os) -> ostream & {
-					return os << "crawl_" << subvol;
 				}).run();
 				BEESCOUNT(crawl_scan);
 				m_crawl_current = first_crawl->get_state();
@@ -281,12 +281,12 @@ BeesRoots::crawl_roots()
 				size_t batch_count = 0;
 				while (this_range && batch_count < BEES_MAX_CRAWL_BATCH) {
 					auto subvol = this_crawl->get_state().m_root;
-					Task([ctx_copy, this_range]() {
+					ostringstream oss;
+					oss << "crawl_" << subvol;
+					auto task_title = oss.str();
+					Task(task_title, [ctx_copy, this_range]() {
 						BEESNOTE("scan_forward " << this_range);
 						ctx_copy->scan_forward(this_range);
-					},
-					[this_range, subvol](ostream &os) -> ostream & {
-						return os << "crawl_" << subvol;
 					}).run();
 					crawled = true;
 					BEESCOUNT(crawl_scan);
@@ -322,7 +322,7 @@ BeesRoots::crawl_thread()
 	// shared_from_this() in a constructor.
 	BEESNOTE("crawling");
 	auto shared_this = shared_from_this();
-	Task([shared_this]() {
+	Task("crawl", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
 		while (tqs < BEES_MAX_QUEUE_SIZE) {
@@ -332,7 +332,7 @@ BeesRoots::crawl_thread()
 			tqs = TaskMaster::get_queue_count();
 		}
 		Task::current_task().run();
-	}, [](ostream &os) -> ostream& { return os << "crawl"; }).run();
+	}).run();
 }
 
 void

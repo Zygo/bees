@@ -19,15 +19,15 @@ namespace crucible {
 
 	class TaskState : public enable_shared_from_this<TaskState> {
 		const function<void()> 			m_exec_fn;
-		const function<ostream&(ostream &)>	m_print_fn;
+		const string				m_title;
 		TaskId					m_id;
 
 		static atomic<TaskId>			s_next_id;
 	public:
-		TaskState(function<void()> exec_fn, function<ostream&(ostream &)> print_fn);
+		TaskState(string title, function<void()> exec_fn);
 
 		void exec();
-		ostream &print(ostream &os);
+		string title() const;
 		TaskId id() const;
 	};
 
@@ -73,19 +73,19 @@ namespace crucible {
 
 	static shared_ptr<TaskMasterState> s_tms = make_shared<TaskMasterState>();
 
-	TaskState::TaskState(function<void()> exec_fn,
-		function<ostream&(ostream &)> print_fn) :
+	TaskState::TaskState(string title, function<void()> exec_fn) :
 		m_exec_fn(exec_fn),
-		m_print_fn(print_fn),
+		m_title(title),
 		m_id(++s_next_id)
 	{
+		THROW_CHECK0(invalid_argument, !m_title.empty());
 	}
 
 	void
 	TaskState::exec()
 	{
 		THROW_CHECK0(invalid_argument, m_exec_fn);
-		THROW_CHECK0(invalid_argument, m_print_fn);
+		THROW_CHECK0(invalid_argument, !m_title.empty());
 
 		char buf[24];
 		memset(buf, '\0', sizeof(buf));
@@ -93,10 +93,7 @@ namespace crucible {
 		Cleanup pthread_name_cleaner([&]() {
 			pthread_setname_np(pthread_self(), buf);
 		});
-		ostringstream oss;
-		m_print_fn(oss);
-		auto thread_name = oss.str();
-		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), thread_name.c_str()));
+		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
 
 		weak_ptr<TaskState> this_task_wp = shared_from_this();
 		Cleanup current_task_cleaner([&]() {
@@ -107,11 +104,11 @@ namespace crucible {
 		m_exec_fn();
 	}
 
-	ostream &
-	TaskState::print(ostream &os)
+	string
+	TaskState::title() const
 	{
-		THROW_CHECK0(invalid_argument, m_print_fn);
-		return m_print_fn(os);
+		THROW_CHECK0(runtime_error, !m_title.empty());
+		return m_title;
 	}
 
 	TaskId
@@ -176,9 +173,7 @@ namespace crucible {
 		os << "Queue (size " << s_tms->m_queue.size() << "):" << endl;
 		size_t counter = 0;
 		for (auto i : s_tms->m_queue) {
-			os << "Queue #" << ++counter << " Task ID " << i->id() << " ";
-			i->print(os);
-			os << endl;
+			os << "Queue #" << ++counter << " Task ID " << i->id() << " " << i->title() << endl;
 		}
 		return os << "Queue End" << endl;
 	}
@@ -193,8 +188,7 @@ namespace crucible {
 			os << "Worker #" << ++counter << " ";
 			auto task = i->current_task_locked();
 			if (task) {
-				os << "Task ID " << task->id() << " ";
-				task->print(os);
+				os << "Task ID " << task->id() << " " << task->title();
 			} else {
 				os << "(idle)";
 			}
@@ -238,8 +232,8 @@ namespace crucible {
 	{
 	}
 
-	Task::Task(function<void()> exec_fn, function<ostream&(ostream &)> print_fn) :
-		m_task_state(make_shared<TaskState>(exec_fn, print_fn))
+	Task::Task(string title, function<void()> exec_fn) :
+		m_task_state(make_shared<TaskState>(title, exec_fn))
 	{
 	}
 
@@ -263,17 +257,17 @@ namespace crucible {
 		return Task(tl_current_task_wp.lock());
 	}
 
-	ostream &
-	Task::print(ostream &os) const
+	string
+	Task::title() const
 	{
 		THROW_CHECK0(runtime_error, m_task_state);
-		return m_task_state->print(os);
+		return m_task_state->title();
 	}
 
 	ostream &
 	operator<<(ostream &os, const Task &task)
 	{
-		return task.print(os);
+		return os << task.title();
 	};
 
 	TaskId

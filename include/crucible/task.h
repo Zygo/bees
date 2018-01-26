@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <ostream>
+#include <string>
 
 namespace crucible {
 	using namespace std;
@@ -22,7 +23,7 @@ namespace crucible {
 	public:
 
 		// create Task object containing closure and description
-		Task(function<void()> exec_fn, function<ostream&(ostream &)> print_fn);
+		Task(string title, function<void()> exec_fn);
 
 		// schedule Task at end of queue.
 		// May run Task in current thread or in other thread.
@@ -33,7 +34,7 @@ namespace crucible {
 		void run_earlier() const;
 
 		// describe Task as text
-		ostream &print(ostream &os) const;
+		string title() const;
 
 		// Returns currently executing task if called from exec_fn.
 		// Usually used to reschedule the currently executing Task.
