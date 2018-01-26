@@ -494,6 +494,7 @@ class BeesCrawl {
 	mutex					m_mutex;
 	set<BeesFileRange>			m_extents;
 	bool					m_deferred = false;
+	bool					m_finished = false;
 
 	mutex					m_state_mutex;
 	BeesCrawlState				m_state;
@@ -508,6 +509,7 @@ public:
 	BeesFileRange pop_front();
 	BeesCrawlState get_state();
 	void set_state(const BeesCrawlState &bcs);
+	void deferred(bool def_setting);
 };
 
 class BeesRoots : public enable_shared_from_this<BeesRoots> {
@@ -529,6 +531,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	Fd open_root_ino_nocache(uint64_t root, uint64_t ino);
 	uint64_t transid_min();
 	uint64_t transid_max();
+	uint64_t transid_max_nocache();
 	void state_load();
 	void state_save();
 	void crawl_roots();

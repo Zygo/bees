@@ -193,8 +193,11 @@ BeesRoots::transid_min()
 }
 
 uint64_t
-BeesRoots::transid_max()
+BeesRoots::transid_max_nocache()
 {
+	// FIXME:  get transid_max from any of the many trees we are searching with
+	// TREE_SEARCH_V2.  Here we are open()ing every subvol.
+
 	uint64_t rv = 0;
 	uint64_t root = 0;
 	BEESNOTE("Calculating transid_max (" << rv << " as of root " << root << ")");
@@ -205,13 +208,16 @@ BeesRoots::transid_max()
 			catch_all([&]() {
 				auto transid = btrfs_get_root_transid(open_root(root));
 				rv = max(rv, transid);
-				// BEESLOG("\troot " << root << " transid " << transid << " max " << rv);
 			});
 		}
 	} while (root);
-	m_transid_re.update(rv);
-	// BEESLOGDEBUG("RateEstimator transid_max update: " << m_transid_re);
 	return rv;
+}
+
+uint64_t
+BeesRoots::transid_max()
+{
+	return m_transid_re.count();
 }
 
 void
@@ -306,12 +312,15 @@ BeesRoots::crawl_roots()
 	BEESCOUNT(crawl_done);
 
 	auto want_transid = m_transid_re.count() + 1;
-	BEESLOGINFO("Crawl ran out of data after " << m_crawl_timer.lap() << "s, waiting for transid " << want_transid << "...");
+	auto ran_out_time = m_crawl_timer.lap();
+	BEESLOGINFO("Crawl master ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
 	BEESNOTE("idle, waiting for transid " << want_transid << ": " << m_transid_re);
+	// FIXME:  Tasks should not block arbitrarily
 	m_transid_re.wait_until(want_transid);
 
-	// Don't count the time we were waiting as part of the crawl time
-	m_crawl_timer.reset();
+	auto resumed_after_time = m_crawl_timer.lap();
+	auto new_transid = m_transid_re.count();
+	BEESLOGINFO("Crawl master resumed after " << resumed_after_time << "s at transid " << new_transid);
 }
 
 void
@@ -321,7 +330,7 @@ BeesRoots::crawl_thread()
 
 	// Start the Task that does the crawling
 	auto shared_this = shared_from_this();
-	Task("crawl", [shared_this]() {
+	Task("crawl_master", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
 		while (tqs < BEES_MAX_QUEUE_SIZE) {
@@ -337,9 +346,11 @@ BeesRoots::crawl_thread()
 	BEESNOTE("tracking transids");
 	auto last_count = m_transid_re.count();
 	while (true) {
+		// Measure current transid
+		catch_all([&]() { m_transid_re.update(transid_max_nocache()); });
+
 		// Make sure we have a full complement of crawlers
-		// Calls transid_max() which updates m_transid_re
-		insert_new_crawl();
+		catch_all([&]() { insert_new_crawl(); });
 
 		// Don't hold root FDs open too long.
 		// The open FDs prevent snapshots from being deleted.
@@ -354,7 +365,7 @@ BeesRoots::crawl_thread()
 		BEESNOTE("waiting for next transid " << m_transid_re);
 		// We don't use wait_for here because somebody needs to
 		// be updating m_transid_re from time to time.
-		nanosleep(m_transid_re.eta_rel(1));
+		nanosleep(m_transid_re.seconds_for(1));
 	}
 }
 
@@ -383,6 +394,9 @@ BeesRoots::insert_root(const BeesCrawlState &new_bcs)
 		m_root_crawl_map.insert(new_pair);
 		m_crawl_dirty = true;
 	}
+	auto found = m_root_crawl_map.find(new_bcs.m_root);
+	THROW_CHECK0(runtime_error, found != m_root_crawl_map.end());
+	found->second->deferred(false);
 }
 
 void
@@ -414,8 +428,6 @@ BeesRoots::insert_new_crawl()
 		new_bcs.m_root = i;
 		crawl_state_erase(new_bcs);
 	}
-
-	// transid_max updates m_transid_re which wakes up crawl_roots()
 }
 
 void
@@ -461,6 +473,10 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_writeback_thread("crawl_writeback")
 {
 	m_crawl_thread.exec([&]() {
+		// Measure current transid before creating any crawlers
+		catch_all([&]() { m_transid_re.update(transid_max_nocache()); });
+
+		// Make sure we have a full complement of crawlers
 		catch_all([&]() {
 			state_load();
 		});
@@ -730,36 +746,32 @@ BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) 
 bool
 BeesCrawl::next_transid()
 {
-	// If this crawl is recently empty, quickly and _silently_ bail out
 	auto roots = m_ctx->roots();
-	auto current_time = time(NULL);
+	auto next_transid = roots->transid_max();
 	auto crawl_state = get_state();
-	auto elapsed_time = current_time - crawl_state.m_started;
-	auto transid_delta = roots->transid_re().eta_abs(crawl_state.m_max_transid + 1);
-	if (elapsed_time < transid_delta) {
-		if (!m_deferred) {
-			BEESLOGINFO("Deferring next transid (poll interval " << transid_delta << "s) in " << get_state());
-		}
+
+	// If we are already at transid_max then we are still finished
+	m_finished = crawl_state.m_max_transid >= next_transid;
+
+	if (m_finished) {
 		m_deferred = true;
-		BEESCOUNT(crawl_defer);
-		return false;
+	} else {
+		// Log performance stats from the old crawl
+		auto current_time = time(NULL);
+
+		// Start new crawl
+		crawl_state.m_min_transid = crawl_state.m_max_transid;
+		crawl_state.m_max_transid = next_transid;
+		crawl_state.m_objectid = 0;
+		crawl_state.m_offset = 0;
+		crawl_state.m_started = current_time;
+		BEESCOUNT(crawl_restart);
+		set_state(crawl_state);
+		m_deferred = false;
+		BEESLOGINFO("Crawl started " << crawl_state);
 	}
 
-	// Log performance stats from the old crawl
-	auto next_transid = roots->transid_max();
-	BEESLOGINFO("Next transid " << next_transid << " in " << get_state());
-
-	// Start new crawl
-	m_deferred = false;
-	crawl_state.m_min_transid = crawl_state.m_max_transid;
-	crawl_state.m_max_transid = next_transid;
-	crawl_state.m_objectid = 0;
-	crawl_state.m_offset = 0;
-	crawl_state.m_started = current_time;
-	BEESCOUNT(crawl_restart);
-	set_state(crawl_state);
-	// BEESLOGINFO("Restarted crawl " << get_state());
-	return true;
+	return !m_finished;
 }
 
 bool
@@ -767,14 +779,20 @@ BeesCrawl::fetch_extents()
 {
 	THROW_CHECK1(runtime_error, m_extents.size(), m_extents.empty());
 
+	// insert_root will undefer us.  Until then, nothing.
+	if (m_deferred) {
+		return false;
+	}
+
 	auto old_state = get_state();
-	if (m_deferred || old_state.m_max_transid <= old_state.m_min_transid) {
-		BEESTRACE("Nothing to crawl in " << get_state());
+
+	// We can't scan an empty transid interval.
+	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
+		BEESTRACE("Crawl finished " << get_state());
 		return next_transid();
 	}
 
 	BEESNOTE("crawling " << get_state());
-	// BEESLOGINFO("Crawling " << get_state());
 
 	Timer crawl_timer;
 
@@ -809,7 +827,7 @@ BeesCrawl::fetch_extents()
 
 	if (!ioctl_ok || sk.m_result.empty()) {
 		BEESCOUNT(crawl_empty);
-		// BEESLOGINFO("Crawl empty " << get_state());
+		BEESLOGINFO("Crawl finished " << get_state());
 		return next_transid();
 	}
 
@@ -966,4 +984,11 @@ BeesCrawl::set_state(const BeesCrawlState &bcs)
 	m_state = bcs;
 	lock.unlock();
 	m_ctx->roots()->crawl_state_set_dirty();
+}
+
+void
+BeesCrawl::deferred(bool def_setting)
+{
+	unique_lock<mutex> lock(m_state_mutex);
+	m_deferred = def_setting;
 }
