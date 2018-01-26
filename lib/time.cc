@@ -59,18 +59,6 @@ namespace crucible {
 		m_start = chrono::high_resolution_clock::now();
 	}
 
-	void
-	Timer::set(const chrono::high_resolution_clock::time_point &start)
-	{
-		m_start = start;
-	}
-
-	void
-	Timer::set(double delta)
-	{
-		m_start += chrono::duration_cast<chrono::high_resolution_clock::duration>(chrono::duration<double>(delta));
-	}
-
 	double
 	Timer::lap()
 	{

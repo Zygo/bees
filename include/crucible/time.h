@@ -19,8 +19,6 @@ namespace crucible {
 		double age() const;
 		double report(int precision = 1000) const;
 		void reset();
-		void set(const chrono::high_resolution_clock::time_point &start);
-		void set(double delta);
 		double lap();
 		bool operator<(double d) const;
 		bool operator>(double d) const;
