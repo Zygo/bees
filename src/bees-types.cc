@@ -160,7 +160,8 @@ BeesFileRange::file_size() const
 		// lost a race (e.g. a file was truncated while we were building a
 		// matching range pair with it).  In such cases we should probably stop
 		// whatever we were doing and backtrack to some higher level anyway.
-		THROW_CHECK1(invalid_argument, m_file_size, m_file_size > 0);
+		// Well, OK, but we call this function from exception handlers...
+		THROW_CHECK1(invalid_argument, m_file_size, m_file_size >= 0);
 		// THROW_CHECK2(invalid_argument, m_file_size, m_end, m_end <= m_file_size || m_end == numeric_limits<off_t>::max());
 	}
 	return m_file_size;
