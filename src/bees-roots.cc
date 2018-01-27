@@ -311,7 +311,7 @@ BeesRoots::crawl_roots()
 
 	BEESCOUNT(crawl_done);
 
-	auto want_transid = m_transid_re.count() + 1;
+	auto want_transid = m_transid_re.count() + m_transid_factor;
 	auto ran_out_time = m_crawl_timer.lap();
 	BEESLOGINFO("Crawl master ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
 	BEESNOTE("idle, waiting for transid " << want_transid << ": " << m_transid_re);
@@ -343,14 +343,18 @@ BeesRoots::crawl_thread()
 	}).run();
 
 	// Monitor transid_max and wake up roots when it changes
-	BEESNOTE("tracking transids");
+	BEESNOTE("tracking transid");
 	auto last_count = m_transid_re.count();
 	while (true) {
 		// Measure current transid
-		catch_all([&]() { m_transid_re.update(transid_max_nocache()); });
+		catch_all([&]() {
+			m_transid_re.update(transid_max_nocache());
+		});
 
 		// Make sure we have a full complement of crawlers
-		catch_all([&]() { insert_new_crawl(); });
+		catch_all([&]() {
+			insert_new_crawl();
+		});
 
 		// Don't hold root FDs open too long.
 		// The open FDs prevent snapshots from being deleted.
@@ -362,10 +366,10 @@ BeesRoots::crawl_thread()
 		}
 		last_count = new_count;
 
-		BEESNOTE("waiting for next transid " << m_transid_re);
-		// We don't use wait_for here because somebody needs to
-		// be updating m_transid_re from time to time.
-		nanosleep(m_transid_re.seconds_for(1));
+		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
+		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
+		BEESNOTE("waiting " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
+		nanosleep(poll_time);
 	}
 }
 
@@ -474,7 +478,9 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 {
 	m_crawl_thread.exec([&]() {
 		// Measure current transid before creating any crawlers
-		catch_all([&]() { m_transid_re.update(transid_max_nocache()); });
+		catch_all([&]() {
+			m_transid_re.update(transid_max_nocache());
+		});
 
 		// Make sure we have a full complement of crawlers
 		catch_all([&]() {

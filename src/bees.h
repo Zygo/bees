@@ -103,6 +103,9 @@ const size_t BEES_MAX_CRAWL_SIZE = 1024;
 // Insert this many items before switching to a new subvol
 const size_t BEES_MAX_CRAWL_BATCH = 128;
 
+// Wait this many transids between crawls
+const size_t BEES_TRANSID_FACTOR = 10;
+
 // If an extent has this many refs, pretend it does not exist
 // to avoid a crippling btrfs performance bug
 // The actual limit in LOGICAL_INO seems to be 2730, but let's leave a little headroom
@@ -524,6 +527,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
 	RateEstimator				m_transid_re;
+	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
 
 	void insert_new_crawl();
 	void insert_root(const BeesCrawlState &bcs);
