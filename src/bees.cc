@@ -147,12 +147,12 @@ BeesNote::get_name()
 	// remember it.  Each output message may be a different Task.
 	// The current task is thread_local so we don't need to worry
 	// about it being destroyed under us.
-        auto current_task = Task::current_task();
-        if (current_task) {
+	auto current_task = Task::current_task();
+	if (current_task) {
 		return current_task.title();
-        }
+	}
 
-        // OK try the pthread name next.
+	// OK try the pthread name next.
 	char buf[24];
 	memset(buf, '\0', sizeof(buf));
 	int err = pthread_getname_np(pthread_self(), buf, sizeof(buf));
