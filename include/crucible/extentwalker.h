@@ -58,7 +58,7 @@ namespace crucible {
 
 		virtual Vec get_extent_map(off_t pos);
 
-		static const unsigned sc_extent_fetch_max = 64;
+		static const unsigned sc_extent_fetch_max = 1024;
 		static const unsigned sc_extent_fetch_min = 4;
 		static const off_t sc_step_size = 0x1000 * (sc_extent_fetch_max / 2);
 
