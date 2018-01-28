@@ -56,6 +56,7 @@ BeesRoots::scan_mode_ntoa(BeesRoots::ScanMode mode)
 	static const bits_ntoa_table table[] = {
 		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ZERO),
 		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ONE),
+		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_TWO),
 		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_COUNT),
 		NTOA_TABLE_ENTRY_END()
 	};
@@ -262,6 +263,7 @@ BeesRoots::crawl_roots()
 	}
 
 	switch (s_scan_mode) {
+
 		case SCAN_MODE_ZERO: {
 			// Scan the same inode/offset tuple in each subvol (good for snapshots)
 			BeesFileRange first_range;
@@ -289,6 +291,7 @@ BeesRoots::crawl_roots()
 
 			break;
 		}
+
 		case SCAN_MODE_ONE: {
 			// Scan each subvol one extent at a time (good for continuous forward progress)
 			size_t batch_count = 0;
@@ -298,6 +301,29 @@ BeesRoots::crawl_roots()
 
 			if (batch_count) {
 				return;
+			}
+
+			break;
+		}
+
+		case SCAN_MODE_TWO: {
+			// Scan oldest crawl first (requires maximum amount of temporary space)
+			vector<shared_ptr<BeesCrawl>> crawl_vector;
+			for (auto i : crawl_map_copy) {
+				crawl_vector.push_back(i.second);
+			}
+			sort(crawl_vector.begin(), crawl_vector.end(), [&](const shared_ptr<BeesCrawl> &a, const shared_ptr<BeesCrawl> &b) -> bool {
+				auto a_state = a->get_state();
+				auto b_state = b->get_state();
+				return tie(a_state.m_started, a_state.m_root) < tie(b_state.m_started, b_state.m_root);
+			});
+
+			size_t batch_count = 0;
+			for (auto i : crawl_vector) {
+				batch_count += crawl_batch(i);
+				if (batch_count) {
+					return;
+				}
 			}
 
 			break;

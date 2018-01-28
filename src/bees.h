@@ -564,6 +564,7 @@ public:
 	enum ScanMode {
 		SCAN_MODE_ZERO,
 		SCAN_MODE_ONE,
+		SCAN_MODE_TWO,
 		SCAN_MODE_COUNT, // must be last
 	};
 
