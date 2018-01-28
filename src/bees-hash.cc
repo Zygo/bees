@@ -610,12 +610,15 @@ BeesHashTable::open_file()
 	// If that doesn't work, try to make a new one
 	if (!new_fd) {
 		string tmp_filename = m_filename + ".tmp";
-		BEESLOGNOTE("creating new hash table '" << tmp_filename << "'");
+		BEESNOTE("creating new hash table '" << tmp_filename << "'");
+		BEESLOGINFO("Creating new hash table '" << tmp_filename << "'");
 		unlinkat(m_ctx->home_fd(), tmp_filename.c_str(), 0);
 		new_fd = openat_or_die(m_ctx->home_fd(), tmp_filename, FLAGS_CREATE_FILE, 0700);
-		BEESLOGNOTE("truncating new hash table '" << tmp_filename << "' size " << m_size << " (" << pretty(m_size) << ")");
+		BEESNOTE("truncating new hash table '" << tmp_filename << "' size " << m_size << " (" << pretty(m_size) << ")");
+		BEESLOGINFO("Truncating new hash table '" << tmp_filename << "' size " << m_size << " (" << pretty(m_size) << ")");
 		ftruncate_or_die(new_fd, m_size);
-		BEESLOGNOTE("truncating new hash table '" << tmp_filename << "' -> '" << m_filename << "'");
+		BEESNOTE("truncating new hash table '" << tmp_filename << "' -> '" << m_filename << "'");
+		BEESLOGINFO("Truncating new hash table '" << tmp_filename << "' -> '" << m_filename << "'");
 		renameat_or_die(m_ctx->home_fd(), tmp_filename, m_ctx->home_fd(), m_filename);
 	}
 
