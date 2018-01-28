@@ -430,7 +430,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 			// Hash is toxic
 			if (found_addr.is_toxic()) {
-				BEESLOGWARN("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr);
+				BEESLOGWARN("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr << " matching bbd " << bbd);
 				// Don't push these back in because we'll never delete them.
 				// Extents may become non-toxic so give them a chance to expire.
 				// hash_table->push_front_hash_addr(hash, found_addr);
@@ -447,7 +447,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				BeesResolver resolved(m_ctx, found_addr);
 				// Toxic extents are really toxic
 				if (resolved.is_toxic()) {
-					BEESLOGWARN("WORKAROUND: abandoned toxic match at found_addr " << found_addr << " matching bbd " << bbd);
+					BEESLOGWARN("WORKAROUND: discovered toxic match at found_addr " << found_addr << " matching bbd " << bbd);
 					BEESCOUNT(scan_toxic_match);
 					// Make sure we never see this hash again.
 					// It has become toxic since it was inserted into the hash table.
