@@ -269,8 +269,7 @@ BeesHashTable::prefetch_loop()
 			out << "\n";
 		}
 
-		size_t uncompressed_count = occupied_count - compressed_count;
-		size_t legacy_count = compressed_count - compressed_offset_count;
+		size_t uncompressed_count = occupied_count - compressed_offset_count;
 
 		ostringstream graph_blob;
 
@@ -281,9 +280,7 @@ BeesHashTable::prefetch_loop()
 		graph_blob
 			<< "\nHash table page occupancy histogram (" << occupied_count << "/" << total_count << " cells occupied, " << (occupied_count * 100 / total_count) << "%)\n"
 			<< out.str() << "0%      |      25%      |      50%      |      75%      |   100% page fill\n"
-			<< "compressed " << compressed_count << " (" << percent(compressed_count, occupied_count) << ")"
-			<< " new-style " << compressed_offset_count << " (" << percent(compressed_offset_count, occupied_count) << ")"
-			<< " old-style " << legacy_count << " (" << percent(legacy_count, occupied_count) << ")\n"
+			<< "compressed " << compressed_count << " (" << percent(compressed_count, occupied_count) << ")\n"
 			<< "uncompressed " << uncompressed_count << " (" << percent(uncompressed_count, occupied_count) << ")"
 			<< " unaligned_eof " << unaligned_eof_count << " (" << percent(unaligned_eof_count, occupied_count) << ")"
 			<< " toxic " << toxic_count << " (" << percent(toxic_count, occupied_count) << ")";

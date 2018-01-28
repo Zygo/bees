@@ -98,90 +98,77 @@ BeesResolver::adjust_offset(const BeesFileRange &haystack, const BeesBlockData &
 		return BeesBlockData();
 	}
 
-	off_t lower_offset = haystack.begin();
-	off_t upper_offset = haystack.end();
+	off_t haystack_offset = haystack.begin();
 	bool is_compressed_offset = false;
 	bool is_exact = false;
-	bool is_legacy = false;
 	if (m_addr.is_compressed()) {
 		BtrfsExtentWalker ew(haystack.fd(), haystack.begin(), m_ctx->root_fd());
 		BEESTRACE("haystack extent data " << ew);
 		Extent e = ew.current();
-		if (m_addr.has_compressed_offset()) {
-			off_t coff = m_addr.get_compressed_offset();
-			if (e.offset() > coff) {
-				// this extent begins after the target block
-				BEESCOUNT(adjust_offset_low);
-				return BeesBlockData();
-			}
-			coff -= e.offset();
-			if (e.size() <= coff) {
-				// this extent ends before the target block
-				BEESCOUNT(adjust_offset_high);
-				return BeesBlockData();
-			}
-			lower_offset = e.begin() + coff;
-			upper_offset = lower_offset + BLOCK_SIZE_CLONE;
-			BEESCOUNT(adjust_offset_hit);
-			is_compressed_offset = true;
-		} else {
-			lower_offset = e.begin();
-			upper_offset = e.end();
-			BEESCOUNT(adjust_legacy);
-			is_legacy = true;
+		THROW_CHECK1(runtime_error, m_addr, m_addr.has_compressed_offset());
+		off_t coff = m_addr.get_compressed_offset();
+		if (e.offset() > coff) {
+			// this extent begins after the target block
+			BEESCOUNT(adjust_offset_low);
+			return BeesBlockData();
 		}
+		coff -= e.offset();
+		if (e.size() <= coff) {
+			// this extent ends before the target block
+			BEESCOUNT(adjust_offset_high);
+			return BeesBlockData();
+		}
+		haystack_offset = e.begin() + coff;
+		BEESCOUNT(adjust_offset_hit);
+		is_compressed_offset = true;
 	} else {
 		BEESCOUNT(adjust_exact);
 		is_exact = true;
 	}
 
-	BEESTRACE("Checking haystack " << haystack << " offsets " << to_hex(lower_offset) << ".." << to_hex(upper_offset));
+	BEESTRACE("Checking haystack " << haystack << " offset " << to_hex(haystack_offset));
 
 	// Check all the blocks in the list
-	for (off_t haystack_offset = lower_offset; haystack_offset < upper_offset; haystack_offset += BLOCK_SIZE_CLONE) {
-		THROW_CHECK1(out_of_range, haystack_offset, (haystack_offset & BLOCK_MASK_CLONE) == 0);
+	THROW_CHECK1(out_of_range, haystack_offset, (haystack_offset & BLOCK_MASK_CLONE) == 0);
 
-		// Straw cannot extend beyond end of haystack
-		if (haystack_offset + needle.size() > haystack_size) {
-			BEESCOUNT(adjust_needle_too_long);
-			break;
-		}
-
-		// Read the haystack
-		BEESTRACE("straw " << name_fd(haystack.fd()) << ", offset " << to_hex(haystack_offset) << ", length " << needle.size());
-		BeesBlockData straw(haystack.fd(), haystack_offset, needle.size());
-
-		BEESTRACE("straw = " << straw);
-
-		// Stop if we find a match
-		if (straw.is_data_equal(needle)) {
-			BEESCOUNT(adjust_hit);
-			m_found_data = true;
-			m_found_hash = true;
-			if (is_compressed_offset) BEESCOUNT(adjust_compressed_offset_correct);
-			if (is_legacy) BEESCOUNT(adjust_legacy_correct);
-			if (is_exact) BEESCOUNT(adjust_exact_correct);
-			return straw;
-		}
-
-		if (straw.hash() != needle.hash()) {
-			// Not the same hash or data, try next block
-			BEESCOUNT(adjust_miss);
-			continue;
-		}
-
-		// Found the hash but not the data.  Yay!
-		m_found_hash = true;
-		BEESLOGINFO("HASH COLLISION\n"
-			<< "\tneedle " << needle << "\n"
-			<< "\tstraw " << straw);
-		BEESCOUNT(hash_collision);
+	// Straw cannot extend beyond end of haystack
+	if (haystack_offset + needle.size() > haystack_size) {
+		BEESCOUNT(adjust_needle_too_long);
+		return BeesBlockData();
 	}
+
+	// Read the haystack
+	BEESTRACE("straw " << name_fd(haystack.fd()) << ", offset " << to_hex(haystack_offset) << ", length " << needle.size());
+	BeesBlockData straw(haystack.fd(), haystack_offset, needle.size());
+
+	BEESTRACE("straw = " << straw);
+
+	// Stop if we find a match
+	if (straw.is_data_equal(needle)) {
+		BEESCOUNT(adjust_hit);
+		m_found_data = true;
+		m_found_hash = true;
+		if (is_compressed_offset) BEESCOUNT(adjust_compressed_offset_correct);
+		if (is_exact) BEESCOUNT(adjust_exact_correct);
+		return straw;
+	}
+
+	if (straw.hash() != needle.hash()) {
+		// Not the same hash or data, try next block
+		BEESCOUNT(adjust_miss);
+		return BeesBlockData();
+	}
+
+	// Found the hash but not the data.  Yay!
+	m_found_hash = true;
+	BEESLOGINFO("HASH COLLISION\n"
+		<< "\tneedle " << needle << "\n"
+		<< "\tstraw " << straw);
+	BEESCOUNT(hash_collision);
 
 	// Ran out of offsets to try
 	BEESCOUNT(adjust_no_match);
 	if (is_compressed_offset) BEESCOUNT(adjust_compressed_offset_wrong);
-	if (is_legacy) BEESCOUNT(adjust_legacy_wrong);
 	if (is_exact) BEESCOUNT(adjust_exact_wrong);
 	m_wrong_data = true;
 	return BeesBlockData();
