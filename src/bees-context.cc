@@ -298,7 +298,9 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
 		BEESLOGINFO("prealloc extent " << e);
-		BeesFileRange prealloc_bfr(m_ctx->tmpfile()->make_hole(e.size()));
+		// Must not extend past EOF
+		auto extent_size = min(e.end(), bfr.file_size()) - e.begin();
+		BeesFileRange prealloc_bfr(m_ctx->tmpfile()->make_hole(extent_size));
 		BeesRangePair brp(prealloc_bfr, bfr);
 		// Raw dedup here - nothing else to do with this extent, nothing to merge with
 		if (m_ctx->dedup(brp)) {
