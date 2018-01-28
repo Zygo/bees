@@ -548,6 +548,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	uint64_t next_root(uint64_t root = 0);
 	void current_state_set(const BeesCrawlState &bcs);
 	RateEstimator& transid_re();
+	size_t crawl_batch(shared_ptr<BeesCrawl> crawl);
 
 friend class BeesFdCache;
 friend class BeesCrawl;

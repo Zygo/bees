@@ -220,6 +220,32 @@ BeesRoots::transid_max()
 	return m_transid_re.count();
 }
 
+size_t
+BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
+{
+	auto ctx_copy = m_ctx;
+	size_t batch_count = 0;
+	auto subvol = this_crawl->get_state().m_root;
+	ostringstream oss;
+	oss << "crawl_" << subvol;
+	auto task_title = oss.str();
+	while (batch_count < BEES_MAX_CRAWL_BATCH) {
+		auto this_state = this_crawl->get_state();
+		auto this_range = this_crawl->pop_front();
+		if (!this_range) {
+			break;
+		}
+		Task(task_title, [ctx_copy, this_range]() {
+			BEESNOTE("scan_forward " << this_range);
+			ctx_copy->scan_forward(this_range);
+		}).run();
+		BEESCOUNT(crawl_scan);
+		m_crawl_current = this_state;
+		++batch_count;
+	}
+	return batch_count;
+}
+
 void
 BeesRoots::crawl_roots()
 {
@@ -234,8 +260,6 @@ BeesRoots::crawl_roots()
 	if (m_root_crawl_map.empty()) {
 		BEESLOGINFO("idle: crawl map is empty!");
 	}
-
-	auto ctx_copy = m_ctx;
 
 	switch (s_scan_mode) {
 		case SCAN_MODE_ZERO: {
@@ -253,25 +277,13 @@ BeesRoots::crawl_roots()
 				}
 			}
 
-			size_t batch_count = 0;
-			while (first_range && batch_count < BEES_MAX_CRAWL_BATCH) {
-				auto subvol = first_crawl->get_state().m_root;
-				ostringstream oss;
-				oss << "crawl_" << subvol;
-				auto task_title = oss.str();
-				Task(task_title, [ctx_copy, first_range]() {
-					BEESNOTE("scan_forward " << first_range);
-					ctx_copy->scan_forward(first_range);
-				}).run();
-				BEESCOUNT(crawl_scan);
-				m_crawl_current = first_crawl->get_state();
-				auto first_range_popped = first_crawl->pop_front();
-				THROW_CHECK2(runtime_error, first_range, first_range_popped, first_range == first_range_popped);
-				first_range = first_crawl->peek_front();
-				++batch_count;
+			if (!first_crawl) {
+				return;
 			}
 
-			if (first_range || batch_count) {
+			auto batch_count = crawl_batch(first_crawl);
+
+			if (batch_count) {
 				return;
 			}
 
@@ -279,33 +291,18 @@ BeesRoots::crawl_roots()
 		}
 		case SCAN_MODE_ONE: {
 			// Scan each subvol one extent at a time (good for continuous forward progress)
-			bool crawled = false;
+			size_t batch_count = 0;
 			for (auto i : crawl_map_copy) {
-				auto this_crawl = i.second;
-				auto this_range = this_crawl->peek_front();
-				size_t batch_count = 0;
-				while (this_range && batch_count < BEES_MAX_CRAWL_BATCH) {
-					auto subvol = this_crawl->get_state().m_root;
-					ostringstream oss;
-					oss << "crawl_" << subvol;
-					auto task_title = oss.str();
-					Task(task_title, [ctx_copy, this_range]() {
-						BEESNOTE("scan_forward " << this_range);
-						ctx_copy->scan_forward(this_range);
-					}).run();
-					crawled = true;
-					BEESCOUNT(crawl_scan);
-					m_crawl_current = this_crawl->get_state();
-					auto this_range_popped = this_crawl->pop_front();
-					THROW_CHECK2(runtime_error, this_range, this_range_popped, this_range == this_range_popped);
-					this_range = this_crawl->peek_front();
-					++batch_count;
-				}
+				batch_count += crawl_batch(i.second);
 			}
 
-			if (crawled) return;
+			if (batch_count) {
+				return;
+			}
+
 			break;
 		}
+
 		case SCAN_MODE_COUNT: assert(false); break;
 	}
 
