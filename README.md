@@ -506,7 +506,12 @@ Command Line Options
   * Specify extent scanning algorithm.  Default mode is 0.
     _EXPERIMENTAL_ feature that may go away.
     * Mode 0: scan extents in ascending order of (inode, subvol, offset).
-    * Mode 1: scan extents in round-robin order from each subvol.
+      Keeps shared extents between snapshots together.  Reads files sequentially.
+      Minimizes temporary space usage.
+    * Mode 1: scan extents from all subvols in parallel.  Good performance
+      on non-spinning media when subvols are unrelated.
+    * Mode 2: scan all extents from one subvol at a time.  Good sequential
+      read performance for spinning media.  Maximizes temporary space usage.
 * --timestamps (-t)
   * Enable timestamps in log output.
 * --notimestamps (-T)
