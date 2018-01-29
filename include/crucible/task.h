@@ -18,9 +18,10 @@ namespace crucible {
 
 		Task(shared_ptr<TaskState> pts);
 
-		TaskId id() const;
-
 	public:
+
+		// create empty Task object
+		Task() = default;
 
 		// create Task object containing closure and description
 		Task(string title, function<void()> exec_fn);
@@ -45,6 +46,9 @@ namespace crucible {
 
 		// Null test
 		operator bool() const;
+
+		// Unique non-repeating(ish) ID for task
+		TaskId id() const;
 	};
 
 	ostream &operator<<(ostream &os, const Task &task);
