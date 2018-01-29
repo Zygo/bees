@@ -299,6 +299,11 @@ namespace crucible {
 		while (fmi != fm.end()) {
 			Extent new_extent(*fmi);
 			THROW_CHECK2(runtime_error, ipos, new_extent.m_begin, ipos <= new_extent.m_begin);
+			// Don't map extents past EOF, we can't read them
+			if (new_extent.m_begin >= m_stat.st_size) {
+				last_extent_is_last = true;
+				break;
+			}
 			if (new_extent.m_begin > ipos) {
 				Extent hole_extent;
 				hole_extent.m_begin = ipos;
@@ -326,13 +331,13 @@ namespace crucible {
 				hole_extent.m_flags |= FIEMAP_EXTENT_LAST;
 			}
 			new_vec.push_back(hole_extent);
-			ipos += new_vec.size();
+			ipos += hole_extent.size();
 		}
+		// Extent list must now be non-empty, at least a hole
 		THROW_CHECK1(runtime_error, new_vec.size(), !new_vec.empty());
 
-		// Allow last extent to extend beyond desired range (e.g. at EOF)
-		// ...but that's not what this does
-		// THROW_CHECK3(runtime_error, ipos, new_vec.rbegin()->m_end, m_stat.st_size, ipos <= new_vec.rbegin()->m_end);
+		// ipos must match end of last extent
+		THROW_CHECK3(runtime_error, ipos, new_vec.rbegin()->m_end, m_stat.st_size, ipos == new_vec.rbegin()->m_end);
 
 		// If we have the last extent in the file, truncate it to the file size.
 		if (ipos >= m_stat.st_size) {
@@ -341,9 +346,10 @@ namespace crucible {
 			new_vec.rbegin()->m_end = m_stat.st_size;
 		}
 
-		// Verify contiguous, ascending order, at least one Extent
+		// Verify at least one Extent
 		THROW_CHECK1(runtime_error, new_vec, !new_vec.empty());
 
+		// Verify contiguous, ascending order, only extent with FIEMAP_EXTENT_LAST flag is the last extent
 		ipos = new_vec.begin()->m_begin;
 		bool last_flag_last = false;
 		for (auto e : new_vec) {
@@ -353,7 +359,6 @@ namespace crucible {
 			ipos += e.size();
 			last_flag_last = e.m_flags & FIEMAP_EXTENT_LAST;
 		}
-		THROW_CHECK1(runtime_error, new_vec, !last_extent_is_last || new_vec.rbegin()->m_end == ipos);
 
 		m_extents = new_vec;
 		m_current = m_extents.begin();
