@@ -247,7 +247,7 @@ BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 	return batch_count;
 }
 
-void
+bool
 BeesRoots::crawl_roots()
 {
 	BEESNOTE("Crawling roots");
@@ -280,13 +280,13 @@ BeesRoots::crawl_roots()
 			}
 
 			if (!first_crawl) {
-				return;
+				return false;
 			}
 
 			auto batch_count = crawl_batch(first_crawl);
 
 			if (batch_count) {
-				return;
+				return true;
 			}
 
 			break;
@@ -300,7 +300,7 @@ BeesRoots::crawl_roots()
 			}
 
 			if (batch_count) {
-				return;
+				return true;
 			}
 
 			break;
@@ -322,7 +322,7 @@ BeesRoots::crawl_roots()
 			for (auto i : crawl_vector) {
 				batch_count += crawl_batch(i);
 				if (batch_count) {
-					return;
+					return true;
 				}
 			}
 
@@ -337,13 +337,9 @@ BeesRoots::crawl_roots()
 	auto want_transid = m_transid_re.count() + m_transid_factor;
 	auto ran_out_time = m_crawl_timer.lap();
 	BEESLOGINFO("Crawl master ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
-	BEESNOTE("idle, waiting for transid " << want_transid << ": " << m_transid_re);
-	// FIXME:  Tasks should not block arbitrarily
-	m_transid_re.wait_until(want_transid);
 
-	auto resumed_after_time = m_crawl_timer.lap();
-	auto new_transid = m_transid_re.count();
-	BEESLOGINFO("Crawl master resumed after " << resumed_after_time << "s at transid " << new_transid);
+	// Do not run again
+	return false;
 }
 
 void
@@ -351,19 +347,25 @@ BeesRoots::crawl_thread()
 {
 	BEESNOTE("creating crawl task");
 
-	// Start the Task that does the crawling
+	// Create the Task that does the crawling
 	auto shared_this = shared_from_this();
-	Task("crawl_master", [shared_this]() {
+	m_crawl_task = Task("crawl_master", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
+		bool run_again = false;
 		while (tqs < BEES_MAX_QUEUE_SIZE) {
-			catch_all([&]() {
-				shared_this->crawl_roots();
-			});
+			run_again = shared_this->crawl_roots();
 			tqs = TaskMaster::get_queue_count();
+			if (!run_again) {
+				break;
+			}
 		}
-		Task::current_task().run();
-	}).run();
+		if (run_again) {
+			shared_this->m_crawl_task.run();
+		} else {
+			shared_this->m_task_running = false;
+		}
+	});
 
 	// Monitor transid_max and wake up roots when it changes
 	BEESNOTE("tracking transid");
@@ -388,6 +390,14 @@ BeesRoots::crawl_thread()
 			m_ctx->fd_cache()->clear();
 		}
 		last_count = new_count;
+
+		// If no crawl task is running, start a new one
+		bool already_running = m_task_running.exchange(true);
+		if (!already_running) {
+			auto resumed_after_time = m_crawl_timer.lap();
+			BEESLOGINFO("Crawl master resumed after " << resumed_after_time << "s at transid " << new_count);
+			m_crawl_task.run();
+		}
 
 		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
 		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
@@ -497,7 +507,8 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_crawl_thread("crawl_transid"),
-	m_writeback_thread("crawl_writeback")
+	m_writeback_thread("crawl_writeback"),
+	m_task_running(false)
 {
 	m_crawl_thread.exec([&]() {
 		// Measure current transid before creating any crawlers

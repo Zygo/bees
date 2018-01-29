@@ -9,8 +9,9 @@
 #include "crucible/fs.h"
 #include "crucible/lockset.h"
 #include "crucible/time.h"
+#include "crucible/task.h"
 
-#include <array>
+#include <atomic>
 #include <functional>
 #include <list>
 #include <mutex>
@@ -528,6 +529,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesThread				m_writeback_thread;
 	RateEstimator				m_transid_re;
 	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
+	atomic<bool>				m_task_running;
+	Task					m_crawl_task;
 
 	void insert_new_crawl();
 	void insert_root(const BeesCrawlState &bcs);
@@ -538,7 +541,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	uint64_t transid_max_nocache();
 	void state_load();
 	void state_save();
-	void crawl_roots();
+	bool crawl_roots();
 	string crawl_state_filename() const;
 	BeesCrawlState crawl_state_get(uint64_t root);
 	void crawl_state_set_dirty();
