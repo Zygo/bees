@@ -81,6 +81,9 @@ namespace crucible {
 		// Write count
 		void update(uint64_t new_count);
 
+		// Ignore counts that go backwards
+		void update_monotonic(uint64_t new_count);
+
 		// Read count
 		uint64_t count() const;
 

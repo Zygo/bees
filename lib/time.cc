@@ -188,6 +188,17 @@ namespace crucible {
 		return update_unlocked(new_count);
 	}
 
+	void
+	RateEstimator::update_monotonic(uint64_t new_count)
+	{
+		unique_lock<mutex> lock(m_mutex);
+		if (m_last_count == numeric_limits<uint64_t>::max() || new_count > m_last_count) {
+			return update_unlocked(new_count);
+		} else {
+			return update_unlocked(m_last_count);
+		}
+	}
+
 	uint64_t
 	RateEstimator::count() const
 	{
