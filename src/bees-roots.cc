@@ -868,7 +868,7 @@ BeesCrawl::fetch_extents()
 	// new references, and max_transid filtering in the kernel locks
 	// the filesystem while slowing us down.
 	// sk.max_transid = old_state.m_max_transid;
-	// sk.max_transid = numeric_limits<uint64_t>::max();
+	sk.max_transid = numeric_limits<uint64_t>::max();
 	sk.nr_items = BEES_MAX_CRAWL_SIZE;
 
 	// Lock in the old state
