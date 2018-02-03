@@ -332,7 +332,9 @@ namespace crucible {
 		THROW_CHECK1(runtime_error, new_vec.size(), !new_vec.empty());
 
 		// Allow last extent to extend beyond desired range (e.g. at EOF)
-		THROW_CHECK2(runtime_error, ipos, new_vec.rbegin()->m_end, ipos <= new_vec.rbegin()->m_end);
+		// ...but that's not what this does
+		// THROW_CHECK3(runtime_error, ipos, new_vec.rbegin()->m_end, m_stat.st_size, ipos <= new_vec.rbegin()->m_end);
+
 		// If we have the last extent in the file, truncate it to the file size.
 		if (ipos >= m_stat.st_size) {
 			THROW_CHECK2(runtime_error, new_vec.rbegin()->m_begin, m_stat.st_size, m_stat.st_size > new_vec.rbegin()->m_begin);
