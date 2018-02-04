@@ -19,8 +19,6 @@ CRUCIBLE_OBJS = \
 	time.o \
 	uuid.o \
 
-libcrucible.so: $(CRUCIBLE_OBJS) .version.o -luuid
-
 include ../makeflags
 include ../Defines.mk
 
@@ -44,5 +42,5 @@ include depends.mk
 %.o: %.cc ../makeflags
 	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
 
-%.so:
-	$(CXX) $(LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^
+libcrucible.so: $(CRUCIBLE_OBJS) .version.o
+	$(CXX) $(LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^ -luuid
