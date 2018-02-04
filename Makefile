@@ -7,7 +7,7 @@ LIBEXEC_PREFIX ?= $(LIB_PREFIX)/bees
 
 SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemunitdir)
 
-MARKDOWN := $(firstword $(shell which markdown markdown2 markdown_py 2>/dev/null || echo markdown))
+MARKDOWN := $(firstword $(shell type -P markdown markdown2 markdown_py 2>/dev/null || echo markdown))
 
 # allow local configuration to override above variables
 -include localconf
