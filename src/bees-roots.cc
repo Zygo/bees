@@ -588,27 +588,34 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				auto parent_rootid = i.offset;
 				// BEESLOG("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
 				BEESTRACE("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
+				BEESCOUNT(root_parent_open_try);
 				Fd parent_fd = open_root(parent_rootid);
 				if (!parent_fd) {
 					BEESLOGTRACE("no parent_fd");
+					BEESCOUNT(root_parent_open_fail);
 					continue;
 				}
+				BEESCOUNT(root_parent_open_ok);
 
 				if (dirid != BTRFS_FIRST_FREE_OBJECTID) {
 					BEESTRACE("dirid " << dirid << " root " << rootid << " INO_PATH");
 					BtrfsIoctlInoPathArgs ino(dirid);
 					if (!ino.do_ioctl_nothrow(parent_fd)) {
-						BEESLOGINFO("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd));
+						BEESLOGINFO("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd) << ": " << strerror(errno));
+						BEESCOUNT(root_parent_path_fail);
 						continue;
 					}
 					if (ino.m_paths.empty()) {
 						BEESLOGINFO("dirid " << dirid << " inode has no paths in parent_fd " << name_fd(parent_fd));
+						BEESCOUNT(root_parent_path_empty);
 						continue;
 					}
+					// Theoretically there is only one, so don't bother looping.
 					BEESTRACE("dirid " << dirid << " path " << ino.m_paths.at(0));
 					parent_fd = openat(parent_fd, ino.m_paths.at(0).c_str(), FLAGS_OPEN_DIR);
 					if (!parent_fd) {
 						BEESLOGTRACE("no parent_fd from dirid");
+						BEESCOUNT(root_parent_path_open_fail);
 						continue;
 					}
 				}
@@ -616,17 +623,21 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				BEESTRACE("openat(" << name_fd(parent_fd) << ", " << name << ")");
 				Fd rv = openat(parent_fd, name.c_str(), FLAGS_OPEN_DIR);
 				if (!rv) {
-					BEESLOGTRACE("open failed for name " << name);
+					BEESLOGTRACE("open failed for name " << name << ": " << strerror(errno));
+					BEESCOUNT(root_open_fail);
 					continue;
 				}
 				BEESCOUNT(root_found);
 
 				// Verify correct root ID
+				// Throw exceptions here because these are very rare events
+				// and unlike the file open case, we don't have alternatives to try
 				auto new_root_id = btrfs_get_root_id(rv);
 				THROW_CHECK2(runtime_error, new_root_id, rootid, new_root_id == rootid);
 				Stat st(rv);
 				THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
 				// BEESLOGDEBUG("open_root_nocache " << rootid << ": " << name_fd(rv));
+				BEESCOUNT(root_ok);
 				return rv;
 			}
 		}
@@ -690,6 +701,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 
 	Fd root_fd = open_root(root);
 	if (!root_fd) {
+		BEESCOUNT(open_no_root);
 		return root_fd;
 	}
 
@@ -698,7 +710,12 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	BEESTRACE("looking up ino " << ino);
 	BtrfsIoctlInoPathArgs ipa(ino);
 	if (!ipa.do_ioctl_nothrow(root_fd)) {
-		BEESLOGINFO("Lookup root " << root << " ino " << ino << " failed: " << strerror(errno));
+		if (errno == ENOENT) {
+			BEESCOUNT(open_lookup_enoent);
+		} else {
+			BEESLOGINFO("Lookup root " << root << " ino " << ino << " failed: " << strerror(errno));
+			BEESCOUNT(open_lookup_error);
+		}
 		return Fd();
 	}
 
@@ -706,18 +723,26 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	Fd rv;
 	if (ipa.m_paths.empty()) {
 		BEESLOGWARN("No paths for root " << root << " ino " << ino);
+		BEESCOUNT(open_lookup_empty);
 	}
+	BEESCOUNT(open_lookup_ok);
+
 	for (auto file_path : ipa.m_paths) {
 		BEESTRACE("Looking up root " << root << " ino " << ino << " in dir " << name_fd(root_fd) << " path " << file_path);
 		BEESCOUNT(open_file);
-		// Try to open file RW, fall back to RO
+		// Just open file RO.  root can do the dedup ioctl without
+		// opening in write mode, and if we do open in write mode,
+		// we can't exec the file while we have it open.
 		const char *fp_cstr = file_path.c_str();
 		rv = openat(root_fd, fp_cstr, FLAGS_OPEN_FILE);
 		if (!rv) {
-			BEESCOUNT(open_fail);
-			// errno == ENOENT is common during snapshot delete, ignore it
-			if (errno != ENOENT) {
+			// errno == ENOENT is the most common error case.
+			// No need to report it.
+			if (errno == ENOENT) {
+				BEESCOUNT(open_fail_enoent);
+			} else {
 				BEESLOGWARN("Could not open path '" << file_path << "' at root " << root << " " << name_fd(root_fd) << ": " << strerror(errno));
+				BEESCOUNT(open_fail_error);
 			}
 			continue;
 		}
@@ -783,7 +808,8 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		return rv;
 	}
 
-	// Odd, we didn't find a path.
+	// All of the paths we tried were wrong.
+	BEESCOUNT(open_no_path);
 	return Fd();
 }
 
