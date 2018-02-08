@@ -122,7 +122,7 @@ namespace crucible {
 			// Splice new node into list
 			Value *last_bp = m_last->bp;
 			THROW_CHECK0(runtime_error, last_bp);
-			// New elemnt points to both ends of list
+			// New element points to both ends of list
 			vp->fp = m_last;
 			vp->bp = last_bp;
 			// Insert vp as fp from the end of the list
@@ -158,8 +158,10 @@ namespace crucible {
 	void
 	LRUCache<Return, Arguments...>::clear()
 	{
+		// Move the map onto the stack, then destroy it after we've released the lock.
+		decltype(m_map) new_map;
 		unique_lock<mutex> lock(m_mutex);
-		m_map.clear();
+		m_map.swap(new_map);
 		m_last = nullptr;
 	}
 
