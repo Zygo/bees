@@ -230,7 +230,7 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 	auto new_bbd = adjust_offset(haystack_bbd, needle_bbd);
 	if (new_bbd.empty()) {
 		// matching offset search failed
-		BEESCOUNT(chase_wrong_data);
+		BEESCOUNT(chase_no_data);
 		return BeesFileRange();
 	}
 	if (new_bbd.begin() == haystack_bbd.begin()) {
