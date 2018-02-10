@@ -945,9 +945,9 @@ BeesBlockData::data() const
 		BEESTOOLONG("Reading BeesBlockData " << *this);
 		Timer read_timer;
 
-		Blob rv(m_length);
+		Blob rv(size());
 		pread_or_die(m_fd, rv, m_offset);
-		THROW_CHECK2(runtime_error, rv.size(), m_length, ranged_cast<off_t>(rv.size()) == m_length);
+		THROW_CHECK2(runtime_error, rv.size(), size(), ranged_cast<off_t>(rv.size()) == size());
 		m_data = rv;
 		BEESCOUNT(block_read);
 		BEESCOUNTADD(block_bytes, rv.size());

@@ -596,7 +596,7 @@ private:
 ostream & operator<<(ostream &os, const BeesHash &bh);
 
 class BeesBlockData {
-	using Blob = vector<char>;
+	using Blob = vector<uint8_t>;
 
 	mutable Fd		m_fd;
 	off_t			m_offset;
