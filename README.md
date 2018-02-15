@@ -386,7 +386,7 @@ Dependencies
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
 
-* btrfs-progs (tested with 4.1..4.7)
+* btrfs-progs (tested with 4.1..4.14)
 
   Needed for btrfs.h and ctree.h during compile.
   Not needed at runtime.
@@ -396,15 +396,17 @@ Dependencies
   This library is only required for a feature that was removed after v0.1.
   The lingering support code can be removed.
 
-* Minimum Linux kernel version: 4.4.3
+* Linux kernel version: minimum 4.4.3, 4.11 or later recommended
 
-  Don't bother trying to make Bees work with older kernels.  It won't
-  end well:  there are too many missing features and bugs to work around.
+  Don't bother trying to make Bees work with kernel versions older
+  than 4.4.3.  It may appear to work, but it won't end well:  there are
+  too many missing features and bugs to work around.
 
-* Minimum *recommended* Linux kernel version: 4.11
+  Kernel versions between 4.4.3 and 4.11 are usable with bees, but bees
+  can trigger known performance bugs and hangs in dedup-related functions.
 
-  Earlier kernels are usable with bees, but bees can trigger a few
-  performance bugs and hangs in dedup-related functions.
+  When in doubt, use a newer kernel version.  As of kernel 4.15.3 there
+  is no released Linux kernel that has no known bugs.
 
 * markdown
 
