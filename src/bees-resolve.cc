@@ -355,7 +355,8 @@ BeesResolver::for_each_extent_ref(BeesBlockData bbd, function<bool(const BeesFil
 		}
 
 		// Look at the old data
-		catch_all([&]() {
+		// FIXME:  propagate exceptions for now.  Proper fix requires a rewrite.
+		// catch_all([&]() {
 			BEESTRACE("chase_extent_ref ino " << ino_off_root << " bbd " << bbd);
 			auto new_range = chase_extent_ref(ino_off_root, bbd);
 			// XXX: should we catch visitor's exceptions here?
@@ -370,7 +371,7 @@ BeesResolver::for_each_extent_ref(BeesBlockData bbd, function<bool(const BeesFil
 				// to a different extent between them.
 				// stop_now = true;
 			}
-		});
+		// });
 
 		if (stop_now) {
 			break;
@@ -411,7 +412,8 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
 		BeesBlockData src_bbd(src_bfr.fd(), src_bfr.begin(), min(BLOCK_SIZE_SUMS, src_bfr.size()));
 		if (bbd.addr().get_physical_or_zero() == src_bbd.addr().get_physical_or_zero()) {
 			BEESCOUNT(replacedst_same);
-			return false; // i.e. continue
+			// stop looping here, all the other srcs will probably fail this test too
+			throw runtime_error("FIXME: bailing out here, need to fix this further up the call stack");
 		}
 
 		// Make pair(src, dst)

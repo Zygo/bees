@@ -489,7 +489,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 			BeesAddress last_replaced_addr;
 			for (auto it = resolved_addrs.begin(); it != resolved_addrs.end(); ++it) {
-				catch_all([&]() {
+				// FIXME:  Need to terminate this loop on replace_dst exception condition
+				// catch_all([&]() {
 					auto it_copy = *it;
 					BEESNOTE("finding one match (out of " << it_copy.count() << ") at " << it_copy.addr() << " for " << bbd);
 					BEESTRACE("finding one match (out of " << it_copy.count() << ") at " << it_copy.addr() << " for " << bbd);
@@ -541,7 +542,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 					} else {
 						BEESCOUNT(scan_dup_miss);
 					}
-				});
+				// });
 			}
 			if (last_replaced_addr) {
 				// If we replaced extents containing the incoming addr,
