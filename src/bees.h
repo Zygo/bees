@@ -8,6 +8,7 @@
 #include "crucible/fd.h"
 #include "crucible/fs.h"
 #include "crucible/lockset.h"
+#include "crucible/progress.h"
 #include "crucible/time.h"
 #include "crucible/task.h"
 
@@ -501,7 +502,7 @@ class BeesCrawl {
 	bool					m_finished = false;
 
 	mutex					m_state_mutex;
-	BeesCrawlState				m_state;
+	ProgressTracker<BeesCrawlState>		m_state;
 
 	bool fetch_extents();
 	void fetch_extents_harder();
@@ -511,7 +512,9 @@ public:
 	BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state);
 	BeesFileRange peek_front();
 	BeesFileRange pop_front();
-	BeesCrawlState get_state();
+	ProgressTracker<BeesCrawlState>::ProgressHolder hold_state(const BeesFileRange &bfr);
+	BeesCrawlState get_state_begin();
+	BeesCrawlState get_state_end();
 	void set_state(const BeesCrawlState &bcs);
 	void deferred(bool def_setting);
 };
@@ -520,7 +523,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
 	BeesStringFile				m_crawl_state_file;
-	BeesCrawlState				m_crawl_current;
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
 	bool					m_crawl_dirty = false;
@@ -540,10 +542,10 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	uint64_t transid_max();
 	uint64_t transid_max_nocache();
 	void state_load();
+	ostream &state_to_stream(ostream &os);
 	void state_save();
 	bool crawl_roots();
 	string crawl_state_filename() const;
-	BeesCrawlState crawl_state_get(uint64_t root);
 	void crawl_state_set_dirty();
 	void crawl_state_erase(const BeesCrawlState &bcs);
 	void crawl_thread();

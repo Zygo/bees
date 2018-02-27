@@ -5,6 +5,7 @@ PROGRAMS = \
 	limits \
 	path \
 	process \
+	progress \
 	task \
 
 all: test
