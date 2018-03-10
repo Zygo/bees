@@ -293,7 +293,11 @@ BeesRoots::crawl_roots()
 				auto this_crawl = i.second;
 				auto this_range = this_crawl->peek_front();
 				if (this_range) {
-					if (!first_range || this_range < first_range) {
+					// Use custom ordering here to avoid abusing BeesFileRange::operator<().
+					if (!first_range ||
+						make_tuple(this_range.fid().ino(), this_range.begin(), this_range.fid().root()) <
+						make_tuple(first_range.fid().ino(), first_range.begin(), first_range.fid().root())
+					) {
 						first_crawl = this_crawl;
 						first_range = this_range;
 					}
