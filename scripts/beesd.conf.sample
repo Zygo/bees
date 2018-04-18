@@ -15,8 +15,8 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # BEESHOME="$MNT_DIR/.beeshome"
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
-## Default options to apply, see --help for details
-# OPTIONS="--relative-paths --notimestamps"
+## Options to apply, see `beesd --help` for details
+# OPTIONS="--strip-paths --no-timestamps"
 
 ## Bees DB size
 # Hash Table Sizing
