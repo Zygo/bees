@@ -14,13 +14,9 @@ export UUID AL16M
 readonly AL16M="$((16*1024*1024))"
 readonly CONFIG_DIR=@PREFIX@/etc/bees/
 
-## Pre checks
-{
-    [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
-    [ "$UID" == "0" ] || ERRO "Must be run as root"
-}
+readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
 
-command -v @LIBEXEC_PREFIX@/bees &> /dev/null || ERRO "Missing 'bees' agent"
+command -v "$bees_bin" &> /dev/null || ERRO "Missing 'bees' agent"
 
 ## Parse args
 ARGUMENTS=()
@@ -54,10 +50,20 @@ case "$UUID" in
         source "$FILE_CONFIG"
     ;;
     *)
-        echo "beesd [options] <btrfs_uuid>"
+        echo "Usage: beesd [options] <btrfs_uuid>"
+        echo "- - -"
+        "$bees_bin" --help
         exit 1
     ;;
 esac
+
+
+## Pre checks
+{
+    [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
+    [ "$UID" == "0" ] || ERRO "Must be run as root"
+}
+
 
 WORK_DIR="${WORK_DIR:-/run/bees/}"
 MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
@@ -113,7 +119,7 @@ fi
     chmod 700 "$DB_PATH"
 }
 
-MNT_DIR="${MNT_DIR//\/\//\/}"
+MNT_DIR="$(realpath $MNT_DIR)"
 
 cd "$MNT_DIR"
-@LIBEXEC_PREFIX@/bees "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
+"$bees_bin" "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
