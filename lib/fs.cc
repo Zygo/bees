@@ -701,7 +701,7 @@ namespace crucible {
 	BtrfsIoctlSearchHeader::set_data(const vector<char> &v, size_t offset)
 	{
 		THROW_CHECK2(invalid_argument, offset, v.size(), offset + sizeof(btrfs_ioctl_search_header) <= v.size());
-		memcpy(this, &v[offset], sizeof(btrfs_ioctl_search_header));
+		*static_cast<btrfs_ioctl_search_header *>(this) = *reinterpret_cast<const btrfs_ioctl_search_header *>(&v[offset]);
 		offset += sizeof(btrfs_ioctl_search_header);
 		THROW_CHECK2(invalid_argument, offset + len, v.size(), offset + len <= v.size());
 		m_data = vector<char>(&v[offset], &v[offset + len]);
