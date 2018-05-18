@@ -152,13 +152,13 @@ Good Btrfs Feature Interactions
 
 Bees has been tested in combination with the following:
 
-* btrfs compression (either method), mixtures of compressed and uncompressed extents
+* btrfs compression (zlib, lzo, zstd), mixtures of compressed and uncompressed extents
 * PREALLOC extents (unconditionally replaced with holes)
 * HOLE extents and btrfs no-holes feature
 * Other deduplicators, reflink copies (though Bees may decide to redo their work)
-* btrfs snapshots and non-snapshot subvols (RW only)
+* btrfs snapshots and non-snapshot subvols (RW and RO)
 * Concurrent file modification (e.g. PostgreSQL and sqlite databases, build daemons)
-* all btrfs RAID profiles (people ask about this, but it's irrelevant)
+* all btrfs RAID profiles (people ask about this, but it's irrelevant to bees)
 * IO errors during dedup (read errors will throw exceptions, Bees will catch them and skip over the affected extent)
 * Filesystems mounted *with* the flushoncommit option
 * 4K filesystem data block size / clone alignment
@@ -166,25 +166,40 @@ Bees has been tested in combination with the following:
 * Large (>16M) extents
 * Huge files (>1TB--although Btrfs performance on such files isn't great in general)
 * filesystems up to 25T bytes, 100M+ files
-* btrfs read-only snapshots
+* btrfs receive
+* btrfs nodatacow/nodatasum inode attribute or mount option (bees skips all nodatasum files)
+* open(O_DIRECT) (seems to work as well--or as poorly--with bees as with any other btrfs feature)
 
 Bad Btrfs Feature Interactions
 ------------------------------
+
+Bees has been tested in combination with the following, and various problems are known:
+
+* bcache, lvmcache:  *severe (filesystem-destroying) metadata corruption
+  issues* observed in testing and reported by users, apparently only when
+  used with bees.  Plain SSD and HDD seem to be OK.
+* btrfs send:  sometimes aborts with an I/O error when bees changes the
+  data layout during a send.  The send can be restarted and will work
+  if bees has finished processing the snapshot being sent.  No data
+  corruption observed other than the truncated send.
+* btrfs qgroups:  very slow, sometimes hangs
+* btrfs autodefrag mount option:  hangs and high CPU usage problems
+  reported by users.  bees cannot distinguish autodefrag activity from
+  normal filesystem activity and will likely try to undo the autodefrag,
+  so it should probably be turned off for bees in any case.
+
+Untested Btrfs Feature Interactions
+-----------------------------------
 
 Bees has not been tested with the following, and undesirable interactions may occur:
 
 * Non-4K filesystem data block size (should work if recompiled)
 * Non-equal hash (SUM) and filesystem data block (CLONE) sizes (probably never will work)
-* btrfs send/receive (receive is probably OK, but send could be confused?)
-* btrfs qgroups (never tested, no idea what might happen)
 * btrfs seed filesystems (does anyone even use those?)
-* btrfs autodefrag mount option (never tested, could fight with Bees)
-* btrfs nodatacow/nodatasum inode attribute or mount option (bees skips all nodatasum files)
 * btrfs out-of-tree kernel patches (e.g. in-band dedup or encryption)
 * btrfs-convert from ext2/3/4 (never tested, might run out of space or ignore significant portions of the filesystem due to sanity checks)
 * btrfs mixed block groups (don't know a reason why it would *not* work, but never tested)
-* open(O_DIRECT)
-* Filesystems mounted *without* the flushoncommit option
+* Filesystems mounted *without* the flushoncommit option (don't know the impact of crashes during dedup writes vs. ordinary writes)
 
 Other Caveats
 -------------
@@ -251,7 +266,7 @@ in the future):
 
 Bug fixes (sometimes included in older LTS kernels):
 
-* Bugs fixed prior to 4.4.3 are not listed here.
+* Bugs fixed prior to 4.4.107 are not listed here.
 * 4.5: hang in the `INO_PATHS` ioctl used by Bees.
 * 4.5: use-after-free in the `FILE_EXTENT_SAME` ioctl used by Bees.
 * 4.6: lost inodes after a rename, crash, and log tree replay
@@ -264,10 +279,26 @@ Bug fixes (sometimes included in older LTS kernels):
   last one.
 * 4.14: backref performance improvements make LOGICAL_INO even faster
   in the worst cases (but possibly slower in the best cases?).
-* (unmerged): WARN_ON(ref->count < 0) in fs/btrfs/backref.c triggers
+* 4.14.29: WARN_ON(ref->count < 0) in fs/btrfs/backref.c triggers
   almost once per second.  The WARN_ON is incorrect and can be removed.
 
-Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
+Unfixed kernel bugs (as of 4.14.34) with workarounds in Bees:
+
+* *Deadlocks* in the kernel dedup ioctl when files are modified
+  immediately before dedup.  `BeesTempFile::make_copy` calls `fsync()`
+  immediately before dedup to work around this.  If the `fsync()` is
+  removed, the filesystem hangs within a few hours, requiring a reboot
+  to recover.  Even with the `fsync()`, it is possible to lose the
+  kernel race condition and encounter a deadlock within a machine-year.
+  VM image workloads may trigger this faster.  Over the past years
+  several specific deadlock cases have been fixed, but at least one
+  remains.
+
+* *Bad interactions* with other Linux block layers:  bcache and lvmcache
+  can fail spectacularly, and apparently only while running bees.
+  This is definitely a kernel bug, either in btrfs or the lower block
+  layers.  Avoid using bees with these tools, or test very carefully
+  before deployment.
 
 * *slow backrefs* (aka toxic extents): If the number of references to a
   single shared extent within a single file grows above a few thousand,
@@ -276,7 +307,8 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   measuring the time the kernel spends performing certain operations
   and permanently blacklisting any extent or hash where the kernel
   starts to get slow.  Inside Bees, such blocks are marked as 'toxic'
-  hash/block addresses.
+  hash/block addresses.  Linux kernel v4.14 is better but can still
+  have problems.
 
 * `LOGICAL_INO` output is arbitrarily limited to 2730 references
   even if more buffer space is provided for results.  Once this number
@@ -299,18 +331,10 @@ Unfixed kernel bugs (as of 4.11.9) with workarounds in Bees:
   list of all extent refs referencing a data extent (i.e. Bees wants
   the compressed-extent behavior in all cases).  *Fixed in v4.14.*
 
-* `LOGICAL_INO` was only called from one thread at any time per process.
-  This means at most one core was irretrievably stuck in this ioctl.
-  *Workaround removed in recent bees versions.*
-
 * `FILE_EXTENT_SAME` is arbitrarily limited to 16MB.  This is less than
   128MB which is the maximum extent size that can be created by defrag
   or prealloc.  Bees avoids feedback loops this can generate while
   attempting to replace extents over 16MB in length.
-
-* If the `fsync()` in `BeesTempFile::make_copy` is removed, the filesystem
-  hangs within a few hours, requiring a reboot to recover.  On the other
-  hand, the `fsync()` only costs about 8% of overall performance.
 
 Not really bugs, but gotchas nonetheless:
 
@@ -385,12 +409,12 @@ Please also review the Makefile for additional hints.
 Dependencies
 ------------
 
-* C++11 compiler (tested with GCC 4.9 and 6.2.0)
+* C++11 compiler (tested with GCC 4.9, 6.2.0, 8.1.0)
 
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
 
-* btrfs-progs (tested with 4.1..4.14)
+* btrfs-progs (tested with 4.1..4.15.1)
 
   Needed for btrfs.h and ctree.h during compile.
   Not needed at runtime.
@@ -400,17 +424,16 @@ Dependencies
   This library is only required for a feature that was removed after v0.1.
   The lingering support code can be removed.
 
-* Linux kernel version: minimum 4.4.3, 4.11 or later recommended
+* Linux kernel version: *minimum* 4.4.107, *4.14.29 or later recommended*
 
-  Don't bother trying to make Bees work with kernel versions older
-  than 4.4.3.  It may appear to work, but it won't end well:  there are
-  too many missing features and bugs to work around.
+  Don't bother trying to make Bees work with kernel versions older than
+  4.4.107.  It may appear to work, but it won't end well:  there are
+  too many missing features and bugs (including data corruption bugs)
+  to work around in older kernels.
 
-  Kernel versions between 4.4.3 and 4.11 are usable with bees, but bees
-  can trigger known performance bugs and hangs in dedup-related functions.
-
-  When in doubt, use a newer kernel version.  As of kernel 4.15.3 there
-  is no released Linux kernel that has no relevant known bugs.
+  Kernel versions between 4.4.107 and 4.14.29 are usable with bees,
+  but bees can trigger known performance bugs and hangs in dedup-related
+  functions.
 
 * markdown
 
