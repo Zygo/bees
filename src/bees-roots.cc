@@ -1100,7 +1100,7 @@ BeesCrawl::hold_state(const BeesFileRange &bfr)
 void
 BeesCrawl::set_state(const BeesCrawlState &bcs)
 {
-	m_state.set(bcs);
+	m_state.hold(bcs);
 	m_ctx->roots()->crawl_state_set_dirty();
 }
 
