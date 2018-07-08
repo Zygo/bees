@@ -183,8 +183,8 @@ BeesContext::dedup(const BeesRangePair &brp)
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
 
-	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()));
-	BEESLOGINFO("       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
+	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
+		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
 
 	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
 		BEESLOGTRACE("equal physical addresses in dedup");
