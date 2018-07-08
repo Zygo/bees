@@ -414,7 +414,8 @@ Dependencies
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
 
-* btrfs-progs (tested with 4.1..4.15.1)
+* btrfs-progs (tested with 4.1..4.15.1) or libbtrfs-dev
+  (tested with version 4.16.1)
 
   Needed for btrfs.h and ctree.h during compile.
   Also needed by the service wrapper script.
