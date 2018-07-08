@@ -561,6 +561,8 @@ Command Line Options
 * --strip-paths (-P)
   * Paths in log output will have the working directory at Bees startup
     stripped.
+* --verbose (-v)
+  * Set log verbosity (0 = no output, 8 = all output, default 8).
 
 
 Bug Reports and Contributions

@@ -30,6 +30,8 @@
 using namespace crucible;
 using namespace std;
 
+int bees_log_level = 8;
+
 int
 do_cmd_help(char *argv[])
 {
@@ -48,6 +50,7 @@ do_cmd_help(char *argv[])
 		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
 		"\t-P, --strip-paths\tStrip $CWD from beginning of all paths in the log\n"
+		"\t-v, --verbose\tSet maximum log level (0..8, default 8)\n"
 		"\n"
 		"Optional environment variables:\n"
 		"\tBEESHOME\tPath to hash table and configuration files\n"
@@ -655,43 +658,54 @@ bees_main(int argc, char *argv[])
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{ "thread-count",   required_argument, NULL, 'c' },
 			{ "thread-factor",  required_argument, NULL, 'C' },
-			{ "scan-mode", 	    required_argument, NULL, 'm' },
-			{ "timestamps",     no_argument,       NULL, 't' },
-			{ "no-timestamps",  no_argument,       NULL, 'T' },
-			{ "absolute-paths", no_argument,       NULL, 'p' },
 			{ "strip-paths",    no_argument,       NULL, 'P' },
-			{ "help",           no_argument,       NULL, 'h' }
+			{ "no-timestamps",  no_argument,       NULL, 'T' },
+			{ "thread-count",   required_argument, NULL, 'c' },
+			{ "help",           no_argument,       NULL, 'h' },
+			{ "scan-mode", 	    required_argument, NULL, 'm' },
+			{ "absolute-paths", no_argument,       NULL, 'p' },
+			{ "timestamps",     no_argument,       NULL, 't' },
+			{ "verbose",        required_argument, NULL, 'v' },
 		};
 
-		c = getopt_long(argc, argv, "c:C:m:TtPph", long_options, &option_index);
+		c = getopt_long(argc, argv, "C:PTc:hm:ptv:", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
 
 		switch (c) {
-			case 'c':
-				thread_count = stoul(optarg);
-				break;
+
 			case 'C':
 				thread_factor = stod(optarg);
-				break;
-			case 'm':
-				BeesRoots::set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
-				break;
-			case 'T':
-				chatter_prefix_timestamp = false;
-				break;
-			case 't':
-				chatter_prefix_timestamp = true;
 				break;
 			case 'P':
 				crucible::set_relative_path(cwd);
 				break;
+			case 'T':
+				chatter_prefix_timestamp = false;
+				break;
+			case 'c':
+				thread_count = stoul(optarg);
+				break;
+			case 'm':
+				BeesRoots::set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
+				break;
 			case 'p':
 				crucible::set_relative_path("");
 				break;
+			case 't':
+				chatter_prefix_timestamp = true;
+				break;
+			case 'v':
+				{
+					int new_log_level = stoul(optarg);
+					THROW_CHECK1(out_of_range, new_log_level, new_log_level >= 0 || new_log_level <= 8);
+					bees_log_level = new_log_level;
+					BEESLOGNOTICE("log level set to " << bees_log_level);
+				}
+				break;
+
 			case 'h':
 				do_cmd_help(argv); // fallthrough
 			default:

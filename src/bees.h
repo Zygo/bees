@@ -127,18 +127,18 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 
 // macros ----------------------------------------
 
-#define BEESLOG(lv,x)   do { Chatter c(lv, BeesNote::get_name()); c << x; } while (0)
+#define BEESLOG(lv,x)   do { if (lv < bees_log_level) { Chatter c(lv, BeesNote::get_name()); c << x; } } while (0)
 #define BEESLOGTRACE(x) do { BEESLOG(LOG_DEBUG, x); BeesTracer::trace_now(); } while (0)
 
 #define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x);   })
 #define BEESTOOLONG(x) BeesTooLong SRSLY_WTF_C(beesTooLong_, __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 #define BEESNOTE(x)    BeesNote    SRSLY_WTF_C(beesNote_,    __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 
-#define BEESLOGERR(x)   BEESLOG(LOG_ERR, x)
-#define BEESLOGWARN(x)  BEESLOG(LOG_WARNING, x)
-#define BEESLOGNOTE(x)  BEESLOG(LOG_NOTICE, x)
-#define BEESLOGINFO(x)  BEESLOG(LOG_INFO, x)
-#define BEESLOGDEBUG(x) BEESLOG(LOG_DEBUG, x)
+#define BEESLOGERR(x)    BEESLOG(LOG_ERR, x)
+#define BEESLOGWARN(x)   BEESLOG(LOG_WARNING, x)
+#define BEESLOGNOTICE(x) BEESLOG(LOG_NOTICE, x)
+#define BEESLOGINFO(x)   BEESLOG(LOG_INFO, x)
+#define BEESLOGDEBUG(x)  BEESLOG(LOG_DEBUG, x)
 
 #define BEESCOUNT(stat) do { \
 	BeesStats::s_global.add_count(#stat); \
@@ -825,6 +825,7 @@ public:
 };
 
 // And now, a giant pile of extern declarations
+extern int bees_log_level;
 extern const char *BEES_VERSION;
 string pretty(double d);
 void bees_sync(int fd);
