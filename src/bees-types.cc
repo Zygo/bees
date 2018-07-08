@@ -386,8 +386,8 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 	BEESTRACE("e_second " << e_second);
 
 	// Preread entire extent
-	posix_fadvise(second.fd(), e_second.begin(), e_second.size(), POSIX_FADV_WILLNEED);
-	posix_fadvise(first.fd(), e_second.begin() + first.begin() - second.begin(), e_second.size(), POSIX_FADV_WILLNEED);
+	readahead(second.fd(), e_second.begin(), e_second.size());
+	readahead(first.fd(), e_second.begin() + first.begin() - second.begin(), e_second.size());
 
 	auto hash_table = ctx->hash_table();
 
@@ -406,7 +406,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 				BEESCOUNT(pairbackward_hole);
 				break;
 			}
-			posix_fadvise(second.fd(), e_second.begin(), e_second.size(), POSIX_FADV_WILLNEED);
+			readahead(second.fd(), e_second.begin(), e_second.size());
 #else
 			// This tends to repeatedly process extents that were recently processed.
 			// We tend to catch duplicate blocks early since we scan them forwards.
@@ -515,7 +515,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 				BEESCOUNT(pairforward_hole);
 				break;
 			}
-			posix_fadvise(second.fd(), e_second.begin(), e_second.size(), POSIX_FADV_WILLNEED);
+			readahead(second.fd(), e_second.begin(), e_second.size());
 		}
 		BEESCOUNT(pairforward_try);
 

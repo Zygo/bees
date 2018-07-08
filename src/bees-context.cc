@@ -313,7 +313,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	}
 
 	// OK we need to read extent now
-	posix_fadvise(bfr.fd(), bfr.begin(), bfr.size(), POSIX_FADV_WILLNEED);
+	readahead(bfr.fd(), bfr.begin(), bfr.size());
 
 	map<off_t, pair<BeesHash, BeesAddress>> insert_map;
 	set<off_t> noinsert_set;
