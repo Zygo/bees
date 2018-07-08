@@ -81,21 +81,21 @@ namespace crucible {
 // macro for throwing an error
 #define THROW_ERROR(type, expr) do { \
 	std::ostringstream _te_oss; \
-	_te_oss << expr; \
+	_te_oss << expr << " at " << __FILE__ << ":" << __LINE__; \
 	throw type(_te_oss.str()); \
 } while (0)
 
 // macro for throwing a system_error with errno
 #define THROW_ERRNO(expr) do { \
 	std::ostringstream _te_oss; \
-	_te_oss << expr; \
+	_te_oss << expr << " at " << __FILE__ << ":" << __LINE__; \
 	throw std::system_error(std::error_code(errno, std::system_category()), _te_oss.str()); \
 } while (0)
 
 // macro for throwing a system_error with some other variable
 #define THROW_ERRNO_VALUE(value, expr) do { \
 	std::ostringstream _te_oss; \
-	_te_oss << expr; \
+	_te_oss << expr << " at " << __FILE__ << ":" << __LINE__; \
 	throw std::system_error(std::error_code((value), std::system_category()), _te_oss.str()); \
 } while (0)
 
