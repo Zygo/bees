@@ -535,13 +535,19 @@ Command Line Options
 --------------------
 
 * --thread-count (-c) COUNT
-  * Specify number of worker threads for scanning.  Overrides --thread-factor (-C)
-    and default/autodetected values.
+  * Specify maximum number of worker threads for scanning.  Overrides
+    --thread-factor (-C) and default/autodetected values.
 * --thread-factor (-C) FACTOR
   * Specify ratio of worker threads to CPU cores.  Overridden by --thread-count (-c).
     Default is 1.0, i.e. 1 worker thread per detected CPU.  Use values
     below 1.0 to leave some cores idle, or above 1.0 if there are more
     disks than CPUs in the filesystem.
+* --loadavg-target (-g) LOADAVG
+  * Specify load average target for dynamic worker threads.
+    Threads will be started or stopped subject to the upper limit imposed
+    by thread-factor and thread-count until the load average is within
+    +/- 0.5 of LOADAVG.
+
 * --scan-mode (-m) MODE
   * Specify extent scanning algorithm.  Default mode is 0.
     _EXPERIMENTAL_ feature that may go away.
@@ -552,6 +558,7 @@ Command Line Options
       on non-spinning media when subvols are unrelated.
     * Mode 2: scan all extents from one subvol at a time.  Good sequential
       read performance for spinning media.  Maximizes temporary space usage.
+
 * --timestamps (-t)
   * Enable timestamps in log output.
 * --no-timestamps (-T)

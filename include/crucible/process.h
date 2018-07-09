@@ -74,5 +74,8 @@ namespace crucible {
 	typedef ResourceHandle<Process::id, Process> Pid;
 
 	pid_t gettid();
+	double getloadavg1();
+	double getloadavg5();
+	double getloadavg15();
 }
 #endif // CRUCIBLE_PROCESS_H

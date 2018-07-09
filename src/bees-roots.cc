@@ -244,6 +244,7 @@ BeesRoots::transid_max()
 size_t
 BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 {
+	BEESNOTE("Crawling batch " << this_crawl->get_state_begin());
 	auto ctx_copy = m_ctx;
 	size_t batch_count = 0;
 	auto subvol = this_crawl->get_state_begin().m_root;
@@ -257,6 +258,7 @@ BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 		}
 		auto this_hold = this_crawl->hold_state(this_range);
 		auto shared_this_copy = shared_from_this();
+		BEESNOTE("Starting task " << this_range);
 		Task(task_title, [ctx_copy, this_hold, this_range, shared_this_copy]() {
 			BEESNOTE("scan_forward " << this_range);
 			ctx_copy->scan_forward(this_range);
@@ -357,6 +359,7 @@ BeesRoots::crawl_roots()
 		case SCAN_MODE_COUNT: assert(false); break;
 	}
 
+	BEESNOTE("Crawl done");
 	BEESCOUNT(crawl_done);
 
 	auto want_transid = m_transid_re.count() + m_transid_factor;

@@ -3,6 +3,7 @@
 #include "crucible/chatter.h"
 #include "crucible/error.h"
 
+#include <cstdlib>
 #include <utility>
 
 // for gettid()
@@ -116,6 +117,39 @@ namespace crucible {
 	gettid()
 	{
 		return syscall(SYS_gettid);
+	}
+
+	double
+	getloadavg1()
+	{
+		double loadavg[1];
+		const int rv = ::getloadavg(loadavg, 1);
+		if (rv != 1) {
+			THROW_ERRNO("getloadavg(..., 1)");
+		}
+		return loadavg[0];
+	}
+
+	double
+	getloadavg5()
+	{
+		double loadavg[2];
+		const int rv = ::getloadavg(loadavg, 2);
+		if (rv != 2) {
+			THROW_ERRNO("getloadavg(..., 2)");
+		}
+		return loadavg[1];
+	}
+
+	double
+	getloadavg15()
+	{
+		double loadavg[3];
+		const int rv = ::getloadavg(loadavg, 3);
+		if (rv != 3) {
+			THROW_ERRNO("getloadavg(..., 3)");
+		}
+		return loadavg[2];
 	}
 
 }

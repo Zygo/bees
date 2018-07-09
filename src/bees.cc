@@ -45,7 +45,8 @@ do_cmd_help(char *argv[])
 		"\t-h, --help\t\tShow this help\n"
 		"\t-c, --thread-count\tWorker thread count (default CPU count * factor)\n"
 		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
-		"\t-m, --scan-mode\t\tScanning mode (0..1, default 0)\n"
+		"\t-g, --loadavg-target\t\tTarget load average for worker threads (default is no target)\n"
+		"\t-m, --scan-mode\t\tScanning mode (0..2, default 0)\n"
 		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
 		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
 		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
@@ -652,24 +653,26 @@ bees_main(int argc, char *argv[])
 	bool chatter_prefix_timestamp = true;
 	double thread_factor = 0;
 	unsigned thread_count = 0;
+	double load_target = 0;
 
 	// Parse options
 	int c;
 	while (1) {
 		int option_index = 0;
-		static struct option long_options[] = {
+		static const struct option long_options[] = {
 			{ "thread-factor",  required_argument, NULL, 'C' },
 			{ "strip-paths",    no_argument,       NULL, 'P' },
 			{ "no-timestamps",  no_argument,       NULL, 'T' },
 			{ "thread-count",   required_argument, NULL, 'c' },
 			{ "help",           no_argument,       NULL, 'h' },
+			{ "loadavg-target", required_argument, NULL, 'g' },
 			{ "scan-mode", 	    required_argument, NULL, 'm' },
 			{ "absolute-paths", no_argument,       NULL, 'p' },
 			{ "timestamps",     no_argument,       NULL, 't' },
 			{ "verbose",        required_argument, NULL, 'v' },
 		};
 
-		c = getopt_long(argc, argv, "C:PTc:hm:ptv:", long_options, &option_index);
+		c = getopt_long(argc, argv, "C:PTc:hg:m:ptv:", long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
@@ -688,6 +691,9 @@ bees_main(int argc, char *argv[])
 			case 'c':
 				thread_count = stoul(optarg);
 				break;
+			case 'g':
+				load_target = stod(optarg);
+				break;
 			case 'm':
 				BeesRoots::set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
 				break;
@@ -700,7 +706,8 @@ bees_main(int argc, char *argv[])
 			case 'v':
 				{
 					int new_log_level = stoul(optarg);
-					THROW_CHECK1(out_of_range, new_log_level, new_log_level >= 0 || new_log_level <= 8);
+					THROW_CHECK1(out_of_range, new_log_level, new_log_level <= 8);
+					THROW_CHECK1(out_of_range, new_log_level, new_log_level >= 0);
 					bees_log_level = new_log_level;
 					BEESLOGNOTICE("log level set to " << bees_log_level);
 				}
@@ -739,6 +746,12 @@ bees_main(int argc, char *argv[])
 		thread_count = max(1U, static_cast<unsigned>(ceil(thread::hardware_concurrency() * thread_factor)));
 	}
 
+	if (load_target != 0) {
+		BEESLOGNOTICE("setting load average target to " << load_target);
+	}
+	TaskMaster::set_loadavg_target(load_target);
+
+	BEESLOGNOTICE("setting worker thread pool maximum size to " << load_target);
 	TaskMaster::set_thread_count(thread_count);
 
 	// Create a context and start crawlers

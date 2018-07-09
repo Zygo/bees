@@ -61,6 +61,9 @@ namespace crucible {
 		// Calls set_thread_count with default
 		static void set_thread_count();
 
+		// Creates thread to track load average and adjust thread count dynamically
+		static void set_loadavg_target(double target);
+
 		// Writes the current non-executing Task queue
 		static ostream & print_queue(ostream &);
 
