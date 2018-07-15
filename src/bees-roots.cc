@@ -380,13 +380,10 @@ BeesRoots::crawl_thread()
 	m_crawl_task = Task("crawl_master", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
-		bool run_again = false;
-		while (tqs < BEES_MAX_QUEUE_SIZE) {
+		bool run_again = true;
+		while (tqs < BEES_MAX_QUEUE_SIZE && run_again) {
 			run_again = shared_this->crawl_roots();
 			tqs = TaskMaster::get_queue_count();
-			if (!run_again) {
-				break;
-			}
 		}
 		if (run_again) {
 			shared_this->m_crawl_task.run();
