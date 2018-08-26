@@ -363,7 +363,7 @@ Bees can be installed by following one these instructions:
 Arch package
 ------------
 
-Bees is availabe in Arch Linux AUR. Install with:
+Bees is available in Arch Linux AUR. Install with:
 
 `$ pacaur -S bees-git`
 
