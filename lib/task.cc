@@ -43,6 +43,7 @@ namespace crucible {
 		condition_variable 			m_condvar;
 		list<shared_ptr<TaskState>>		m_queue;
 		size_t					m_thread_max;
+		size_t					m_thread_min = 0;
 		set<shared_ptr<TaskConsumer>>		m_threads;
 		shared_ptr<thread>			m_load_tracking_thread;
 		double					m_load_target = 0;
@@ -56,6 +57,7 @@ namespace crucible {
 		void start_threads_nolock();
 		void start_stop_threads();
 		void set_thread_count(size_t thread_max);
+		void set_thread_min_count(size_t thread_min);
 		void adjust_thread_count();
 		size_t calculate_thread_count_nolock();
 		void set_loadavg_target(double target);
@@ -269,7 +271,7 @@ namespace crucible {
 		m_thread_target = min(max(0.0, m_thread_target), double(m_configured_thread_max));
 
 		// Convert to integer but keep within range
-		const size_t rv = min(size_t(ceil(m_thread_target)), m_configured_thread_max);
+		const size_t rv = max(m_thread_min, min(size_t(ceil(m_thread_target)), m_configured_thread_max));
 
 		return rv;
 	}
@@ -304,6 +306,22 @@ namespace crucible {
 	TaskMaster::set_thread_count(size_t thread_max)
 	{
 		s_tms->set_thread_count(thread_max);
+	}
+
+	void
+	TaskMasterState::set_thread_min_count(size_t thread_min)
+	{
+		unique_lock<mutex> lock(m_mutex);
+		m_thread_min = thread_min;
+		lock.unlock();
+		adjust_thread_count();
+		start_stop_threads();
+	}
+
+	void
+	TaskMaster::set_thread_min_count(size_t thread_min)
+	{
+		s_tms->set_thread_min_count(thread_min);
 	}
 
 	void

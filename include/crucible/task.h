@@ -58,6 +58,9 @@ namespace crucible {
 		// Blocks until the running thread count reaches this number
 		static void set_thread_count(size_t threads);
 
+		// Sets minimum thread count when load average tracking enabled
+		static void set_thread_min_count(size_t min_threads);
+
 		// Calls set_thread_count with default
 		static void set_thread_count();
 

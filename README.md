@@ -545,8 +545,11 @@ Command Line Options
 * --loadavg-target (-g) LOADAVG
   * Specify load average target for dynamic worker threads.
     Threads will be started or stopped subject to the upper limit imposed
-    by thread-factor and thread-count until the load average is within
-    +/- 0.5 of LOADAVG.
+    by thread-factor, thread-min and thread-count until the load average
+    is within +/- 0.5 of LOADAVG.
+* --thread-min (-G) COUNT
+  * Specify minimum number of worker threads for scanning.
+    Ignored unless -g option is used to specify a target load.
 
 * --scan-mode (-m) MODE
   * Specify extent scanning algorithm.  Default mode is 0.
