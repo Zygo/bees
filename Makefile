@@ -22,8 +22,9 @@ include Defines.mk
 
 default: $(DEFAULT_MAKE_TARGET)
 
-all: lib src scripts README.html
-reallyall: all test
+all: lib src scripts
+docs: README.html
+reallyall: all docs test
 
 clean: ## Cleanup
 	git clean -dfx -e localconf
@@ -76,5 +77,5 @@ install: install_bees install_scripts $(OPTIONAL_INSTALL_TARGETS)
 help: ## Show help
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##/\t/'
 
-bees: all
+bees: reallyall
 fly: install
