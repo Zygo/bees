@@ -14,50 +14,82 @@ export UUID AL16M
 readonly AL16M="$((16*1024*1024))"
 readonly CONFIG_DIR=@ETC_PREFIX@/bees/
 
+readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
+
+command -v "$bees_bin" &> /dev/null || ERRO "Missing 'bees' agent"
+
+uuid_valid(){
+    if uuidparse -n -o VARIANT $1 | grep -i -q invalid; then
+        false
+    fi
+}
+
+help(){
+    echo "Usage: beesd [options] <btrfs_uuid>"
+    echo "- - -"
+    exec "$bees_bin" --help
+}
+
+get_bees_supp_opts(){
+    "$bees_bin" --help |& awk '/--../ { gsub( ",", "" ); print $1 " " $2}'
+}
+
+SUPPORTED_ARGS=(
+    $(get_bees_supp_opts)
+)
+NOT_SUPPORTED_ARGS=()
+ARGUMENTS=()
+
+for arg in "${@}"; do
+    supp=false
+    for supp_arg in "${SUPPORTED_ARGS[@]}"; do
+        if [ "$arg" == "$supp_arg" ]; then
+            supp=true
+            break
+        fi
+    done
+    if $supp; then
+        ARGUMENTS+=($arg)
+    else
+        NOT_SUPPORTED_ARGS+=($arg)
+    fi
+done
+
+for arg in "${ARGUMENTS[@]}"; do
+    case $arg in
+        -h) help;;
+        --help) help;;
+    esac
+done
+
+for arg in "${NOT_SUPPORTED_ARGS[@]}"; do
+    if uuid_valid $arg; then
+        [ ! -z "$UUID" ] && help
+        UUID=$arg
+    fi
+done
+
+[ -z "$UUID" ] && help
+
+
+FILE_CONFIG=""
+for file in "$CONFIG_DIR"/*.conf; do
+    [ ! -f "$file" ] && continue
+        if grep -q 'UUID=' "$file" | grep -q -- "$UUID"; then
+            INFO "Find $UUID in $file, use as conf"
+            FILE_CONFIG="$file"
+        fi
+done
+[ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
+source "$FILE_CONFIG"
+
+
 ## Pre checks
 {
     [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
     [ "$UID" == "0" ] || ERRO "Must be run as root"
 }
 
-command -v @LIBEXEC_PREFIX@/bees &> /dev/null || ERRO "Missing 'bees' agent"
-
-## Parse args
-ARGUMENTS=()
-while [ $# -gt 0 ]; do
-    case "$1" in
-        -*)
-            ARGUMENTS+=($1)
-        ;;
-        *)
-            if [ -z "$UUID" ]; then
-                UUID="$1"
-            else
-                ERRO "Only one filesystem may be supplied"
-            fi
-        ;;
-    esac
-    shift
-done
-
-case "$UUID" in
-    *-*-*-*-*)
-        FILE_CONFIG=""
-        for file in "$CONFIG_DIR"/*.conf; do
-            [ ! -f "$file" ] && continue
-            if grep -q "$UUID" "$file"; then
-                INFO "Find $UUID in $file, use as conf"
-                FILE_CONFIG="$file"
-            fi
-        done
-        [ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
-        source "$FILE_CONFIG"
-    ;;
-    *)
-        echo "beesd [options] <btrfs_uuid>"
-        exit 1
-    ;;
-esac
 
 WORK_DIR="${WORK_DIR:-/run/bees/}"
 MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
@@ -113,7 +145,7 @@ fi
     chmod 700 "$DB_PATH"
 }
 
-MNT_DIR="${MNT_DIR//\/\//\/}"
+MNT_DIR="$(realpath $MNT_DIR)"
 
 cd "$MNT_DIR"
-@LIBEXEC_PREFIX@/bees "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
+"$bees_bin" "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
