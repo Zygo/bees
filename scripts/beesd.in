@@ -75,7 +75,7 @@ done
 FILE_CONFIG=""
 for file in "$CONFIG_DIR"/*.conf; do
     [ ! -f "$file" ] && continue
-        if grep -q 'UUID=' "$file" | grep -q -- "$UUID"; then
+        if grep 'UUID=' "$file" | grep -q -- "$UUID"; then
             INFO "Find $UUID in $file, use as conf"
             FILE_CONFIG="$file"
         fi
