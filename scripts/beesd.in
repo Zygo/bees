@@ -72,15 +72,9 @@ done
 [ -z "$UUID" ] && help
 
 
-FILE_CONFIG=""
-for file in "$CONFIG_DIR"/*.conf; do
-    [ ! -f "$file" ] && continue
-        if grep -q 'UUID=' "$file" | grep -q -- "$UUID"; then
-            INFO "Find $UUID in $file, use as conf"
-            FILE_CONFIG="$file"
-        fi
-done
+FILE_CONFIG="$(egrep -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
 [ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
+INFO "Find $UUID in $FILE_CONFIG, use as conf"
 source "$FILE_CONFIG"
 
 
