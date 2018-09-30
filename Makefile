@@ -7,8 +7,6 @@ LIBEXEC_PREFIX ?= $(LIB_PREFIX)/bees
 
 SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemunitdir)
 
-MARKDOWN := $(firstword $(shell type -P markdown markdown2 markdown_py 2>/dev/null || echo markdown))
-
 BEES_VERSION ?= $(shell git describe --always --dirty || echo UNKNOWN)
 
 # allow local configuration to override above variables
@@ -25,13 +23,12 @@ include Defines.mk
 default: $(DEFAULT_MAKE_TARGET)
 
 all: lib src scripts
-docs: README.html
-reallyall: all docs test
+reallyall: all doc test
 
 clean: ## Cleanup
 	git clean -dfx -e localconf
 
-.PHONY: lib src test
+.PHONY: lib src test doc
 
 lib: ## Build libs
 	$(MAKE) -C lib
@@ -44,14 +41,13 @@ test: ## Run tests
 test: lib src
 	$(MAKE) -C test
 
+doc: ## Build docs
+	$(MAKE) -C docs
+
 scripts/%: scripts/%.in
 	$(TEMPLATE_COMPILER)
 
 scripts: scripts/beesd scripts/beesd@.service
-
-README.html: README.md
-	$(MARKDOWN) README.md > README.html.new
-	mv -f README.html.new README.html
 
 install_libs: lib
 	install -Dm644 lib/libcrucible.so $(DESTDIR)$(LIB_PREFIX)/libcrucible.so

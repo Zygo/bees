@@ -31,30 +31,30 @@ Weaknesses
  * Runs continuously as a daemon - no quick start/stop
  * Requires root privilege (or `CAP_SYS_ADMIN`)
  * First run may require temporary disk space for extent reorganization
- * [First run may increase metadata space usage if many snapshots exist](docs/gotchas.md)
+ * [First run may increase metadata space usage if many snapshots exist](gotchas.md)
  * Constant hash table size - no decreased RAM usage if data set becomes smaller
  * btrfs only
 
 Installation and Usage
 ----------------------
 
- * [Installation](docs/install.md)
- * [Configuration](docs/config.md)
- * [Running](docs/running.md)
- * [Command Line Options](docs/options.md)
+ * [Installation](install.md)
+ * [Configuration](config.md)
+ * [Running](running.md)
+ * [Command Line Options](options.md)
 
 Recommended Reading
 -------------------
 
- * [bees Gotchas](docs/gotchas.md)
- * [btrfs kernel bugs](docs/btrfs-kernel.md)
- * [bees vs. other btrfs features](docs/btrfs-other.md)
+ * [bees Gotchas](gotchas.md)
+ * [btrfs kernel bugs](btrfs-kernel.md)
+ * [bees vs. other btrfs features](btrfs-other.md)
 
 More Information
 ----------------
 
- * [How bees works](docs/how-it-works.md)
- * [Missing bees features](docs/missing.md)
+ * [How bees works](how-it-works.md)
+ * [Missing bees features](missing.md)
 
 Bug Reports and Contributions
 -----------------------------
