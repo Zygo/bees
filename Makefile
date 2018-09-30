@@ -9,6 +9,8 @@ SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemun
 
 MARKDOWN := $(firstword $(shell type -P markdown markdown2 markdown_py 2>/dev/null || echo markdown))
 
+BEES_VERSION ?= $(shell git describe --always --dirty || echo UNKNOWN)
+
 # allow local configuration to override above variables
 -include localconf
 
@@ -36,7 +38,7 @@ lib: ## Build libs
 
 src: ## Build bins
 src: lib
-	$(MAKE) -C src
+	$(MAKE) BEES_VERSION="$(BEES_VERSION)" -C src
 
 test: ## Run tests
 test: lib src
