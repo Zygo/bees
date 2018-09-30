@@ -20,7 +20,7 @@ BEES_OBJS = \
 	bees-types.o \
 
 bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
-	echo "const char *BEES_VERSION = \"$(shell git describe --always --dirty || echo UNKNOWN)\";" > bees-version.new.c
+	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.new.c
 	mv -f bees-version.new.c bees-version.c
 
 .depends/%.dep: %.cc Makefile
