@@ -49,6 +49,7 @@ Recommended Reading
  * [bees Gotchas](docs/gotchas.md)
  * [btrfs kernel bugs](docs/btrfs-kernel.md)
  * [bees vs. other btrfs features](docs/btrfs-other.md)
+ * [What to do when something goes wrong](docs/wrong.md)
 
 More Information
 ----------------
