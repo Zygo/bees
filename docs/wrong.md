@@ -96,7 +96,15 @@ bees Crashes
   **Note that this output may include filenames or data from your
   filesystem.**
 
- * If the crash happens often (or you just want to be extra prepared),
+ * If you have `systemd-coredump` installed, you can use `coredumpctl`:
+
+        (echo set pagination off;
+        echo info shared;
+        echo bt;
+        echo thread apply all bt;
+        echo thread apply all bt full) | coredumpctl gdb bees
+
+ * If the crash happens often (or don't want to use coredumpctl),
    you can run automate the gdb data collection with this wrapper script:
 
 <pre>
