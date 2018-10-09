@@ -30,5 +30,5 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 #     1TB                16MB               1024K
 #    64TB                 1GB               1024K
 #
-# Size MUST be power of 16M
-# DB_SIZE=$((64*$AL16M)) # 1G in bytes
+# Size MUST be multiple of 128KB
+# DB_SIZE=$((8192*$AL128K)) # 1G in bytes
