@@ -514,7 +514,9 @@ BeesHashTable::push_random_hash_addr(HashType hash, AddrType addr)
 	auto pos = distribution(generator);
 
 	int case_cond = 0;
+#if 0
 	vector<Cell> saved(er.first, er.second);
+#endif
 
 	if (found) {
 		// If hash already exists after pos, swap with pos
