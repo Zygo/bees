@@ -13,7 +13,7 @@ Create a directory for bees state files:
         mkdir -p "$BEESHOME"
 
 Create an empty hash table ([your choice of size](config.md), but it
-must be a multiple of 16MB).  This example creates a 1GB hash table:
+must be a multiple of 128KB).  This example creates a 1GB hash table:
 
         truncate -s 1g "$BEESHOME/beeshash.dat"
         chmod 700 "$BEESHOME/beeshash.dat"
@@ -50,7 +50,7 @@ Configuration
 There are some runtime configurable options using environment variables:
 
 * BEESHOME: Directory containing bees state files:
-	* beeshash.dat  | persistent hash table.  Must be a multiple of 16MB, and must be created before bees starts.
+	* beeshash.dat  | persistent hash table.  Must be a multiple of 128KB, and must be created before bees starts.
 	* beescrawl.dat | state of SEARCH_V2 crawlers.  ASCII text.  bees will create this.
 	* beesstats.txt | statistics and performance counters.  ASCII text.  bees will create this.
 * BEESSTATUS: File containing a snapshot of current bees state:  performance

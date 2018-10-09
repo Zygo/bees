@@ -56,7 +56,7 @@ const off_t BLOCK_SIZE_MAX_TEMP_FILE = 1024 * 1024 * 1024;
 const off_t BLOCK_SIZE_HASHTAB_BUCKET = BLOCK_SIZE_MMAP;
 
 // Extent size for hash table (since the nocow file attribute does not seem to be working today)
-const off_t BLOCK_SIZE_HASHTAB_EXTENT = 16 * 1024 * 1024;
+const off_t BLOCK_SIZE_HASHTAB_EXTENT = BLOCK_SIZE_MAX_COMPRESSED_EXTENT;
 
 // Bytes per second we want to flush (8GB every two hours)
 const double BEES_FLUSH_RATE = 8.0 * 1024 * 1024 * 1024 / 7200.0;

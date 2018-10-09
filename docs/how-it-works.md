@@ -16,7 +16,7 @@ be stored on a different btrfs filesystem, ext4, or even CIFS.
 bees uses a persistent dedupe hash table with a fixed size configured
 by the user.  Any size of hash table can be dedicated to dedupe.  If a
 fast dedupe with low hit rate is desired, bees can use a hash table as
-small as 16MB.
+small as 128KB.
 
 The bees hash table is loaded into RAM at startup and `mlock`ed so it
 will not be swapped out by the kernel (if swap is permitted, performance
