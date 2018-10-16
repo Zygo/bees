@@ -605,6 +605,7 @@ struct BeesHash {
 	BeesHash(Type that) : m_hash(that) { }
 	operator Type() const { return m_hash; }
 	BeesHash& operator=(const Type that) { m_hash = that; return *this; }
+	BeesHash(const uint8_t *ptr, size_t len);
 private:
 	Type	m_hash;
 

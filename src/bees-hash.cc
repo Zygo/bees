@@ -1,5 +1,6 @@
 #include "bees.h"
 
+#include "crucible/city.h"
 #include "crucible/crc64.h"
 #include "crucible/string.h"
 
@@ -10,6 +11,12 @@
 
 using namespace crucible;
 using namespace std;
+
+BeesHash::BeesHash(const uint8_t *ptr, size_t len) :
+	// m_hash(CityHash64(reinterpret_cast<const char *>(ptr), len))
+	m_hash(Digest::CRC::crc64(ptr, len))
+{
+}
 
 ostream &
 operator<<(ostream &os, const BeesHash &bh)

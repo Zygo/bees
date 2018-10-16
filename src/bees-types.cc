@@ -1,6 +1,5 @@
 #include "bees.h"
 
-#include "crucible/crc64.h"
 #include "crucible/limits.h"
 #include "crucible/ntoa.h"
 #include "crucible/string.h"
@@ -964,11 +963,7 @@ BeesBlockData::hash() const
 		// We can only dedup unaligned EOF blocks against other unaligned EOF blocks,
 		// so we do NOT round up to a full sum block size.
 		const Blob &blob = data();
-		// TODO:  It turns out that file formats with 4K block
-		// alignment and embedded CRC64 do exist, and every block
-		// of such files has the same hash.  Could use a subset
-		// of SHA1 here instead.
-		m_hash = Digest::CRC::crc64(blob.data(), blob.size());
+		m_hash = BeesHash(blob.data(), blob.size());
 		m_hash_done = true;
 		BEESCOUNT(block_hash);
 	}
@@ -980,9 +975,8 @@ bool
 BeesBlockData::is_data_zero() const
 {
 	// The CRC64 of zero is zero, so skip some work if we already know the CRC
-	if (m_hash_done && m_hash != 0) {
-		return false;
-	}
+	// ...but that doesn't work for any other hash function, and it
+	// saves us next to nothing.
 
 	// OK read block (maybe) and check every byte
 	for (auto c : data()) {
