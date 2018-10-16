@@ -5,6 +5,7 @@ default: libcrucible.a
 
 CRUCIBLE_OBJS = \
 	chatter.o \
+	city.o \
 	cleanup.o \
 	crc64.o \
 	error.o \
