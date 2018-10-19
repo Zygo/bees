@@ -46,8 +46,8 @@ BeesCrawlState::BeesCrawlState() :
 bool
 BeesCrawlState::operator<(const BeesCrawlState &that) const
 {
-	return tie(m_min_transid, m_objectid, m_offset, m_root, m_max_transid)
-		< tie(that.m_min_transid, that.m_objectid, that.m_offset, that.m_root, that.m_max_transid);
+	return tie(m_min_transid, m_max_transid, m_objectid, m_offset, m_root)
+		< tie(that.m_min_transid, that.m_max_transid, that.m_objectid, that.m_offset, that.m_root);
 }
 
 string
