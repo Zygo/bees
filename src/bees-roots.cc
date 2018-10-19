@@ -527,6 +527,16 @@ BeesRoots::state_load()
 			loaded_state.m_started = d.at("started");
 		}
 		BEESLOGDEBUG("loaded_state " << loaded_state);
+		if (loaded_state.m_min_transid == numeric_limits<uint64_t>::max()) {
+			BEESLOGWARN("WARNING: root " << loaded_state.m_root << ": bad min_transid " << loaded_state.m_min_transid << ", resetting to 0");
+			loaded_state.m_min_transid = 0;
+			BEESCOUNT(bug_bad_min_transid);
+		}
+		if (loaded_state.m_max_transid == numeric_limits<uint64_t>::max()) {
+			BEESLOGWARN("WARNING: root " << loaded_state.m_root << ": bad max_transid " << loaded_state.m_max_transid << ", resetting to " << loaded_state.m_min_transid);
+			loaded_state.m_max_transid = loaded_state.m_min_transid;
+			BEESCOUNT(bug_bad_max_transid);
+		}
 		insert_root(loaded_state);
 	}
 }
