@@ -185,9 +185,12 @@ BeesRoots::transid_min()
 		return 0;
 	}
 	uint64_t rv = numeric_limits<uint64_t>::max();
+	const uint64_t max_rv = rv;
 	for (auto i : m_root_crawl_map) {
 		rv = min(rv, i.second->get_state_end().m_min_transid);
 	}
+	// If we get through this loop without setting rv, we'll create broken crawlers due to integer overflow.
+	THROW_CHECK2(runtime_error, rv, max_rv, max_rv > rv);
 	return rv;
 }
 
