@@ -761,6 +761,15 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
 	THROW_CHECK1(invalid_argument, addr, !addr.is_magic());
 	THROW_CHECK0(invalid_argument, !!root_fd());
+
+	// There can be only one of these running at a time, or the slow
+	// backrefs bug will kill the whole system.  Also it looks like there
+	// are so many locks held while LOGICAL_INO runs that there is no
+	// point in trying to run two of them on the same filesystem.
+	BEESNOTE("waiting to resolve addr " << addr);
+	static mutex s_resolve_mutex;
+	unique_lock<mutex> lock(s_resolve_mutex);
+
 	Timer resolve_timer;
 
 	// There is no performance benefit if we restrict the buffer size.
@@ -768,6 +777,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 
 	{
 		BEESTOOLONG("Resolving addr " << addr << " in " << root_path() << " refs " << log_ino.m_iors.size());
+		BEESNOTE("resolving addr " << addr << " with LOGICAL_INO");
 		if (log_ino.do_ioctl_nothrow(root_fd())) {
 			BEESCOUNT(resolve_ok);
 		} else {
