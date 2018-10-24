@@ -54,10 +54,9 @@ string
 BeesRoots::scan_mode_ntoa(BeesRoots::ScanMode mode)
 {
 	static const bits_ntoa_table table[] = {
-		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ZERO),
-		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_ONE),
-		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_TWO),
-		NTOA_TABLE_ENTRY_ENUM(SCAN_MODE_COUNT),
+		{ .n = SCAN_MODE_LOCKSTEP, .mask = ~0ULL, .a = "lockstep" },
+		{ .n = SCAN_MODE_INDEPENDENT, .mask = ~0ULL, .a = "independent" },
+		{ .n = SCAN_MODE_SEQUENTIAL, .mask = ~0ULL, .a = "sequential" },
 		NTOA_TABLE_ENTRY_END()
 	};
 	return bits_ntoa(mode, table);
@@ -269,8 +268,8 @@ BeesRoots::crawl_roots()
 
 	switch (m_scan_mode) {
 
-		case SCAN_MODE_ZERO: {
-			// Scan the same inode/offset tuple in each subvol (good for snapshots)
+		case SCAN_MODE_LOCKSTEP: {
+			// Scan the same inode/offset tuple in each subvol (bad for locking)
 			BeesFileRange first_range;
 			shared_ptr<BeesCrawl> first_crawl;
 			for (auto i : crawl_map_copy) {
@@ -301,7 +300,7 @@ BeesRoots::crawl_roots()
 			break;
 		}
 
-		case SCAN_MODE_ONE: {
+		case SCAN_MODE_INDEPENDENT: {
 			// Scan each subvol one extent at a time (good for continuous forward progress)
 			size_t batch_count = 0;
 			for (auto i : crawl_map_copy) {
@@ -315,7 +314,7 @@ BeesRoots::crawl_roots()
 			break;
 		}
 
-		case SCAN_MODE_TWO: {
+		case SCAN_MODE_SEQUENTIAL: {
 			// Scan oldest crawl first (requires maximum amount of temporary space)
 			vector<shared_ptr<BeesCrawl>> crawl_vector;
 			for (auto i : crawl_map_copy) {

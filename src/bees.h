@@ -594,12 +594,11 @@ public:
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
 	bool is_root_ro(uint64_t root);
 
-	// TODO:  think of better names for these.
-	// or TODO:  do extent-tree scans instead
+	// TODO:  do extent-tree scans instead
 	enum ScanMode {
-		SCAN_MODE_ZERO,
-		SCAN_MODE_ONE,
-		SCAN_MODE_TWO,
+		SCAN_MODE_LOCKSTEP,
+		SCAN_MODE_INDEPENDENT,
+		SCAN_MODE_SEQUENTIAL,
 		SCAN_MODE_COUNT, // must be last
 	};
 
@@ -607,7 +606,7 @@ public:
 	void set_workaround_btrfs_send(bool do_avoid);
 
 private:
-	ScanMode m_scan_mode = SCAN_MODE_ZERO;
+	ScanMode m_scan_mode = SCAN_MODE_LOCKSTEP;
 	static string scan_mode_ntoa(ScanMode new_mode);
 
 };
