@@ -699,8 +699,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	mutable mutex					m_blacklist_mutex;
 	set<BeesFileId>					m_blacklist;
 
-	string						m_uuid;
-
 	Timer						m_total_timer;
 
 	LockSet<uint64_t>				m_extent_lock_set;
