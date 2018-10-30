@@ -150,6 +150,10 @@ BeesContext::show_progress()
 Fd
 BeesContext::home_fd()
 {
+	if (!!m_home_fd) {
+		return m_home_fd;
+	}
+
 	const char *base_dir = getenv("BEESHOME");
 	if (!base_dir) {
 		base_dir = ".beeshome";
