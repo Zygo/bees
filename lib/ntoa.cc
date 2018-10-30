@@ -1,8 +1,7 @@
 #include "crucible/ntoa.h"
 
-#include <cassert>
-#include <sstream>
-#include <string>
+#include "crucible/error.h"
+#include "crucible/string.h"
 
 namespace crucible {
 	using namespace std;
@@ -12,7 +11,7 @@ namespace crucible {
 		string out;
 		while (n && table->a) {
 			// No bits in n outside of mask
-			assert( ((~table->mask) & table->n) == 0);
+			THROW_CHECK2(invalid_argument, table->mask, table->n, ((~table->mask) & table->n) == 0);
 			if ( (n & table->mask) == table->n) {
 				if (!out.empty()) {
 					out += "|";
@@ -23,12 +22,10 @@ namespace crucible {
 			++table;
 		}
 		if (n) {
-			ostringstream oss;
-			oss << "0x" << hex << n;
 			if (!out.empty()) {
 				out += "|";
 			}
-			out += oss.str();
+			out += to_hex(n);
 		}
 		if (out.empty()) {
 			out = "0";
