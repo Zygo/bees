@@ -202,8 +202,38 @@ BeesRoots::transid_max_nocache()
 	BEESNOTE("Calculating transid_max (" << rv << " as of root " << root << ")");
 	BEESTRACE("Calculating transid_max...");
 
-	rv = btrfs_get_root_transid(m_ctx->root_fd());
+	rv = btrfs_get_root_transid(root);
 
+	// XXX:  Do we need any of this?  Or is
+	// m_transid_re.update(btrfs_get_root_transid(BTRFS_FS_TREE_OBJECTID)) good enough?
+
+	BtrfsIoctlSearchKey sk;
+	sk.tree_id = BTRFS_ROOT_TREE_OBJECTID;
+	sk.min_type = sk.max_type = BTRFS_ROOT_BACKREF_KEY;
+	sk.min_objectid = root;
+
+	while (true) {
+		sk.nr_items = 1024;
+		sk.do_ioctl(m_ctx->root_fd());
+
+		if (sk.m_result.empty()) {
+			break;
+		}
+
+		for (auto i : sk.m_result) {
+			sk.next_min(i);
+			if (i.type == BTRFS_ROOT_BACKREF_KEY) {
+				if (i.transid > rv) {
+					BEESLOGDEBUG("transid_max root " << i.objectid << " parent " << i.offset << " transid " << i.transid);
+					BEESCOUNT(transid_max_miss);
+				}
+				root = i.objectid;
+			}
+			if (i.transid > rv) {
+				rv = i.transid;
+			}
+		}
+	}
 	m_transid_re.update(rv);
 	return rv;
 }
