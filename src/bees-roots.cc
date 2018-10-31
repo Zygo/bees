@@ -207,19 +207,15 @@ uint64_t
 BeesRoots::transid_max_nocache()
 {
 	uint64_t rv = 0;
-	uint64_t root = BTRFS_FS_TREE_OBJECTID;
-	BEESNOTE("Calculating transid_max (" << rv << " as of root " << root << ")");
-	BEESTRACE("Calculating transid_max...");
+	BEESNOTE("Calculating transid_max");
+	BEESTRACE("Calculating transid_max");
 
-	rv = btrfs_get_root_transid(root);
-
-	// XXX:  Do we need any of this?  Or is
-	// m_transid_re.update(btrfs_get_root_transid(BTRFS_FS_TREE_OBJECTID)) good enough?
-
+	// We look for the root of the extent tree and read its transid.
+	// Should run in O(1) time and be fairly reliable.
 	BtrfsIoctlSearchKey sk;
 	sk.tree_id = BTRFS_ROOT_TREE_OBJECTID;
-	sk.min_type = sk.max_type = BTRFS_ROOT_BACKREF_KEY;
-	sk.min_objectid = root;
+	sk.min_type = sk.max_type = BTRFS_ROOT_ITEM_KEY;
+	sk.min_objectid = sk.max_objectid = BTRFS_EXTENT_TREE_OBJECTID;
 
 	while (true) {
 		sk.nr_items = 1024;
@@ -230,21 +226,18 @@ BeesRoots::transid_max_nocache()
 			break;
 		}
 
+		// We are just looking for the highest transid on the filesystem.
+		// We don't care which object it comes from.
 		for (auto i : sk.m_result) {
 			sk.next_min(i);
-			if (i.type == BTRFS_ROOT_BACKREF_KEY) {
-				if (i.transid > rv) {
-					BEESLOGDEBUG("transid_max root " << i.objectid << " parent " << i.offset << " transid " << i.transid);
-					BEESCOUNT(transid_max_miss);
-				}
-				root = i.objectid;
-			}
 			if (i.transid > rv) {
 				rv = i.transid;
 			}
 		}
 	}
-	m_transid_re.update(rv);
+
+	// transid must be greater than zero, or we did something very wrong
+	THROW_CHECK1(runtime_error, rv, rv > 0);
 	return rv;
 }
 
