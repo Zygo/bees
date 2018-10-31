@@ -32,7 +32,7 @@ using namespace std;
 
 int bees_log_level = 8;
 
-int
+void
 do_cmd_help(char *argv[])
 {
 	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
@@ -73,7 +73,6 @@ do_cmd_help(char *argv[])
 		"\n"
 	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
 	<< endl;
-	return 0;
 }
 
 // tracing ----------------------------------------
@@ -654,10 +653,10 @@ bees_main(int argc, char *argv[])
 	BeesNote::set_name("bees");
 	BEESNOTE("main");
 
-	list<shared_ptr<BeesContext>> all_contexts;
-	shared_ptr<BeesContext> bc;
-
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
+
+	// Create a context so we can apply configuration to it
+	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
 
 	string cwd(readlink_or_die("/proc/self/cwd"));
 
@@ -704,7 +703,7 @@ bees_main(int argc, char *argv[])
 
 	// Parse options
 	int c;
-	while (1) {
+	while (true) {
 		int option_index = 0;
 
 		c = getopt_long(argc, argv, getopt_list.c_str(), long_options, &option_index);
@@ -755,10 +754,15 @@ bees_main(int argc, char *argv[])
 				break;
 
 			case 'h':
-				do_cmd_help(argv); // fallthrough
 			default:
-				return 2;
+				do_cmd_help(argv);
+				return EXIT_FAILURE;
 		}
+	}
+
+	if (optind + 1 != argc) {
+		BEESLOGERR("Only one filesystem path per bees process");
+		return EXIT_FAILURE;
 	}
 
 	Chatter::enable_timestamp(chatter_prefix_timestamp);
@@ -806,18 +810,7 @@ bees_main(int argc, char *argv[])
 	bc->roots()->set_workaround_btrfs_send(workaround_btrfs_send);
 
 	// Create a context and start crawlers
-	bool did_subscription = false;
-	while (optind < argc) {
-		catch_all([&]() {
-			bc = make_shared<BeesContext>(bc);
-			bc->set_root_path(argv[optind++]);
-			did_subscription = true;
-		});
-	}
-
-	if (!did_subscription) {
-		BEESLOGWARN("WARNING: no filesystems added");
-	}
+	bc->set_root_path(argv[optind++]);
 
 	BeesThread status_thread("status", [&]() {
 		bc->dump_status();
@@ -827,7 +820,7 @@ bees_main(int argc, char *argv[])
 	bc->show_progress();
 
 	// That is all.
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 int
@@ -837,7 +830,7 @@ main(int argc, char *argv[])
 
 	if (argc < 2) {
 		do_cmd_help(argv);
-		return 2;
+		return EXIT_FAILURE;
 	}
 
 	int rv = 1;
