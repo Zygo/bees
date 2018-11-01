@@ -88,11 +88,8 @@ const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
 // Log warnings when an operation takes too long
 const double BEES_TOO_LONG = 5.0;
 
-// Avoid any extent where LOGICAL_INO takes this long
-const double BEES_TOXIC_DURATION = 9.9;
-// EXPERIMENT:  Kernel v4.14+ may let us ignore toxicity
-// NOPE:  kernel 4.14 has the same toxicity problems as any previous kernel
-// const double BEES_TOXIC_DURATION = 99.9;
+// Avoid any extent where LOGICAL_INO takes this much kernel CPU time
+const double BEES_TOXIC_SYS_DURATION = 0.1;
 
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;

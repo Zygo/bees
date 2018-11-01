@@ -8,6 +8,11 @@
 #include <iostream>
 #include <vector>
 
+// round
+#include <cmath>
+// struct rusage
+#include <sys/resource.h>
+
 using namespace crucible;
 using namespace std;
 
@@ -766,6 +771,12 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	THROW_CHECK1(invalid_argument, addr, !addr.is_magic());
 	THROW_CHECK0(invalid_argument, !!root_fd());
 
+#if 0
+	// If we look at per-thread CPU usage we get a better estimate of
+	// how badly btrfs is performing without confounding factors like
+	// transaction latency, competing threads, and freeze/SIGSTOP
+	// pausing the bees process.
+
 	// There can be only one of these running at a time, or the slow
 	// backrefs bug will kill the whole system.  Also it looks like there
 	// are so many locks held while LOGICAL_INO runs that there is no
@@ -773,11 +784,16 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	BEESNOTE("waiting to resolve addr " << addr);
 	static mutex s_resolve_mutex;
 	unique_lock<mutex> lock(s_resolve_mutex);
+#endif
 
+	// Time how long this takes
 	Timer resolve_timer;
 
-	// There is no performance benefit if we restrict the buffer size.
         BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
+
+	// Get this thread's system CPU usage
+	struct rusage usage_before;
+	DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_before));
 
 	{
 		BEESTOOLONG("Resolving addr " << addr << " in " << root_path() << " refs " << log_ino.m_iors.size());
@@ -790,16 +806,27 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 		BEESCOUNTADD(resolve_ms, resolve_timer.age() * 1000);
 	}
 
-	// Prevent unavoidable performance bug from crippling the rest of the system
+	// Again!
+	struct rusage usage_after;
+	DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_after));
+
+	double sys_usage_delta =
+		(usage_after.ru_stime.tv_sec + usage_after.ru_stime.tv_usec / 1000000.0) -
+		(usage_before.ru_stime.tv_sec + usage_before.ru_stime.tv_usec / 1000000.0);
+
+	double user_usage_delta =
+		(usage_after.ru_utime.tv_sec + usage_after.ru_utime.tv_usec / 1000000.0) -
+		(usage_before.ru_utime.tv_sec + usage_before.ru_utime.tv_usec / 1000000.0);
+
 	auto rt_age = resolve_timer.age();
 
 	// Avoid performance bug
 	BeesResolveAddrResult rv;
 	rv.m_biors = log_ino.m_iors;
-	if (rt_age < BEES_TOXIC_DURATION && log_ino.m_iors.size() < BEES_MAX_EXTENT_REF_COUNT) {
+	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION && log_ino.m_iors.size() < BEES_MAX_EXTENT_REF_COUNT) {
 		rv.m_is_toxic = false;
 	} else {
-		BEESLOGWARN("WORKAROUND: toxic address " << addr << " in " << root_path() << " with " << log_ino.m_iors.size() << " refs took " << rt_age << "s in LOGICAL_INO");
+		BEESLOGNOTICE("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << log_ino.m_iors.size());
 		BEESCOUNT(resolve_toxic);
 		rv.m_is_toxic = true;
 	}
