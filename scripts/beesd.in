@@ -9,9 +9,10 @@ YN(){ [[ "$1" =~ (1|Y|y) ]]; }
 export BEESHOME BEESSTATUS
 export WORK_DIR CONFIG_DIR
 export CONFIG_FILE
-export UUID AL128K
+export UUID AL16M AL128K
 
 readonly AL128K="$((128*1024))"
+readonly AL16M="$((16*1024*1024))"
 readonly CONFIG_DIR=@ETC_PREFIX@/bees/
 
 readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
