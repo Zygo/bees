@@ -441,7 +441,6 @@ private:
 	BeesThread  		m_writeback_thread;
 	BeesThread	        m_prefetch_thread;
 	RateLimiter		m_flush_rate_limit;
-	set<HashType>		m_toxic_hashes;
 	BeesStringFile		m_stats_file;
 
 	// Mutex/condvar for the writeback thread
@@ -468,7 +467,6 @@ private:
 	void set_extent_dirty_locked(uint64_t extent_index);
 	void flush_dirty_extents();
 	bool flush_dirty_extent(uint64_t extent_index);
-	bool is_toxic_hash(HashType h) const;
 
 	size_t			hash_to_extent_index(HashType ht);
 	unique_lock<mutex>	lock_extent_by_hash(HashType ht);

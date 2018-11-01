@@ -384,25 +384,9 @@ BeesHashTable::fetch_missing_extent_by_hash(HashType hash)
 	fetch_missing_extent_by_index(extent_index);
 }
 
-bool
-BeesHashTable::is_toxic_hash(BeesHashTable::HashType hash) const
-{
-	return m_toxic_hashes.find(hash) != m_toxic_hashes.end();
-}
-
 vector<BeesHashTable::Cell>
 BeesHashTable::find_cell(HashType hash)
 {
-	// This saves a lot of time prefilling the hash table, and there's no risk of eviction
-	if (is_toxic_hash(hash)) {
-		BEESCOUNT(hash_toxic);
-		BeesAddress toxic_addr(0x1000);
-		toxic_addr.set_toxic();
-		Cell toxic_cell(hash, toxic_addr);
-		vector<Cell> rv;
-		rv.push_back(toxic_cell);
-		return rv;
-	}
 	fetch_missing_extent_by_hash(hash);
 	BEESTOOLONG("find_cell hash " << BeesHash(hash));
 	vector<Cell> rv;
@@ -716,13 +700,6 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	catch_all([&]() {
 		m_ctx->blacklist_add(BeesFileId(m_fd));
 	});
-
-	// Skip zero because we already weed that out before it gets near a hash function
-	for (unsigned i = 1; i < 256; ++i) {
-		vector<uint8_t> v(BLOCK_SIZE_SUMS, i);
-		HashType hash = Digest::CRC::crc64(v.data(), v.size());
-		m_toxic_hashes.insert(hash);
-	}
 }
 
 BeesHashTable::~BeesHashTable()
