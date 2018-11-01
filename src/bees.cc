@@ -276,9 +276,10 @@ BeesStatTmpl<T>::add_count(string idx, size_t amount)
 {
 	unique_lock<mutex> lock(m_mutex);
 	if (!m_stats_map.count(idx)) {
-		m_stats_map[idx] = 0;
+		m_stats_map[idx] = amount;
+	} else {
+		m_stats_map[idx] += amount;
 	}
-	m_stats_map.at(idx) += amount;
 }
 
 template <class T>
