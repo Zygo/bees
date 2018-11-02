@@ -202,4 +202,9 @@
 					   struct btrfs_ioctl_search_args_v2)
 #endif
 
+#ifndef BTRFS_IOC_LOGICAL_INO_V2
+#define BTRFS_IOC_LOGICAL_INO_V2 _IOWR(BTRFS_IOCTL_MAGIC, 59, struct btrfs_ioctl_logical_ino_args)
+#define BTRFS_LOGICAL_INO_ARGS_IGNORE_OFFSET (1ULL << 0)
+#endif
+
 #endif // CRUCIBLE_BTRFS_H

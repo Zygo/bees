@@ -238,11 +238,13 @@ namespace crucible {
 	}
 
 	void *
-	BtrfsDataContainer::prepare()
+	BtrfsDataContainer::prepare(size_t container_size)
 	{
+		if (m_data.size() < container_size) {
+			m_data.resize(container_size);
+		}
 		btrfs_data_container *p = reinterpret_cast<btrfs_data_container *>(m_data.data());
-		size_t min_size = offsetof(btrfs_data_container, val);
-		size_t container_size = m_data.size();
+		const size_t min_size = offsetof(btrfs_data_container, val);
 		if (container_size < min_size) {
 			THROW_ERROR(out_of_range, "container size " << container_size << " smaller than minimum " << min_size);
 		}
@@ -301,33 +303,123 @@ namespace crucible {
 	}
 
 	BtrfsIoctlLogicalInoArgs::BtrfsIoctlLogicalInoArgs(uint64_t new_logical, size_t new_size) :
-		m_container(new_size)
+		m_container_size(new_size)
 	{
 		memset_zero<btrfs_ioctl_logical_ino_args>(this);
 		logical = new_logical;
+	}
+
+	size_t
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::size() const
+	{
+		return m_end - m_begin;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::const_iterator
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::cbegin() const
+	{
+		return m_begin;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::const_iterator
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::cend() const
+	{
+		return m_end;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::iterator
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::begin() const
+	{
+		return m_begin;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::iterator
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::end() const
+	{
+		return m_end;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::iterator
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::data() const
+	{
+		return m_begin;
+	}
+
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::operator vector<BtrfsInodeOffsetRoot>() const
+	{
+		return vector<BtrfsInodeOffsetRoot>(m_begin, m_end);
+	}
+
+	void
+	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::clear()
+	{
+		m_end = m_begin = nullptr;
+	}
+
+	void
+	BtrfsIoctlLogicalInoArgs::set_flags(uint64_t new_flags)
+	{
+		// We are still supporting building with old headers that don't have .flags yet
+		reserved[3] = new_flags;
+	}
+
+	uint64_t
+	BtrfsIoctlLogicalInoArgs::get_flags() const
+	{
+		// We are still supporting building with old headers that don't have .flags yet
+		return reserved[3];
 	}
 
 	bool
 	BtrfsIoctlLogicalInoArgs::do_ioctl_nothrow(int fd)
 	{
 		btrfs_ioctl_logical_ino_args *p = static_cast<btrfs_ioctl_logical_ino_args *>(this);
-		inodes = reinterpret_cast<uint64_t>(m_container.prepare());
-		size = m_container.get_size();
+		thread_local BtrfsDataContainer container;
+		inodes = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
+		size = container.get_size();
 
 		m_iors.clear();
 
-		if (ioctl(fd, BTRFS_IOC_LOGICAL_INO, p)) {
-			return false;
+		static unsigned long bili_version = 0;
+
+		if (get_flags() == 0) {
+			// Could use either V1 or V2
+			if (bili_version) {
+				// We tested both versions and came to a decision
+				if (ioctl(fd, bili_version, p)) {
+					return false;
+				}
+			}  else {
+				// Try V2
+				if (ioctl(fd, BTRFS_IOC_LOGICAL_INO_V2, p)) {
+					// V2 failed, try again with V1
+					if (ioctl(fd, BTRFS_IOC_LOGICAL_INO, p)) {
+						// both V1 and V2 failed, doesn't tell us which one to choose
+						return false;
+					}
+					// V1 and V2 both tested with same arguments, V1 OK, and V2 failed
+					bili_version = BTRFS_IOC_LOGICAL_INO;
+				} else {
+					// V2 succeeded, don't use V1 any more
+					bili_version = BTRFS_IOC_LOGICAL_INO_V2;
+				}
+			}
+		} else {
+			// Flags/size require a V2 feature, no fallback to V1 possible
+			if (ioctl(fd, BTRFS_IOC_LOGICAL_INO_V2, p)) {
+				return false;
+			}
+			// V2 succeeded so we don't need to probe any more
+			bili_version = BTRFS_IOC_LOGICAL_INO_V2;
 		}
 
 		btrfs_data_container *bdc = reinterpret_cast<btrfs_data_container *>(p->inodes);
 		BtrfsInodeOffsetRoot *input_iter = reinterpret_cast<BtrfsInodeOffsetRoot *>(bdc->val);
-		m_iors.reserve(bdc->elem_cnt);
 
-		for (auto count = bdc->elem_cnt; count > 2; count -= 3) {
-			m_iors.push_back(*input_iter++);
-		}
-
+		// elem_cnt counts uint64_t, but BtrfsInodeOffsetRoot is 3x uint64_t
+		THROW_CHECK1(runtime_error, bdc->elem_cnt, bdc->elem_cnt % 3 == 0);
+		m_iors.m_begin = input_iter;
+		m_iors.m_end = input_iter + bdc->elem_cnt / 3;
 		return true;
 	}
 
@@ -350,7 +442,7 @@ namespace crucible {
 	}
 
 	BtrfsIoctlInoPathArgs::BtrfsIoctlInoPathArgs(uint64_t inode, size_t new_size) :
-		m_container(new_size)
+		m_container_size(new_size)
 	{
 		memset_zero<btrfs_ioctl_ino_path_args>(this);
 		inum = inode;
@@ -360,8 +452,9 @@ namespace crucible {
 	BtrfsIoctlInoPathArgs::do_ioctl_nothrow(int fd)
 	{
 		btrfs_ioctl_ino_path_args *p = static_cast<btrfs_ioctl_ino_path_args *>(this);
-		fspath = reinterpret_cast<uint64_t>(m_container.prepare());
-		size = m_container.get_size();
+		thread_local BtrfsDataContainer container;
+		fspath = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
+		size = m_container_size;
 
 		m_paths.clear();
 
@@ -377,8 +470,8 @@ namespace crucible {
 
 		for (auto count = bdc->elem_cnt; count > 0; --count) {
 			const char *path = cp + *up++;
-			if (static_cast<size_t>(path - cp) > m_container.get_size()) {
-				THROW_ERROR(out_of_range, "offset " << (path - cp) << " > size " << m_container.get_size() << " in " << __PRETTY_FUNCTION__);
+			if (static_cast<size_t>(path - cp) > container.get_size()) {
+				THROW_ERROR(out_of_range, "offset " << (path - cp) << " > size " << container.get_size() << " in " << __PRETTY_FUNCTION__);
 			}
 			m_paths.push_back(string(path));
 		}
