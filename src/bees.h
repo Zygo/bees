@@ -106,11 +106,6 @@ const size_t BEES_MAX_CRAWL_BATCH = 128;
 // Wait this many transids between crawls
 const size_t BEES_TRANSID_FACTOR = 10;
 
-// If an extent has this many refs, pretend it does not exist
-// to avoid a crippling btrfs performance bug
-// The actual limit in LOGICAL_INO seems to be 2730, but let's leave a little headroom
-const size_t BEES_MAX_EXTENT_REF_COUNT = 2560;
-
 // Flags
 const int FLAGS_OPEN_COMMON   = O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC | O_NOATIME | O_LARGEFILE | O_NOCTTY;
 const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;

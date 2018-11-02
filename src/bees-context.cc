@@ -823,7 +823,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// Avoid performance bug
 	BeesResolveAddrResult rv;
 	rv.m_biors = log_ino.m_iors;
-	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION && log_ino.m_iors.size() < BEES_MAX_EXTENT_REF_COUNT) {
+	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION) {
 		rv.m_is_toxic = false;
 	} else {
 		BEESLOGNOTICE("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << log_ino.m_iors.size());
