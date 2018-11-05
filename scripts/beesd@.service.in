@@ -6,20 +6,19 @@ After=sysinit.target
 [Service]
 Type=simple
 ExecStart=@PREFIX@/sbin/beesd --no-timestamps %i
-Nice=19
-KillMode=control-group
-KillSignal=SIGTERM
-CPUShares=128
-StartupCPUShares=256
-BlockIOWeight=100
-StartupBlockIOWeight=250
+CPUAccounting=true
+CPUSchedulingPolicy=batch
+CPUWeight=12
 IOSchedulingClass=idle
 IOSchedulingPriority=7
-CPUSchedulingPolicy=batch
+IOWeight=10
+KillMode=control-group
+KillSignal=SIGTERM
+MemoryAccounting=true
 Nice=19
 Restart=on-abnormal
-CPUAccounting=true
-MemoryAccounting=true
+StartupCPUWeight=25
+StartupIOWeight=25
 
 [Install]
 WantedBy=basic.target
