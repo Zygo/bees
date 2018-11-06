@@ -78,22 +78,16 @@ Other Gotchas
 -------------
 
 * bees avoids the [slow backrefs kernel bug](btrfs-kernel.md) by
-  measuring the time required to perform `LOGICAL_INO` operations.  If an
-  extent requires over 10 seconds to perform a `LOGICAL_INO` then bees
-  blacklists the extent and avoids referencing it in future operations.
-  In most cases, fewer than 0.1% of extents in a filesystem must be
-  avoided this way.  This results in short write latency spikes of up
-  to and a little over 10 seconds as btrfs will not allow writes to the
+  measuring the time required to perform `LOGICAL_INO` operations.
+  If an extent requires over 0.1 kernel CPU seconds to perform a
+  `LOGICAL_INO` ioctl, then bees blacklists the extent and avoids
+  referencing it in future operations.  In most cases, fewer than 0.1%
+  of extents in a filesystem must be avoided this way.  This results
+  in short write latency spikes as btrfs will not allow writes to the
   filesystem while `LOGICAL_INO` is running.  Generally the CPU spends
   most of the runtime of the `LOGICAL_INO` ioctl running the kernel,
-  so on a single-core CPU the entire system can freeze up for a few
-  seconds at a time.
-
-* Load managers that send a `SIGSTOP` to the bees process to throttle
-  CPU usage may affect the `LOGICAL_INO` timing mechanism, causing extents
-  to be incorrectly labelled 'toxic'.  This will cause a small reduction
-  of dedupe hit rate.  Slow and heavily loaded disks can trigger the same
-  effect if `LOGICAL_INO` takes too long due to IO latency.
+  so on a single-core CPU the entire system can freeze up for a second
+  during operations on toxic extents.
 
 * If a process holds a directory FD open, the subvol containing the
   directory cannot be deleted (`btrfs sub del` will start the deletion

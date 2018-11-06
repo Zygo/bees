@@ -38,19 +38,23 @@ Unfixed kernel bugs (as of 4.14.71):
   `rsync` is copying from, while `rsync` will rename the new file over
   the old file to replace it.
 
+* **btrfs send** has various problems when bees is deduping RO snapshots,
+  especially if the snapshot is used as a parent for incremental send.
+
 Minor kernel problems with workarounds:
 
-* **Slow backrefs** (aka toxic extents): If the number of references to a
-  single shared extent within a single file grows above a few thousand,
-  the kernel consumes CPU for minutes at a time while holding various
-  locks that block access to the filesystem.  bees avoids this bug
-  by measuring the time the kernel spends performing `LOGICAL_INO`
-  operations and permanently blacklisting any extent or hash involved
-  where the kernel starts to get slow.  Inside bees, such blocks are
-  known as 'toxic' hash/block addresses.
+* **Slow backrefs** (aka toxic extents):  Under certain conditions,
+  if the number of references to a single shared extent grows too high,
+  the kernel consumes more and more CPU while holding locks that block
+  access to the filesystem.  bees avoids this bug by measuring the time
+  the kernel spends performing `LOGICAL_INO` operations and permanently
+  blacklisting any extent or hash involved where the kernel starts
+  to get slow.  In the bees log, such blocks are labelled as 'toxic'
+  hash/block addresses.
 
-* **`FILE_EXTENT_SAME` is arbitrarily limited to 16MB**.  This is
-  less than 128MB which is the maximum extent size that can be created
-  by defrag, prealloc, or filesystems without the `compress-force`
-  mount option.  bees avoids feedback loops this can generate while
-  attempting to replace extents over 16MB in length.
+Older kernels:
+
+* Older kernels have various data corruption and deadlock/hang issues
+  that are no longer listed here, and older kernels are missing important
+  features such as `LOGICAL_INO_V2`.  Using an older kernel is not
+  recommended.

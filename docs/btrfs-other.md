@@ -31,7 +31,8 @@ bees has been tested in combination with the following, and various problems are
 * btrfs send:  some kernel versions have bugs in btrfs send that can be
   triggered by bees.  The send can be restarted and will work if bees
   has finished processing the snapshot being sent.  No data corruption
-  observed other than the truncated send.
+  observed other than the truncated send.  Incremental send doesn't seem
+  to work with bees running on the sending side.
 * btrfs qgroups:  very slow, sometimes hangs...and it's even worse when
   bees is running.
 * btrfs autodefrag mount option:  hangs and high CPU usage problems
