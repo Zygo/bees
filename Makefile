@@ -31,18 +31,18 @@ clean: ## Cleanup
 .PHONY: lib src test doc
 
 lib: ## Build libs
-	$(MAKE) -C lib
+	+$(MAKE) -C lib
 
 src: ## Build bins
 src: lib
-	$(MAKE) BEES_VERSION="$(BEES_VERSION)" -C src
+	+$(MAKE) BEES_VERSION="$(BEES_VERSION)" -C src
 
 test: ## Run tests
 test: lib src
-	$(MAKE) -C test
+	+$(MAKE) -C test
 
 doc: ## Build docs
-	$(MAKE) -C docs
+	+$(MAKE) -C docs
 
 scripts/%: scripts/%.in
 	$(TEMPLATE_COMPILER)
