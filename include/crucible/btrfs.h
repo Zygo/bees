@@ -23,6 +23,7 @@
 #undef min
 #undef max
 #undef mutex
+#undef swap
 
 #ifndef BTRFS_FIRST_FREE_OBJECTID
 
