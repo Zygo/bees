@@ -22,6 +22,8 @@ CRUCIBLE_OBJS = \
 include ../makeflags
 include ../Defines.mk
 
+BEES_LDFLAGS = $(LDFLAGS)
+
 configure.h: configure.h.in
 	$(TEMPLATE_COMPILER)
 
@@ -29,7 +31,7 @@ configure.h: configure.h.in
 	mkdir -p $@
 
 .depends/%.dep: %.cc configure.h Makefile | .depends
-	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
 depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
 	cat $^ > $@.new
@@ -42,7 +44,7 @@ depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
 include depends.mk
 
 %.o: %.cc ../makeflags
-	$(CXX) $(CXXFLAGS) -fPIC -o $@ -c $<
+	$(CXX) $(BEES_CXXFLAGS) -fPIC -o $@ -c $<
 
 libcrucible.so: $(CRUCIBLE_OBJS) .version.o
-	$(CXX) $(LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^ -luuid
+	$(CXX) $(BEES_LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^ -luuid

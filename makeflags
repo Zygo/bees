@@ -1,11 +1,13 @@
 # Default:
-CCFLAGS  = -Wall -Wextra -Werror -I../include -fpic -D_FILE_OFFSET_BITS=64
+CCFLAGS = -Wall -Wextra -Werror -O3
 
 # Optimized:
-# CCFLAGS  = -Wall -Wextra -Werror -O3 -march=native -I../include -fpic -D_FILE_OFFSET_BITS=64
+# CCFLAGS = -Wall -Wextra -Werror -O3 -march=native
 
 # Debug:
-# CCFLAGS  = -Wall -Wextra -Werror -O0 -I../include -ggdb -fpic -D_FILE_OFFSET_BITS=64
+# CCFLAGS = -Wall -Wextra -Werror -O0 -ggdb
 
-CFLAGS   += $(CCFLAGS) -std=c99
-CXXFLAGS += $(CCFLAGS) -std=c++11 -Wold-style-cast
+CCFLAGS += -I../include -fpic -D_FILE_OFFSET_BITS=64
+
+BEES_CFLAGS   = $(CCFLAGS) -std=c99 $(CFLAGS)
+BEES_CXXFLAGS = $(CCFLAGS) -std=c++11 -Wold-style-cast $(CXXFLAGS)

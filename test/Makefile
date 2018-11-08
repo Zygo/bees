@@ -16,13 +16,13 @@ FORCE:
 include ../makeflags
 
 LIBS = -lcrucible -lpthread
-LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
+BEES_LDFLAGS = -L../lib -Wl,-rpath=$(abspath ../lib) $(LDFLAGS)
 
 .depends:
 	mkdir -p $@
 
 .depends/%.dep: %.cc tests.h Makefile | .depends
-	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
 depends.mk: $(PROGRAMS:%=.depends/%.dep)
 	cat $^ > $@.new
@@ -30,13 +30,11 @@ depends.mk: $(PROGRAMS:%=.depends/%.dep)
 
 include depends.mk
 
-%.o: %.cc %.h ../makeflags Makefile
-	@echo "Implicit rule %.o: %.cc"
-	$(CXX) $(CXXFLAGS) -o $@ -c $<
+$(PROGRAMS:%=%.o): %.o: %.cc ../makeflags Makefile
+	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
 $(PROGRAMS): %: %.o ../makeflags Makefile
-	@echo "Implicit rule %: %.o"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $< $(LIBS)
 
 %.txt: % Makefile FORCE
 	./$< >$@ 2>&1 || (RC=$$?; cat $@; exit $$RC)

@@ -1,14 +1,14 @@
+BEES = ../bin/bees
 PROGRAMS = \
-	../bin/bees \
 	../bin/fiemap \
 	../bin/fiewalk \
 
-all: $(PROGRAMS)
+all: $(BEES) $(PROGRAMS)
 
 include ../makeflags
 
 LIBS = -lcrucible -lpthread
-LDFLAGS = -L../lib
+BEES_LDFLAGS = -L../lib $(LDFLAGS)
 
 BEES_OBJS = \
 	bees.o \
@@ -27,7 +27,7 @@ bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
 	mkdir -p $@
 
 .depends/%.dep: %.cc Makefile | .depends
-	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
+	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
 depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
 	cat $^ > $@.new
@@ -35,15 +35,17 @@ depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
 
 include depends.mk
 
-%.o: %.cc %.h
-	$(CXX) $(CXXFLAGS) -o $@ -c $<
+$(BEES_OBJS) fiemap.o fiewalk.o: %.o: %.cc
+	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
-../bin/%: %.o
-	@echo Implicit bin rule "$<" '->' "$@"
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+$(PROGRAMS): ../bin/%: %.o
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $< $(LIBS)
 
-../bin/bees: $(BEES_OBJS) bees-version.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+bees-version.o: %.o: %.c
+	$(CC) $(BEES_CFLAGS) -o $@ -c $<
+
+$(BEES): $(BEES_OBJS) bees-version.o
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
 	rm -fv *.o bees-version.c
