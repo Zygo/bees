@@ -23,8 +23,10 @@ bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
 	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.new.c
 	mv -f bees-version.new.c bees-version.c
 
-.depends/%.dep: %.cc Makefile
-	@mkdir -p .depends
+.depends:
+	mkdir -p $@
+
+.depends/%.dep: %.cc Makefile | .depends
 	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
 depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)

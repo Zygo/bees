@@ -25,8 +25,10 @@ include ../Defines.mk
 configure.h: configure.h.in
 	$(TEMPLATE_COMPILER)
 
-.depends/%.dep: %.cc configure.h Makefile
-	@mkdir -p .depends
+.depends:
+	mkdir -p $@
+
+.depends/%.dep: %.cc configure.h Makefile | .depends
 	$(CXX) $(CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
 depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
