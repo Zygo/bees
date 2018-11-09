@@ -95,6 +95,7 @@ namespace crucible {
 			iterator m_end = nullptr;
 		friend struct BtrfsIoctlLogicalInoArgs;
 		} m_iors;
+		BtrfsDataContainer m_container;
 	};
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlLogicalInoArgs &p);

@@ -303,7 +303,8 @@ namespace crucible {
 	}
 
 	BtrfsIoctlLogicalInoArgs::BtrfsIoctlLogicalInoArgs(uint64_t new_logical, size_t new_size) :
-		m_container_size(new_size)
+		m_container_size(new_size),
+		m_container(new_size)
 	{
 		memset_zero<btrfs_ioctl_logical_ino_args>(this);
 		logical = new_logical;
@@ -374,9 +375,8 @@ namespace crucible {
 	BtrfsIoctlLogicalInoArgs::do_ioctl_nothrow(int fd)
 	{
 		btrfs_ioctl_logical_ino_args *p = static_cast<btrfs_ioctl_logical_ino_args *>(this);
-		thread_local BtrfsDataContainer container;
-		inodes = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
-		size = container.get_size();
+		inodes = reinterpret_cast<uint64_t>(m_container.prepare(m_container_size));
+		size = m_container.get_size();
 
 		m_iors.clear();
 
@@ -452,7 +452,7 @@ namespace crucible {
 	BtrfsIoctlInoPathArgs::do_ioctl_nothrow(int fd)
 	{
 		btrfs_ioctl_ino_path_args *p = static_cast<btrfs_ioctl_ino_path_args *>(this);
-		thread_local BtrfsDataContainer container;
+		BtrfsDataContainer container(m_container_size);
 		fspath = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
 		size = m_container_size;
 
@@ -816,13 +816,8 @@ namespace crucible {
 		// Keep the ioctl buffer from one run to the next to save on malloc costs
 		size_t target_buf_size = sizeof(btrfs_ioctl_search_args_v2) + m_buf_size;
 
-		thread_local vector<char> ioctl_arg;
-		if (ioctl_arg.size() < m_buf_size) {
-			ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
-			ioctl_arg.resize(target_buf_size);
-		} else {
-			memcpy(ioctl_arg.data(), static_cast<btrfs_ioctl_search_key*>(this), sizeof(btrfs_ioctl_search_key));
-		}
+		vector<char> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
+		ioctl_arg.resize(target_buf_size);
 
 		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(ioctl_arg.data());
 
