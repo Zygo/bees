@@ -169,6 +169,12 @@ namespace crucible {
 		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
 
+	// Perf blames this function for a few percent overhead; move it here so it can be inline
+	inline bool BtrfsIoctlSearchHeader::operator<(const BtrfsIoctlSearchHeader &that) const
+	{
+		return tie(objectid, type, offset, len, transid) < tie(that.objectid, that.type, that.offset, that.len, that.transid);
+	}
+
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_header &hdr);
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchHeader &hdr);
 

@@ -757,12 +757,6 @@ namespace crucible {
 	}
 
 	bool
-	BtrfsIoctlSearchHeader::operator<(const BtrfsIoctlSearchHeader &that) const
-	{
-		return tie(objectid, type, offset, len, transid) < tie(that.objectid, that.type, that.offset, that.len, that.transid);
-	}
-
-	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
 	{
 		// Normally we like to be paranoid and fill empty bytes with zero,
