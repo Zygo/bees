@@ -823,6 +823,8 @@ namespace crucible {
 
 		ioctl_ptr->buf_size = m_buf_size;
 
+		m_result.clear();
+
 		// Don't bother supporting V1.  Kernels that old have other problems.
 		int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_ptr);
 		if (rv != 0) {
@@ -830,8 +832,6 @@ namespace crucible {
 		}
 
 		static_cast<btrfs_ioctl_search_key&>(*this) = ioctl_ptr->key;
-
-		m_result.clear();
 
 		size_t offset = pointer_distance(ioctl_ptr->buf, ioctl_ptr);
 		for (decltype(nr_items) i = 0; i < nr_items; ++i) {
