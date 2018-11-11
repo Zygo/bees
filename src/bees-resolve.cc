@@ -161,9 +161,11 @@ BeesResolver::adjust_offset(const BeesFileRange &haystack, const BeesBlockData &
 
 	// Found the hash but not the data.  Yay!
 	m_found_hash = true;
+#if 0
 	BEESLOGINFO("HASH COLLISION\n"
 		<< "\tneedle " << needle << "\n"
 		<< "\tstraw " << straw);
+#endif
 	BEESCOUNT(hash_collision);
 
 	// Ran out of offsets to try
