@@ -627,7 +627,7 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 
 	// We seem to get lockups without this!
 	if (did_block_write) {
-#if 1
+#if 0
 		// Is this fixed by "Btrfs: fix deadlock between dedup on same file and starting writeback"?
 		// No.
 		// Is this fixed in kernel 4.14.34?
