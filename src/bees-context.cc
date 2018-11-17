@@ -179,13 +179,26 @@ BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
 }
 
 bool
+BeesContext::is_root_ro(uint64_t root)
+{
+	return roots()->is_root_ro(root);
+}
+
+bool
 BeesContext::dedup(const BeesRangePair &brp)
 {
 	// TOOLONG and NOTE can retroactively fill in the filename details, but LOG can't
 	BEESNOTE("dedup " << brp);
 
-	brp.first.fd(shared_from_this());
 	brp.second.fd(shared_from_this());
+
+	if (is_root_ro(brp.second.fid().root())) {
+		// BEESLOGDEBUG("WORKAROUND: dst subvol is read-only in " << name_fd(brp.second.fd()));
+		BEESCOUNT(dedup_workaround_btrfs_send);
+		return false;
+	}
+
+	brp.first.fd(shared_from_this());
 
 	BEESTOOLONG("dedup " << brp);
 

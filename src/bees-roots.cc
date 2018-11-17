@@ -11,8 +11,6 @@
 using namespace crucible;
 using namespace std;
 
-BeesRoots::ScanMode BeesRoots::s_scan_mode = BeesRoots::SCAN_MODE_ZERO;
-
 string
 format_time(time_t t)
 {
@@ -67,8 +65,19 @@ void
 BeesRoots::set_scan_mode(ScanMode mode)
 {
 	THROW_CHECK1(invalid_argument, mode, mode < SCAN_MODE_COUNT);
-	s_scan_mode = mode;
+	m_scan_mode = mode;
 	BEESLOGINFO("Scan mode set to " << mode << " (" << scan_mode_ntoa(mode) << ")");
+}
+
+void
+BeesRoots::set_workaround_btrfs_send(bool do_avoid)
+{
+	m_workaround_btrfs_send = do_avoid;
+	if (m_workaround_btrfs_send) {
+		BEESLOGINFO("WORKAROUND: btrfs send workaround enabled");
+	} else {
+		BEESLOGINFO("btrfs send workaround disabled");
+	}
 }
 
 string
@@ -281,7 +290,7 @@ BeesRoots::crawl_roots()
 		BEESLOGINFO("idle: crawl map is empty!");
 	}
 
-	switch (s_scan_mode) {
+	switch (m_scan_mode) {
 
 		case SCAN_MODE_ZERO: {
 			// Scan the same inode/offset tuple in each subvol (good for snapshots)
@@ -367,6 +376,13 @@ BeesRoots::crawl_roots()
 }
 
 void
+BeesRoots::clear_caches()
+{
+	m_ctx->fd_cache()->clear();
+	m_root_ro_cache.clear();
+}
+
+void
 BeesRoots::crawl_thread()
 {
 	BEESNOTE("creating crawl task");
@@ -408,7 +424,7 @@ BeesRoots::crawl_thread()
 		// Even open files are a problem if they're big enough.
 		auto new_count = m_transid_re.count();
 		if (new_count != last_count) {
-			m_ctx->fd_cache()->clear();
+			clear_caches();
 		}
 		last_count = new_count;
 
@@ -541,6 +557,12 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_writeback_thread("crawl_writeback"),
 	m_task_running(false)
 {
+
+	m_root_ro_cache.func([&](uint64_t root) -> bool {
+		return is_root_ro_nocache(root);
+	});
+	m_root_ro_cache.max_size(BEES_ROOT_FD_CACHE_SIZE);
+
 	m_crawl_thread.exec([&]() {
 		// Measure current transid before creating any crawlers
 		catch_all([&]() {
@@ -646,6 +668,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				Stat st(rv);
 				THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
 				// BEESLOGDEBUG("open_root_nocache " << rootid << ": " << name_fd(rv));
+
 				BEESCOUNT(root_ok);
 				return rv;
 			}
@@ -667,6 +690,32 @@ BeesRoots::open_root(uint64_t rootid)
 	return m_ctx->fd_cache()->open_root(m_ctx, rootid);
 }
 
+bool
+BeesRoots::is_root_ro_nocache(uint64_t root)
+{
+	Fd root_fd = open_root(root);
+	BEESTRACE("checking subvol flags on root " << root << " path " << name_fd(root_fd));
+
+	uint64_t flags = 0;
+	DIE_IF_NON_ZERO(ioctl(root_fd, BTRFS_IOC_SUBVOL_GETFLAGS, &flags));
+	if (flags & BTRFS_SUBVOL_RDONLY) {
+		BEESLOGDEBUG("WORKAROUND: Avoiding RO subvol " << root);
+		BEESCOUNT(root_workaround_btrfs_send);
+		return true;
+	}
+	return false;
+}
+
+bool
+BeesRoots::is_root_ro(uint64_t root)
+{
+	// If we are not implementing the workaround there is no need for cache
+	if (!m_workaround_btrfs_send) {
+		return false;
+	}
+
+	return m_root_ro_cache(root);
+}
 
 uint64_t
 BeesRoots::next_root(uint64_t root)
@@ -886,6 +935,20 @@ BeesCrawl::fetch_extents()
 	// We can't scan an empty transid interval.
 	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
 		BEESTRACE("Crawl finished " << get_state_end());
+		return next_transid();
+	}
+
+	// Check for btrfs send workaround: don't scan RO roots at all, pretend
+	// they are just empty.  We can't free any space there, and we
+	// don't have the necessary analysis logic to be able to use
+	// them as dedup src extents (yet).
+	//
+	// This will keep the max_transid up to date so if the root
+	// is ever switched back to read-write, it won't trigger big
+	// expensive in-kernel searches for ancient transids.
+	if (m_ctx->is_root_ro(old_state.m_root)) {
+		BEESLOGDEBUG("WORKAROUND: RO root " << old_state.m_root);
+		BEESCOUNT(root_workaround_btrfs_send);
 		return next_transid();
 	}
 
