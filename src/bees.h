@@ -534,11 +534,14 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
 	atomic<bool>				m_task_running;
 	Task					m_crawl_task;
+	bool					m_workaround_btrfs_send = false;
+	LRUCache<bool, uint64_t>		m_root_ro_cache;
 
 	void insert_new_crawl();
 	void insert_root(const BeesCrawlState &bcs);
 	Fd open_root_nocache(uint64_t root);
 	Fd open_root_ino_nocache(uint64_t root, uint64_t ino);
+	bool is_root_ro_nocache(uint64_t root);
 	uint64_t transid_min();
 	uint64_t transid_max();
 	uint64_t transid_max_nocache();
@@ -555,6 +558,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	void current_state_set(const BeesCrawlState &bcs);
 	RateEstimator& transid_re();
 	size_t crawl_batch(shared_ptr<BeesCrawl> crawl);
+	void clear_caches();
 
 friend class BeesFdCache;
 friend class BeesCrawl;
@@ -564,6 +568,7 @@ public:
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
+	bool is_root_ro(uint64_t root);
 
 	// TODO:  think of better names for these.
 	// or TODO:  do extent-tree scans instead
@@ -574,10 +579,11 @@ public:
 		SCAN_MODE_COUNT, // must be last
 	};
 
-	static void set_scan_mode(ScanMode new_mode);
+	void set_scan_mode(ScanMode new_mode);
+	void set_workaround_btrfs_send(bool do_avoid);
 
 private:
-	static ScanMode s_scan_mode;
+	ScanMode m_scan_mode = SCAN_MODE_ZERO;
 	static string scan_mode_ntoa(ScanMode new_mode);
 
 };
@@ -724,6 +730,7 @@ public:
 
 	BeesFileRange scan_forward(const BeesFileRange &bfr);
 
+	bool is_root_ro(uint64_t root);
 	BeesRangePair dup_extent(const BeesFileRange &src);
 	bool dedup(const BeesRangePair &brp);
 

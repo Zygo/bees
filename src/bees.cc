@@ -35,6 +35,7 @@ int bees_log_level = 8;
 int
 do_cmd_help(char *argv[])
 {
+	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
 	cerr << "Usage: " << argv[0] << " [options] fs-root-path [fs-root-path-2...]\n"
 		"Performs best-effort extent-same deduplication on btrfs.\n"
 		"\n"
@@ -42,25 +43,35 @@ do_cmd_help(char *argv[])
 		"Other directories will be rejected.\n"
 		"\n"
 		"Options:\n"
-		"\t-h, --help\t\tShow this help\n"
-		"\t-c, --thread-count\tWorker thread count (default CPU count * factor)\n"
-		"\t-C, --thread-factor\tWorker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
-		"\t-G, --thread-min\t\tMinimum worker thread count with load average target (default 0)\n"
-		"\t-g, --loadavg-target\t\tTarget load average for worker threads (default is no target)\n"
-		"\t-m, --scan-mode\t\tScanning mode (0..2, default 0)\n"
-		"\t-t, --timestamps\tShow timestamps in log output (default)\n"
-		"\t-T, --no-timestamps\tOmit timestamps in log output\n"
-		"\t-p, --absolute-paths\tShow absolute paths (default)\n"
-		"\t-P, --strip-paths\tStrip $CWD from beginning of all paths in the log\n"
-		"\t-v, --verbose\tSet maximum log level (0..8, default 8)\n"
+		"    -h, --help            Show this help\n"
+		"\n"
+		"Load management options:\n"
+		"    -c, --thread-count    Worker thread count (default CPU count * factor)\n"
+		"    -C, --thread-factor   Worker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
+		"    -G, --thread-min      Minimum worker thread count (default 0)\n"
+		"    -g, --loadavg-target  Target load average for worker threads (default none)\n"
+		"\n"
+		"Filesystem tree traversal options:\n"
+		"    -m, --scan-mode       Scanning mode (0..2, default 0)\n"
+		"\n"
+		"Workarounds:\n"
+		"    -a, --workaround-btrfs-send    Workaround for btrfs send\n"
+		"\n"
+		"Logging options:\n"
+		"    -t, --timestamps      Show timestamps in log output (default)\n"
+		"    -T, --no-timestamps   Omit timestamps in log output\n"
+		"    -p, --absolute-paths  Show absolute paths (default)\n"
+		"    -P, --strip-paths     Strip $CWD from beginning of all paths in the log\n"
+		"    -v, --verbose         Set maximum log level (0..8, default 8)\n"
 		"\n"
 		"Optional environment variables:\n"
-		"\tBEESHOME\tPath to hash table and configuration files\n"
-		"\t\t\t(default is .beeshome/ in the root of each filesystem).\n"
+		"    BEESHOME    Path to hash table and configuration files\n"
+		"                (default is .beeshome/ in the root of each filesystem).\n"
 		"\n"
-		"\tBEESSTATUS\tFile to write status to (tmpfs recommended, e.g. /run).\n"
-		"\t\t\tNo status is written if this variable is unset.\n"
+		"    BEESSTATUS  File to write status to (tmpfs recommended, e.g. /run).\n"
+		"                No status is written if this variable is unset.\n"
 		"\n"
+	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
 	<< endl;
 	return 0;
 }
@@ -656,26 +667,47 @@ bees_main(int argc, char *argv[])
 	unsigned thread_count = 0;
 	unsigned thread_min = 0;
 	double load_target = 0;
+	bool workaround_btrfs_send = false;
+
+	// Configure getopt_long
+	static const struct option long_options[] = {
+		{ "thread-factor",         required_argument, NULL, 'C' },
+		{ "thread-min",            required_argument, NULL, 'G' },
+		{ "strip-paths",           no_argument,       NULL, 'P' },
+		{ "no-timestamps",         no_argument,       NULL, 'T' },
+		{ "workaround-btrfs-send", no_argument,       NULL, 'a' },
+		{ "thread-count",          required_argument, NULL, 'c' },
+		{ "loadavg-target",        required_argument, NULL, 'g' },
+		{ "help",                  no_argument,       NULL, 'h' },
+		{ "scan-mode",             required_argument, NULL, 'm' },
+		{ "absolute-paths",        no_argument,       NULL, 'p' },
+		{ "timestamps",            no_argument,       NULL, 't' },
+		{ "verbose",               required_argument, NULL, 'v' },
+		{ 0, 0, 0, 0 },
+	};
+
+	// Build getopt_long's short option list from the long_options table.
+	// While we're at it, make sure we didn't duplicate any options.
+	string getopt_list;
+	set<decltype(option::val)> option_vals;
+	for (const struct option *op = long_options; op->val; ++op) {
+		THROW_CHECK1(runtime_error, op->val, !option_vals.count(op->val));
+		option_vals.insert(op->val);
+		if ((op->val & 0xff) != op->val) {
+			continue;
+		}
+		getopt_list += op->val;
+		if (op->has_arg == required_argument) {
+			getopt_list += ':';
+		}
+	}
 
 	// Parse options
 	int c;
 	while (1) {
 		int option_index = 0;
-		static const struct option long_options[] = {
-			{ "thread-factor",  required_argument, NULL, 'C' },
-			{ "thread-min",     required_argument, NULL, 'G' },
-			{ "strip-paths",    no_argument,       NULL, 'P' },
-			{ "no-timestamps",  no_argument,       NULL, 'T' },
-			{ "thread-count",   required_argument, NULL, 'c' },
-			{ "loadavg-target", required_argument, NULL, 'g' },
-			{ "help",           no_argument,       NULL, 'h' },
-			{ "scan-mode", 	    required_argument, NULL, 'm' },
-			{ "absolute-paths", no_argument,       NULL, 'p' },
-			{ "timestamps",     no_argument,       NULL, 't' },
-			{ "verbose",        required_argument, NULL, 'v' },
-		};
 
-		c = getopt_long(argc, argv, "C:G:PTc:hg:m:ptv:", long_options, &option_index);
+		c = getopt_long(argc, argv, getopt_list.c_str(), long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
@@ -694,6 +726,9 @@ bees_main(int argc, char *argv[])
 			case 'T':
 				chatter_prefix_timestamp = false;
 				break;
+			case 'a':
+				workaround_btrfs_send = true;
+				break;
 			case 'c':
 				thread_count = stoul(optarg);
 				break;
@@ -701,7 +736,7 @@ bees_main(int argc, char *argv[])
 				load_target = stod(optarg);
 				break;
 			case 'm':
-				BeesRoots::set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
+				bc->roots()->set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
 				break;
 			case 'p':
 				crucible::set_relative_path("");
@@ -761,6 +796,9 @@ bees_main(int argc, char *argv[])
 
 	BEESLOGNOTICE("setting worker thread pool maximum size to " << thread_count);
 	TaskMaster::set_thread_count(thread_count);
+
+	// Workaround for btrfs send
+	bc->roots()->set_workaround_btrfs_send(workaround_btrfs_send);
 
 	// Create a context and start crawlers
 	bool did_subscription = false;
