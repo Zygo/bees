@@ -38,9 +38,6 @@ Unfixed kernel bugs (as of 4.14.71):
   `rsync` is copying from, while `rsync` will rename the new file over
   the old file to replace it.
 
-* **btrfs send** has various problems when bees is deduping RO snapshots,
-  especially if the snapshot is used as a parent for incremental send.
-
 Minor kernel problems with workarounds:
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
@@ -51,6 +48,19 @@ Minor kernel problems with workarounds:
   blacklisting any extent or hash involved where the kernel starts
   to get slow.  In the bees log, such blocks are labelled as 'toxic'
   hash/block addresses.
+
+* **btrfs send** has various bugs that are triggered when bees is
+  deduping snapshots.  bees provides the [`--workaround-btrfs-send`
+  option](options.md) which should be used whenever `btrfs send` and
+  bees are run on the same filesystem.
+
+  This issue affects:
+   * `btrfs send` (any mode) and bees active at the same time.
+   * `btrfs send` in incremental mode (using `-p` option) with bees
+     active at the same or different times.
+
+  Note `btrfs receive` is not affected.  It is OK to run bees with no
+  workarounds on a filesystem that receives btrfs snapshots.
 
 Older kernels:
 

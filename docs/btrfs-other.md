@@ -28,11 +28,9 @@ bees has been tested in combination with the following, and various problems are
 * bcache, lvmcache:  **severe (filesystem-destroying) metadata corruption
   issues** observed in testing and reported by users, apparently only when
   used with bees.  Plain SSD and HDD seem to be OK.
-* btrfs send:  some kernel versions have bugs in btrfs send that can be
-  triggered by bees.  The send can be restarted and will work if bees
-  has finished processing the snapshot being sent.  No data corruption
-  observed other than the truncated send.  Incremental send doesn't seem
-  to work with bees running on the sending side.
+* btrfs send:  there are bugs in `btrfs send` that can be triggered by bees.
+  The [`--workaround-btrfs-send` option](options.md) works around this issue,
+  but possibly at great cost.
 * btrfs qgroups:  very slow, sometimes hangs...and it's even worse when
   bees is running.
 * btrfs autodefrag mount option:  hangs and high CPU usage problems
