@@ -1,4 +1,4 @@
-TAG := $(shell git describe --always --dirty || echo UNKNOWN)
+TAG ?= $(shell git describe --always --dirty || echo UNKNOWN)
 
 default: libcrucible.so
 %.so: Makefile
