@@ -34,7 +34,7 @@ clean: ## Cleanup
 .PHONY: lib src test
 
 lib: ## Build libs
-	$(MAKE) -C lib
+	$(MAKE) TAG="$(BEES_VERSION)" -C lib
 
 src: ## Build bins
 src: lib
