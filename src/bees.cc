@@ -785,6 +785,11 @@ bees_main(int argc, char *argv[])
 			thread_factor = BEES_DEFAULT_THREAD_FACTOR;
 		}
 		thread_count = max(1U, static_cast<unsigned>(ceil(thread::hardware_concurrency() * thread_factor)));
+		if (thread_count > BEES_DEFAULT_THREAD_LIMIT) {
+			BEESLOGNOTICE("Limiting computed thread count to " << BEES_DEFAULT_THREAD_LIMIT);
+			BEESLOGNOTICE("Use --thread-count to override this limit");
+			thread_count = BEES_DEFAULT_THREAD_LIMIT;
+		}
 	}
 
 	if (load_target != 0) {

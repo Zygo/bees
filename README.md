@@ -336,6 +336,12 @@ Unfixed kernel bugs (as of 4.14.34) with workarounds in Bees:
   or prealloc.  Bees avoids feedback loops this can generate while
   attempting to replace extents over 16MB in length.
 
+* **Systems with many CPU cores** may [lock up when bees runs with one
+  worker thread for every core](https://github.com/Zygo/bees/issues/91).
+  bees limits the number of threads it will try to create based on
+  detected CPU core count.  Users may override this limit with the
+  [`--thread-count` option](options.md).
+
 Not really bugs, but gotchas nonetheless:
 
 * If a process holds a directory FD open, the subvol containing the
@@ -536,12 +542,18 @@ Command Line Options
 
 * --thread-count (-c) COUNT
   * Specify maximum number of worker threads for scanning.  Overrides
-    --thread-factor (-C) and default/autodetected values.
+    --thread-factor (-C) and default/autodetected values,
+    and the hardcoded thread limit.
 * --thread-factor (-C) FACTOR
   * Specify ratio of worker threads to CPU cores.  Overridden by --thread-count (-c).
     Default is 1.0, i.e. 1 worker thread per detected CPU.  Use values
     below 1.0 to leave some cores idle, or above 1.0 if there are more
     disks than CPUs in the filesystem.
+    If the computed thread count is higher than `BEES_DEFAULT_THREAD_LIMIT`
+    (currently 8), then only that number of threads will be created.
+    This limit can be overridden by the `--thread-count` option; however,
+    be aware that there are kernel issues with systems that have many CPU
+    cores when users try to run bees on all of them.
 * --loadavg-target (-g) LOADAVG
   * Specify load average target for dynamic worker threads.
     Threads will be started or stopped subject to the upper limit imposed
