@@ -62,6 +62,12 @@ Minor kernel problems with workarounds:
   Note `btrfs receive` is not affected.  It is OK to run bees with no
   workarounds on a filesystem that receives btrfs snapshots.
 
+* **Systems with many CPU cores** may [lock up when bees runs with one
+  worker thread for every core](https://github.com/Zygo/bees/issues/91).
+  bees limits the number of threads it will try to create based on
+  detected CPU core count.  Users may override this limit with the
+  [`--thread-count` option](options.md).
+
 Older kernels:
 
 * Older kernels have various data corruption and deadlock/hang issues
