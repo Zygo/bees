@@ -23,6 +23,7 @@ Strengths
  * Constant hash table size - no increased RAM usage if data set becomes larger
  * Works on live data - no scheduled downtime required
  * Automatic self-throttling based on system load
+ * **NEW** [Now works with `btrfs send`](options.md)
 
 Weaknesses
 ----------
