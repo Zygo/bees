@@ -699,7 +699,7 @@ BeesRoots::is_root_ro_nocache(uint64_t root)
 	uint64_t flags = 0;
 	DIE_IF_NON_ZERO(ioctl(root_fd, BTRFS_IOC_SUBVOL_GETFLAGS, &flags));
 	if (flags & BTRFS_SUBVOL_RDONLY) {
-		BEESLOGDEBUG("WORKAROUND: Avoiding RO subvol " << root);
+		BEESLOGDEBUG("WORKAROUND: Avoiding RO root " << root);
 		BEESCOUNT(root_workaround_btrfs_send);
 		return true;
 	}
@@ -947,7 +947,7 @@ BeesCrawl::fetch_extents()
 	// is ever switched back to read-write, it won't trigger big
 	// expensive in-kernel searches for ancient transids.
 	if (m_ctx->is_root_ro(old_state.m_root)) {
-		BEESLOGDEBUG("WORKAROUND: RO root " << old_state.m_root);
+		BEESLOGDEBUG("WORKAROUND: skipping scan of RO root " << old_state.m_root);
 		BEESCOUNT(root_workaround_btrfs_send);
 		return next_transid();
 	}

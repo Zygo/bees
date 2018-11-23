@@ -193,7 +193,7 @@ BeesContext::dedup(const BeesRangePair &brp)
 	brp.second.fd(shared_from_this());
 
 	if (is_root_ro(brp.second.fid().root())) {
-		// BEESLOGDEBUG("WORKAROUND: dst subvol is read-only in " << name_fd(brp.second.fd()));
+		// BEESLOGDEBUG("WORKAROUND: dst root is read-only in " << name_fd(brp.second.fd()));
 		BEESCOUNT(dedup_workaround_btrfs_send);
 		return false;
 	}
