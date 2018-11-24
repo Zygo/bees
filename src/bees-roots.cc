@@ -399,15 +399,22 @@ BeesRoots::crawl_thread()
 	m_crawl_task = Task("crawl_master", [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
+#if 0
 		bool run_again = true;
 		while (tqs < BEES_MAX_QUEUE_SIZE && run_again) {
 			run_again = shared_this->crawl_roots();
 			tqs = TaskMaster::get_queue_count();
 		}
+#else
+		bool run_again = false;
+		while (tqs < BEES_MAX_QUEUE_SIZE) {
+			run_again = shared_this->crawl_roots();
+			tqs = TaskMaster::get_queue_count();
+			if (!run_again) break;
+		}
+#endif
 		if (run_again) {
 			shared_this->m_crawl_task.run();
-		} else {
-			shared_this->m_task_running = false;
 		}
 	});
 
@@ -436,12 +443,7 @@ BeesRoots::crawl_thread()
 		last_count = new_count;
 
 		// If no crawl task is running, start a new one
-		bool already_running = m_task_running.exchange(true);
-		if (!already_running) {
-			auto resumed_after_time = m_crawl_timer.lap();
-			BEESLOGINFO("Crawl master resumed after " << resumed_after_time << "s at transid " << new_count);
-			m_crawl_task.run();
-		}
+		m_crawl_task.run();
 
 		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
 		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
@@ -561,8 +563,7 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_crawl_thread("crawl_transid"),
-	m_writeback_thread("crawl_writeback"),
-	m_task_running(false)
+	m_writeback_thread("crawl_writeback")
 {
 
 	m_root_ro_cache.func([&](uint64_t root) -> bool {

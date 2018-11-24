@@ -535,7 +535,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesThread				m_writeback_thread;
 	RateEstimator				m_transid_re;
 	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
-	atomic<bool>				m_task_running;
 	Task					m_crawl_task;
 	bool					m_workaround_btrfs_send = false;
 	LRUCache<bool, uint64_t>		m_root_ro_cache;
