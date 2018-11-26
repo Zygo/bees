@@ -22,7 +22,7 @@ Dependencies
 
 * [Linux kernel version](btrfs-kernel.md) gets its own page.
 
-* markdown and bash for documentation
+* markdown for documentation
 
 * util-linux version that provides `blkid` command for the helper
   script `scripts/beesd` to work

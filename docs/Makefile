@@ -1,4 +1,4 @@
-MARKDOWN := $(firstword $(shell bash -c 'type -P markdown markdown2 markdown_py' 2>/dev/null || echo markdown))
+MARKDOWN := $(firstword $(shell command -v markdown markdown2 markdown_py 2>/dev/null || echo markdown))
 .PHONY: docs
 
 docs: $(subst .md,.html,$(wildcard *.md)) index.html ../README.html
