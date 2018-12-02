@@ -35,7 +35,7 @@ dump_bucket_locked(BeesHashTable::Cell *p, BeesHashTable::Cell *q)
 }
 #endif
 
-const bool VERIFY_CLEARS_BUGS = false;
+static const bool VERIFY_CLEARS_BUGS = false;
 
 bool
 verify_cell_range(BeesHashTable::Cell *p, BeesHashTable::Cell *q, bool clear_bugs = VERIFY_CLEARS_BUGS)
@@ -396,10 +396,10 @@ BeesHashTable::fetch_missing_extent_by_index(uint64_t extent_index)
 	catch_all([&]() {
 		BEESTOOLONG("pread(fd " << m_fd << " '" << name_fd(m_fd)<< "', length " << to_hex(dirty_extent_end - dirty_extent) << ", offset " << to_hex(dirty_extent - m_byte_ptr) << ")");
 		pread_or_die(m_fd, dirty_extent, dirty_extent_end - dirty_extent, dirty_extent - m_byte_ptr);
-	});
 
-	// Only count extents successfully read
-	BEESCOUNT(hash_extent_in);
+		// Only count extents successfully read
+		BEESCOUNT(hash_extent_in);
+	});
 }
 
 void
@@ -425,11 +425,9 @@ BeesHashTable::find_cell(HashType hash)
 	return rv;
 }
 
-// Move an entry to the end of the list.  Used after an attempt to resolve
-// an address in the hash table fails.  Probably more correctly called
-// push_back_hash_addr, except it never inserts.  Shared hash tables
-// never erase anything, since there is no way to tell if an entry is
-// out of date or just belonging to the wrong filesystem.
+/// Remove a hash from the table, leaving an empty space on the list
+/// where the hash used to be.  Used when an invalid address is found
+/// because lookups on invalid addresses really hurt.
 void
 BeesHashTable::erase_hash_addr(HashType hash, AddrType addr)
 {
@@ -441,7 +439,6 @@ BeesHashTable::erase_hash_addr(HashType hash, AddrType addr)
 	Cell *ip = find(er.first, er.second, mv);
 	bool found = (ip < er.second);
 	if (found) {
-		// Lookups on invalid addresses really hurt us.  Kill it with fire!
 		*ip = Cell(0, 0);
 		set_extent_dirty_locked(hash_to_extent_index(hash));
 		BEESCOUNT(hash_erase);
@@ -450,14 +447,17 @@ BeesHashTable::erase_hash_addr(HashType hash, AddrType addr)
 			BEESLOGDEBUG("while erasing hash " << hash << " addr " << addr);
 		}
 #endif
+	} else {
+		BEESCOUNT(hash_erase_miss);
 	}
 }
 
-// If entry is already present in list, move it to the front of the
-// list without dropping any entries, and return true.  If entry is not
-// present in list, insert it at the front of the list, possibly dropping
-// the last entry in the list, and return false.  Used to move duplicate
-// hash blocks to the front of the list.
+/// Insert a hash entry at the head of the list.  If entry is already
+/// present in list, move it to the front of the list without dropping
+/// any entries, and return true.  If entry is not present in list,
+/// insert it at the front of the list, possibly dropping the last entry
+/// in the list, and return false.  Used to move duplicate hash blocks
+/// to the front of the list.
 bool
 BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 {
@@ -481,7 +481,7 @@ BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 		auto dp = ip;
 		--sp;
 		// If we are deleting the last entry then don't copy it
-		if (ip == er.second) {
+		if (dp == er.second) {
 			--sp;
 			--dp;
 			BEESCOUNT(hash_evict);
@@ -495,6 +495,8 @@ BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 		er.first[0] = mv;
 		set_extent_dirty_locked(hash_to_extent_index(hash));
 		BEESCOUNT(hash_front);
+	} else {
+		BEESCOUNT(hash_front_already);
 	}
 #if 0
 	if (verify_cell_range(er.first, er.second)) {
@@ -504,11 +506,12 @@ BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 	return found;
 }
 
-// If entry is already present in list, returns true and does not
-// modify list.  If entry is not present in list, returns false and
-// inserts at a random position in the list, possibly evicting the entry
-// at the end of the list.  Used to insert new unique (not-yet-duplicate)
-// blocks in random order.
+/// Insert a hash entry at some unspecified point in the list.
+/// If entry is already present in list, returns true and does not
+/// modify list.  If entry is not present in list, returns false and
+/// inserts at a random position in the list, possibly evicting the entry
+/// at the end of the list.  Used to insert new unique (not-yet-duplicate)
+/// blocks in random order.
 bool
 BeesHashTable::push_random_hash_addr(HashType hash, AddrType addr)
 {
@@ -573,7 +576,12 @@ BeesHashTable::push_random_hash_addr(HashType hash, AddrType addr)
 	}
 
 	// Evict something and insert at pos
-	move_backward(er.first + pos, er.second - 1, er.second);
+	// move_backward(er.first + pos, er.second - 1, er.second);
+	ip = er.second - 1;
+	while (ip > er.first + pos) {
+		auto dp = ip;
+		*dp = *--ip;
+	}
 	er.first[pos] = mv;
 	BEESCOUNT(hash_evict);
 	case_cond = 5;
