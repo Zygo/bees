@@ -77,5 +77,7 @@ namespace crucible {
 	double getloadavg1();
 	double getloadavg5();
 	double getloadavg15();
+
+	string signal_ntoa(int sig);
 }
 #endif // CRUCIBLE_PROCESS_H
