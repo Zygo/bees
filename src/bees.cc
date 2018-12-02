@@ -531,10 +531,16 @@ BeesTempFile::resize(off_t offset)
 	BEESCOUNTADD(tmp_resize_ms, resize_timer.age() * 1000);
 }
 
+BeesTempFile::~BeesTempFile()
+{
+	BEESLOGDEBUG("Destructing BeesTempFile " << this);
+}
+
 BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
 	m_end_offset(0)
 {
+	BEESLOGDEBUG("Constructing BeesTempFile " << this);
 	create();
 }
 
@@ -640,6 +646,77 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 	return rv;
 }
 
+static
+ostream &
+operator<<(ostream &os, const siginfo_t &si)
+{
+	return os << "siginfo_t { "
+		<< "signo = " << si.si_signo << " (" << signal_ntoa(si.si_signo) << "), "
+		<< "errno = " << si.si_errno << ", "
+		<< "code = " << si.si_code << ", "
+		// << "trapno = " << si.si_trapno << ", "
+		<< "pid = " << si.si_pid << ", "
+		<< "uid = " << si.si_uid << ", "
+		<< "status = " << si.si_status << ", "
+		<< "utime = " << si.si_utime << ", "
+		<< "stime = " << si.si_stime << ", "
+		// << "value = " << si.si_value << ", "
+		<< "int = " << si.si_int << ", "
+		<< "ptr = " << si.si_ptr << ", "
+		<< "overrun = " << si.si_overrun << ", "
+		<< "timerid = " << si.si_timerid << ", "
+		<< "addr = " << si.si_addr << ", "
+		<< "band = " << si.si_band << ", "
+		<< "fd = " << si.si_fd << ", "
+		<< "addr_lsb = " << si.si_addr_lsb << ", "
+		<< "lower = " << si.si_lower << ", "
+		<< "upper = " << si.si_upper << ", "
+		// << "pkey = " << si.si_pkey << ", "
+		<< "call_addr = " << si.si_call_addr << ", "
+		<< "syscall = " << si.si_syscall << ", "
+		<< "arch = " << si.si_arch
+		<< " }";
+}
+
+static sigset_t new_sigset, old_sigset;
+
+void
+block_term_signal()
+{
+	BEESLOGDEBUG("Masking signals");
+
+	DIE_IF_NON_ZERO(sigemptyset(&new_sigset));
+	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGTERM));
+	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGINT));
+	DIE_IF_NON_ZERO(sigprocmask(SIG_BLOCK, &new_sigset, &old_sigset));
+}
+
+void
+wait_for_term_signal()
+{
+	BEESNOTE("waiting for signals");
+	BEESLOGDEBUG("Waiting for signals...");
+	siginfo_t info;
+
+	// Ironically, sigwaitinfo can be interrupted by a signal.
+	while (true) {
+		const int rv = sigwaitinfo(&new_sigset, &info);
+		if (rv == -1) {
+			if (errno == EINTR) {
+				BEESLOGDEBUG("Restarting sigwaitinfo");
+				continue;
+			}
+			THROW_ERRNO("sigwaitinfo errno = " << errno);
+		} else {
+			BEESLOGNOTICE("Received signal " << rv << " info " << info);
+			// Unblock so we die immediately if signalled again
+			DIE_IF_NON_ZERO(sigprocmask(SIG_BLOCK, &old_sigset, &new_sigset));
+			break;
+		}
+	}
+	BEESLOGDEBUG("Signal catcher exiting");
+}
+
 int
 bees_main(int argc, char *argv[])
 {
@@ -655,6 +732,10 @@ bees_main(int argc, char *argv[])
 	BEESNOTE("main");
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
+
+	// Have to block signals now before we create a bunch of threads
+	// so the threads will also have the signals blocked.
+	block_term_signal();
 
 	// Create a context so we can apply configuration to it
 	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
@@ -813,12 +894,14 @@ bees_main(int argc, char *argv[])
 	// Create a context and start crawlers
 	bc->set_root_path(argv[optind++]);
 
-	BeesThread status_thread("status", [&]() {
-		bc->dump_status();
-	});
+	// Start crawlers
+	bc->start();
 
 	// Now we just wait forever
-	bc->show_progress();
+	wait_for_term_signal();
+
+	// Shut it down
+	bc->stop();
 
 	// That is all.
 	return EXIT_SUCCESS;

@@ -414,7 +414,7 @@ BeesRoots::crawl_thread()
 	// Monitor transid_max and wake up roots when it changes
 	BEESNOTE("tracking transid");
 	auto last_count = m_transid_re.count();
-	while (true) {
+	while (!m_stop_requested) {
 		// Measure current transid
 		catch_all([&]() {
 			m_transid_re.update(transid_max_nocache());
@@ -441,7 +441,12 @@ BeesRoots::crawl_thread()
 		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
 		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
 		BEESNOTE("waiting " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
-		nanosleep(poll_time);
+		unique_lock<mutex> lock(m_stop_mutex);
+		if (m_stop_requested) {
+			BEESLOGDEBUG("Stop requested in crawl thread");
+			break;
+		}
+		m_stop_condvar.wait_for(lock, chrono::duration<double>(poll_time));
 	}
 }
 
@@ -456,7 +461,16 @@ BeesRoots::writeback_thread()
 			state_save();
 		});
 
-		nanosleep(BEES_WRITEBACK_INTERVAL);
+		unique_lock<mutex> lock(m_stop_mutex);
+		if (m_stop_requested) {
+			BEESLOGDEBUG("Stop requested in writeback thread");
+			catch_all([&]() {
+				BEESNOTE("flushing crawler state");
+				state_save();
+			});
+			return;
+		}
+		m_stop_condvar.wait_for(lock, chrono::duration<double>(BEES_WRITEBACK_INTERVAL));
 	}
 }
 
@@ -574,11 +588,35 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 		catch_all([&]() {
 			state_load();
 		});
+
 		m_writeback_thread.exec([&]() {
 			writeback_thread();
 		});
 		crawl_thread();
 	});
+}
+
+void
+BeesRoots::stop()
+{
+	BEESLOGDEBUG("BeesRoots stop requested");
+	BEESNOTE("stopping BeesRoots");
+	unique_lock<mutex> lock(m_stop_mutex);
+	m_stop_requested = true;
+	m_stop_condvar.notify_all();
+	lock.unlock();
+
+	// Stop crawl writeback first because we will break progress
+	// state tracking when we cancel the TaskMaster queue
+	BEESLOGDEBUG("Waiting for crawl writeback");
+	BEESNOTE("waiting for crawl_writeback thread");
+	m_writeback_thread.join();
+
+	BEESLOGDEBUG("Waiting for crawl thread");
+	BEESNOTE("waiting for crawl_thread thread");
+	m_crawl_thread.join();
+
+	BEESLOGDEBUG("BeesRoots stopped");
 }
 
 Fd

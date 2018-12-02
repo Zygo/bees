@@ -130,13 +130,11 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 		wrote_extent = true;
 	});
 
-	BEESNOTE("flush rate limited after extent #" << extent_index << " of " << m_extents << " extents");
-	m_flush_rate_limit.sleep_for(BLOCK_SIZE_HASHTAB_EXTENT);
 	return wrote_extent;
 }
 
-void
-BeesHashTable::flush_dirty_extents()
+size_t
+BeesHashTable::flush_dirty_extents(bool slowly)
 {
 	THROW_CHECK1(runtime_error, m_buckets, m_buckets > 0);
 
@@ -144,12 +142,22 @@ BeesHashTable::flush_dirty_extents()
 	for (size_t extent_index = 0; extent_index < m_extents; ++extent_index) {
 		if (flush_dirty_extent(extent_index)) {
 			++wrote_extents;
+			if (slowly) {
+				BEESNOTE("flush rate limited after extent #" << extent_index << " of " << m_extents << " extents");
+				chrono::duration<double> sleep_time(m_flush_rate_limit.sleep_time(BLOCK_SIZE_HASHTAB_EXTENT));
+				unique_lock<mutex> lock(m_stop_mutex);
+				if (m_stop_requested) {
+					BEESLOGDEBUG("Stop requested in hash table flush_dirty_extents");
+					break;
+				}
+				m_stop_condvar.wait_for(lock, sleep_time);
+			}
 		}
 	}
-
-	BEESNOTE("idle after writing " << wrote_extents << " of " << m_extents << " extents");
-	unique_lock<mutex> lock(m_dirty_mutex);
-	m_dirty_condvar.wait(lock);
+	if (!slowly) {
+		BEESLOGINFO("Flushed " << wrote_extents << " of " << m_extents << " extents");
+	}
+	return wrote_extents;
 }
 
 void
@@ -160,15 +168,29 @@ BeesHashTable::set_extent_dirty_locked(uint64_t extent_index)
 
 	// Signal writeback thread
 	unique_lock<mutex> dirty_lock(m_dirty_mutex);
+	m_dirty = true;
 	m_dirty_condvar.notify_one();
 }
 
 void
 BeesHashTable::writeback_loop()
 {
-	while (true) {
-		flush_dirty_extents();
+	while (!m_stop_requested) {
+		auto wrote_extents = flush_dirty_extents(true);
+
+		BEESNOTE("idle after writing " << wrote_extents << " of " << m_extents << " extents");
+
+		unique_lock<mutex> lock(m_dirty_mutex);
+		if (m_stop_requested) {
+			break;
+		}
+		if (m_dirty) {
+			m_dirty = false;
+		} else {
+			m_dirty_condvar.wait(lock);
+		}
 	}
+	BEESLOGDEBUG("Exited hash table writeback_loop");
 }
 
 static
@@ -186,7 +208,7 @@ void
 BeesHashTable::prefetch_loop()
 {
 	bool not_locked = true;
-	while (true) {
+	while (!m_stop_requested) {
 		size_t width = 64;
 		vector<size_t> occupancy(width, 0);
 		size_t occupied_count = 0;
@@ -196,7 +218,7 @@ BeesHashTable::prefetch_loop()
 		size_t toxic_count = 0;
 		size_t unaligned_eof_count = 0;
 
-		for (uint64_t ext = 0; ext < m_extents; ++ext) {
+		for (uint64_t ext = 0; ext < m_extents && !m_stop_requested; ++ext) {
 			BEESNOTE("prefetching hash table extent #" << ext << " of " << m_extents);
 			catch_all([&]() {
 				fetch_missing_extent_by_index(ext);
@@ -300,7 +322,7 @@ BeesHashTable::prefetch_loop()
 			m_stats_file.write(graph_blob.str());
 		});
 
-		if (not_locked) {
+		if (not_locked && !m_stop_requested) {
 			// Always do the mlock, whether shared or not
 			THROW_CHECK1(runtime_error, m_size, m_size > 0);
 			BEESLOGINFO("mlock(" << pretty(m_size) << ")...");
@@ -314,7 +336,12 @@ BeesHashTable::prefetch_loop()
 		}
 
 		BEESNOTE("idle " << BEES_HASH_TABLE_ANALYZE_INTERVAL << "s");
-		nanosleep(BEES_HASH_TABLE_ANALYZE_INTERVAL);
+		unique_lock<mutex> lock(m_stop_mutex);
+		if (m_stop_requested) {
+			BEESLOGDEBUG("Stop requested in hash table prefetch");
+			return;
+		}
+		m_stop_condvar.wait_for(lock, chrono::duration<double>(BEES_HASH_TABLE_ANALYZE_INTERVAL));
 	}
 }
 
@@ -704,13 +731,50 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 
 BeesHashTable::~BeesHashTable()
 {
+	BEESLOGDEBUG("Destroy BeesHashTable");
 	if (m_cell_ptr && m_size) {
-		flush_dirty_extents();
+		// Dirty extents should have been flushed before now,
+		// e.g. in stop().  If that didn't happen, don't fall
+		// into the same trap (and maybe throw an exception) here.
+		// flush_dirty_extents(false);
 		catch_all([&]() {
 			DIE_IF_NON_ZERO(munmap(m_cell_ptr, m_size));
 			m_cell_ptr = nullptr;
 			m_size = 0;
 		});
 	}
+	BEESLOGDEBUG("BeesHashTable destroyed");
 }
 
+void
+BeesHashTable::stop()
+{
+	BEESNOTE("stopping BeesHashTable threads");
+	BEESLOGDEBUG("Stopping BeesHashTable threads");
+
+	unique_lock<mutex> lock(m_stop_mutex);
+	m_stop_requested = true;
+	m_stop_condvar.notify_all();
+	lock.unlock();
+
+	// Wake up hash writeback too
+	unique_lock<mutex> dirty_lock(m_dirty_mutex);
+	m_dirty_condvar.notify_all();
+	dirty_lock.unlock();
+
+	BEESNOTE("waiting for hash_prefetch thread");
+	BEESLOGDEBUG("Waiting for hash_prefetch thread");
+	m_prefetch_thread.join();
+
+	BEESNOTE("waiting for hash_writeback thread");
+	BEESLOGDEBUG("Waiting for hash_writeback thread");
+	m_writeback_thread.join();
+
+	if (m_cell_ptr && m_size) {
+		BEESLOGDEBUG("Flushing hash table");
+		BEESNOTE("flushing hash table");
+		flush_dirty_extents(false);
+	}
+
+	BEESLOGDEBUG("BeesHashTable stopped");
+}

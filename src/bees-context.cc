@@ -1,5 +1,6 @@
 #include "bees.h"
 
+#include "crucible/cleanup.h"
 #include "crucible/limits.h"
 #include "crucible/string.h"
 #include "crucible/task.h"
@@ -13,8 +14,12 @@
 // struct rusage
 #include <sys/resource.h>
 
+// struct sigset
+#include <signal.h>
+
 using namespace crucible;
 using namespace std;
+
 
 static inline
 const char *
@@ -82,17 +87,15 @@ BeesContext::dump_status()
 	if (!status_charp) return;
 	string status_file(status_charp);
 	BEESLOGINFO("Writing status to file '" << status_file << "' every " << BEES_STATUS_INTERVAL << " sec");
-	while (1) {
-		BEESNOTE("waiting " << BEES_STATUS_INTERVAL);
-		sleep(BEES_STATUS_INTERVAL);
-
+	Timer total_timer;
+	while (!m_stop_status) {
 		BEESNOTE("writing status to file '" << status_file << "'");
 		ofstream ofs(status_file + ".tmp");
 
 		auto thisStats = BeesStats::s_global;
 		ofs << "TOTAL:\n";
 		ofs << "\t" << thisStats << "\n";
-		auto avg_rates = thisStats / m_total_timer.age();
+		auto avg_rates = thisStats / total_timer.age();
 		ofs << "RATES:\n";
 		ofs << "\t" << avg_rates << "\n";
 
@@ -113,42 +116,65 @@ BeesContext::dump_status()
 
 		BEESNOTE("renaming status file '" << status_file << "'");
 		rename((status_file + ".tmp").c_str(), status_file.c_str());
+
+		BEESNOTE("idle " << BEES_STATUS_INTERVAL);
+		unique_lock<mutex> lock(m_stop_mutex);
+		if (m_stop_status) {
+			return;
+		}
+		m_stop_condvar.wait_for(lock, chrono::duration<double>(BEES_STATUS_INTERVAL));
 	}
 }
 
 void
 BeesContext::show_progress()
 {
-	auto lastProgressStats = BeesStats::s_global;
-	auto lastStats = lastProgressStats;
+	auto lastStats = BeesStats::s_global;
 	Timer stats_timer;
-	while (1) {
-		sleep(BEES_PROGRESS_INTERVAL);
+	Timer all_timer;
+	while (!stop_requested()) {
+		BEESNOTE("idle " << BEES_PROGRESS_INTERVAL);
 
-		if (stats_timer.age() > BEES_STATS_INTERVAL) {
-			stats_timer.lap();
-
-			auto thisStats = BeesStats::s_global;
-			auto avg_rates = lastStats / BEES_STATS_INTERVAL;
-			BEESLOGINFO("TOTAL: " << thisStats);
-			BEESLOGINFO("RATES: " << avg_rates);
-			lastStats = thisStats;
+		unique_lock<mutex> lock(m_stop_mutex);
+		if (m_stop_requested) {
+			return;
 		}
+		m_stop_condvar.wait_for(lock, chrono::duration<double>(BEES_PROGRESS_INTERVAL));
 
-		BEESLOGINFO("ACTIVITY:");
-
+		// Snapshot stats and timer state
 		auto thisStats = BeesStats::s_global;
-		auto deltaStats = thisStats - lastProgressStats;
-		if (deltaStats) {
-			BEESLOGINFO("\t" << deltaStats / BEES_PROGRESS_INTERVAL);
-		};
-		lastProgressStats = thisStats;
+		auto stats_age = stats_timer.age();
+		auto all_age = all_timer.age();
+		stats_timer.lap();
 
+		auto avg_rates = thisStats / stats_age;
+
+		BEESNOTE("logging event counter totals for last " << all_timer);
+		BEESLOGINFO("TOTAL COUNTS (" << all_age << "s):\n\t" << thisStats);
+
+		BEESNOTE("logging event counter rates for last " << all_timer);
+		BEESLOGINFO("TOTAL RATES (" << all_age << "s):\n\t" << avg_rates);
+
+		BEESNOTE("logging event counter delta counts for last " << stats_age);
+		BEESLOGINFO("DELTA COUNTS (" << stats_age << "s):");
+
+		auto deltaStats = thisStats - lastStats;
+		BEESLOGINFO("\t" << deltaStats / stats_age);
+
+		BEESNOTE("logging event counter delta rates for last " << stats_age);
+		BEESLOGINFO("DELTA RATES (" << stats_age << "s):");
+
+		auto deltaRates = deltaStats / stats_age;
+		BEESLOGINFO("\t" << deltaRates);
+
+		BEESNOTE("logging current thread status");
 		BEESLOGINFO("THREADS:");
 
 		for (auto t : BeesNote::get_status()) {
 			BEESLOGINFO("\ttid " << t.first << ": " << t.second);
 		}
+
+		lastStats = thisStats;
 	}
 }
 
@@ -171,11 +197,19 @@ BeesContext::home_fd()
 }
 
 BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
-	m_parent_ctx(parent)
+	m_parent_ctx(parent),
+	m_progress_thread("progress_report"),
+	m_status_thread("status_report")
 {
 	if (m_parent_ctx) {
 		m_fd_cache = m_parent_ctx->fd_cache();
 	}
+	m_progress_thread.exec([=]() {
+		show_progress();
+	});
+	m_status_thread.exec([=]() {
+		dump_status();
+	});
 }
 
 bool
@@ -745,7 +779,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr)
 
 	Extent e;
 	catch_all([&]() {
-		while (true) {
+		while (!stop_requested()) {
 			e = ew.current();
 
 			catch_all([&]() {
@@ -881,11 +915,106 @@ BeesContext::set_root_fd(Fd fd)
 	m_resolve_cache.func([&](BeesAddress addr) -> BeesResolveAddrResult {
 		return resolve_addr_uncached(addr);
 	});
+}
 
-	// Start queue producers
+const char *
+BeesHalt::what() const noexcept
+{
+	return "bees stop requested";
+}
+
+void
+BeesContext::start()
+{
+	BEESLOGNOTICE("Starting bees main loop...");
+	BEESNOTE("starting BeesContext");
+
+	// Force these to exist now so we don't have recursive locking
+	// operations trying to access them
+	fd_cache();
+	hash_table();
+
+	// Kick off the crawlers
 	roots();
+}
 
-	BEESLOGINFO("returning from set_root_fd in " << name_fd(fd));
+void
+BeesContext::stop()
+{
+	Timer stop_timer;
+	BEESLOGNOTICE("Stopping bees...");
+	BEESLOGWARN("WARNING: This feature is EXPERIMENTAL and may not work!");
+
+	BEESNOTE("setting stop_request flag");
+
+	BEESNOTE("pausing work queue");
+	BEESLOGDEBUG("Pausing work queue");
+	TaskMaster::set_thread_count(0);
+
+	BEESLOGDEBUG("Setting stop_request flag");
+	unique_lock<mutex> lock(m_stop_mutex);
+	m_stop_requested = true;
+	m_stop_condvar.notify_all();
+	lock.unlock();
+
+	// Stop crawlers first so we get good progress persisted on disk
+	BEESNOTE("stopping crawlers");
+	BEESLOGDEBUG("Stopping crawlers");
+	if (m_roots) {
+		m_roots->stop();
+		m_roots.reset();
+	} else {
+		BEESLOGDEBUG("Crawlers not running");
+	}
+
+	BEESNOTE("cancelling work queue");
+	BEESLOGDEBUG("Cancelling work queue");
+	TaskMaster::cancel();
+
+	BEESNOTE("stopping hash table");
+	BEESLOGDEBUG("Stopping hash table");
+	if (m_hash_table) {
+		m_hash_table->stop();
+		m_hash_table.reset();
+	} else {
+		BEESLOGDEBUG("Hash table not running");
+	}
+
+	BEESNOTE("closing tmpfiles");
+	BEESLOGDEBUG("Closing tmpfiles");
+	m_tmpfiles.clear();
+
+	BEESNOTE("closing FD caches");
+	BEESLOGDEBUG("Closing FD caches");
+	if (m_fd_cache) {
+		m_fd_cache->clear();
+		BEESNOTE("destroying FD caches");
+		BEESLOGDEBUG("Destroying FD caches");
+		m_fd_cache.reset();
+	}
+
+	BEESNOTE("waiting for progress thread");
+	BEESLOGDEBUG("Waiting for progress thread");
+	m_progress_thread.join();
+
+	// XXX: nobody can see this BEESNOTE because we are killing the
+	// thread that publishes it
+	BEESNOTE("waiting for progress thread");
+	BEESLOGDEBUG("Waiting for progress thread");
+	lock.lock();
+	m_stop_status = true;
+	m_stop_condvar.notify_all();
+	lock.unlock();
+	m_status_thread.join();
+
+	BEESLOGNOTICE("bees stopped in " << stop_timer << " sec");
+}
+
+bool
+BeesContext::stop_requested() const
+{
+	unique_lock<mutex> lock(m_stop_mutex);
+	return m_stop_requested;
 }
 
 void
@@ -910,22 +1039,32 @@ BeesContext::is_blacklisted(const BeesFileId &fid) const
 shared_ptr<BeesTempFile>
 BeesContext::tmpfile()
 {
-	// There need be only one, this is not a high-contention path
-	static mutex s_mutex;
-	unique_lock<mutex> lock(s_mutex);
+	// FIXME: this whole thing leaks FDs (quite slowly).  Make a pool instead.
+
+	unique_lock<mutex> lock(m_stop_mutex);
+
+	if (m_stop_requested) {
+		throw BeesHalt();
+	}
 
 	if (!m_tmpfiles[this_thread::get_id()]) {
-		m_tmpfiles[this_thread::get_id()] = make_shared<BeesTempFile>(shared_from_this());
+		// We know we are the only possible accessor of this,
+		// so drop the lock to avoid a deadlock loop
+		lock.unlock();
+		auto rv = make_shared<BeesTempFile>(shared_from_this());
+		lock.lock();
+		m_tmpfiles[this_thread::get_id()] = rv;
 	}
-	auto rv = m_tmpfiles[this_thread::get_id()];
-	return rv;
+	return m_tmpfiles[this_thread::get_id()];
 }
 
 shared_ptr<BeesFdCache>
 BeesContext::fd_cache()
 {
-	static mutex s_mutex;
-	unique_lock<mutex> lock(s_mutex);
+	unique_lock<mutex> lock(m_stop_mutex);
+	if (m_stop_requested) {
+		throw BeesHalt();
+	}
 	if (!m_fd_cache) {
 		m_fd_cache = make_shared<BeesFdCache>();
 	}
@@ -936,8 +1075,10 @@ BeesContext::fd_cache()
 shared_ptr<BeesRoots>
 BeesContext::roots()
 {
-	static mutex s_mutex;
-	unique_lock<mutex> lock(s_mutex);
+	unique_lock<mutex> lock(m_stop_mutex);
+	if (m_stop_requested) {
+		throw BeesHalt();
+	}
 	if (!m_roots) {
 		m_roots = make_shared<BeesRoots>(shared_from_this());
 	}
@@ -948,8 +1089,10 @@ BeesContext::roots()
 shared_ptr<BeesHashTable>
 BeesContext::hash_table()
 {
-	static mutex s_mutex;
-	unique_lock<mutex> lock(s_mutex);
+	unique_lock<mutex> lock(m_stop_mutex);
+	if (m_stop_requested) {
+		throw BeesHalt();
+	}
 	if (!m_hash_table) {
 		m_hash_table = make_shared<BeesHashTable>(shared_from_this(), "beeshash.dat");
 	}

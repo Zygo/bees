@@ -410,6 +410,8 @@ public:
 	BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t size = BLOCK_SIZE_HASHTAB_EXTENT);
 	~BeesHashTable();
 
+	void stop();
+
 	vector<Cell>	find_cell(HashType hash);
 	bool		push_random_hash_addr(HashType hash, AddrType addr);
 	void		erase_hash_addr(HashType hash, AddrType addr);
@@ -444,6 +446,12 @@ private:
 	// Mutex/condvar for the writeback thread
 	mutex			m_dirty_mutex;
 	condition_variable	m_dirty_condvar;
+	bool			m_dirty;
+
+	// Mutex/condvar to stop
+	mutex			m_stop_mutex;
+	condition_variable	m_stop_condvar;
+	bool			m_stop_requested = false;
 
 	// Per-extent structures
 	struct ExtentMetaData {
@@ -463,7 +471,7 @@ private:
 	void fetch_missing_extent_by_hash(HashType hash);
 	void fetch_missing_extent_by_index(uint64_t extent_index);
 	void set_extent_dirty_locked(uint64_t extent_index);
-	void flush_dirty_extents();
+	size_t flush_dirty_extents(bool slowly);
 	bool flush_dirty_extent(uint64_t extent_index);
 
 	size_t			hash_to_extent_index(HashType ht);
@@ -529,6 +537,10 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	bool					m_workaround_btrfs_send = false;
 	LRUCache<bool, uint64_t>		m_root_ro_cache;
 
+	mutex					m_stop_mutex;
+	condition_variable			m_stop_condvar;
+	bool					m_stop_requested = false;
+
 	void insert_new_crawl();
 	void insert_root(const BeesCrawlState &bcs);
 	Fd open_root_nocache(uint64_t root);
@@ -557,6 +569,9 @@ friend class BeesCrawl;
 
 public:
 	BeesRoots(shared_ptr<BeesContext> ctx);
+	void start();
+	void stop();
+
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
@@ -651,6 +666,7 @@ class BeesTempFile {
 	void resize(off_t new_end_offset);
 
 public:
+	~BeesTempFile();
 	BeesTempFile(shared_ptr<BeesContext> ctx);
 	BeesFileRange make_hole(off_t count);
 	BeesFileRange make_copy(const BeesFileRange &src);
@@ -677,6 +693,10 @@ struct BeesResolveAddrResult {
 	bool is_toxic() const { return m_is_toxic; }
 };
 
+struct BeesHalt : exception {
+	const char *what() const noexcept override;
+};
+
 class BeesContext : public enable_shared_from_this<BeesContext> {
 	shared_ptr<BeesContext>				m_parent_ctx;
 
@@ -685,7 +705,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	shared_ptr<BeesFdCache>				m_fd_cache;
 	shared_ptr<BeesHashTable>			m_hash_table;
 	shared_ptr<BeesRoots>				m_roots;
-
 	map<thread::id, shared_ptr<BeesTempFile>>	m_tmpfiles;
 
 	LRUCache<BeesResolveAddrResult, BeesAddress>	m_resolve_cache;
@@ -700,6 +719,14 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	Timer						m_total_timer;
 
 	LockSet<uint64_t>				m_extent_lock_set;
+
+	mutable mutex					m_stop_mutex;
+	condition_variable				m_stop_condvar;
+	bool						m_stop_requested = false;
+	bool						m_stop_status = false;
+
+	BeesThread					m_progress_thread;
+	BeesThread					m_status_thread;
 
 	void set_root_fd(Fd fd);
 
@@ -732,6 +759,10 @@ public:
 
 	void dump_status();
 	void show_progress();
+
+	void start();
+	void stop();
+	bool stop_requested() const;
 
 	shared_ptr<BeesFdCache> fd_cache();
 	shared_ptr<BeesHashTable> hash_table();
