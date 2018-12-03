@@ -56,6 +56,7 @@ More Information
 
  * [How bees works](how-it-works.md)
  * [Missing bees features](missing.md)
+ * [Event counter descriptions](event-counters.md)
 
 Bug Reports and Contributions
 -----------------------------
