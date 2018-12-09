@@ -62,9 +62,8 @@ packages.
 Build from source
 -----------------
 
-Build with `make`. The build produces `bin/bees` and `lib/libcrucible.so`,
-which must be copied to somewhere in `$PATH` and `$LD_LIBRARY_PATH`
-on the target system respectively.
+Build with `make`. The build produces `bin/bees` which must be copied
+to somewhere in `$PATH` on the target system respectively.
 
 It will also generate `scripts/beesd@.service` for systemd users. This
 service makes use of a helper script `scripts/beesd` to boot the service.

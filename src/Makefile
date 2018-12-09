@@ -7,7 +7,7 @@ all: $(BEES) $(PROGRAMS)
 
 include ../makeflags
 
-LIBS = -lcrucible -lpthread
+LIBS = -lcrucible -luuid -lpthread
 BEES_LDFLAGS = -L../lib $(LDFLAGS)
 
 BEES_OBJS = \

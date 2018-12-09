@@ -16,7 +16,7 @@ FORCE:
 include ../makeflags
 
 LIBS = -lcrucible -lpthread
-BEES_LDFLAGS = -L../lib -Wl,-rpath=$(abspath ../lib) $(LDFLAGS)
+BEES_LDFLAGS = -L../lib $(LDFLAGS)
 
 .depends:
 	mkdir -p $@

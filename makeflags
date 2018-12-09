@@ -7,7 +7,7 @@ CCFLAGS = -Wall -Wextra -Werror -O3
 # Debug:
 # CCFLAGS = -Wall -Wextra -Werror -O0 -ggdb
 
-CCFLAGS += -I../include -fpic -D_FILE_OFFSET_BITS=64
+CCFLAGS += -I../include -D_FILE_OFFSET_BITS=64
 
 BEES_CFLAGS   = $(CCFLAGS) -std=c99 $(CFLAGS)
 BEES_CXXFLAGS = $(CCFLAGS) -std=c++11 -Wold-style-cast $(CXXFLAGS)

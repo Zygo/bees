@@ -1,7 +1,7 @@
 TAG ?= $(shell git describe --always --dirty || echo UNKNOWN)
 
-default: libcrucible.so
-%.so: Makefile
+default: libcrucible.a
+%.a: Makefile
 
 CRUCIBLE_OBJS = \
 	chatter.o \
@@ -44,7 +44,7 @@ depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
 include depends.mk
 
 %.o: %.cc ../makeflags
-	$(CXX) $(BEES_CXXFLAGS) -fPIC -o $@ -c $<
+	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
-libcrucible.so: $(CRUCIBLE_OBJS) .version.o
-	$(CXX) $(BEES_LDFLAGS) -fPIC -shared -Wl,-soname,$@ -o $@ $^ -luuid
+libcrucible.a: $(CRUCIBLE_OBJS) .version.o
+	$(AR) rcs $@ $^

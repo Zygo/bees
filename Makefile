@@ -49,16 +49,13 @@ scripts/%: scripts/%.in
 
 scripts: scripts/beesd scripts/beesd@.service
 
-install_libs: lib
-	install -Dm644 lib/libcrucible.so $(DESTDIR)$(LIB_PREFIX)/libcrucible.so
-
 install_tools: ## Install support tools + libs
-install_tools: install_libs src
+install_tools: src
 	install -Dm755 bin/fiemap $(DESTDIR)$(PREFIX)/bin/fiemap
 	install -Dm755 bin/fiewalk $(DESTDIR)$(PREFIX)/sbin/fiewalk
 
 install_bees: ## Install bees + libs
-install_bees: install_libs src $(RUN_INSTALL_TESTS)
+install_bees: src $(RUN_INSTALL_TESTS)
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
 install_scripts: ## Install scipts
