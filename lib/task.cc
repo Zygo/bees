@@ -50,6 +50,7 @@ namespace crucible {
 		double					m_prev_loadavg;
 		size_t					m_configured_thread_max;
 		double					m_thread_target;
+		bool					m_cancelled = false;
 
 	friend class TaskConsumer;
 	friend class TaskMaster;
@@ -62,6 +63,7 @@ namespace crucible {
 		size_t calculate_thread_count_nolock();
 		void set_loadavg_target(double target);
 		void loadavg_thread_fn();
+		void cancel();
 
 	public:
 		~TaskMasterState();
@@ -165,6 +167,9 @@ namespace crucible {
 	{
 		THROW_CHECK0(runtime_error, task);
 		unique_lock<mutex> lock(s_tms->m_mutex);
+		if (s_tms->m_cancelled) {
+			return;
+		}
 		s_tms->m_queue.push_back(task);
 		s_tms->m_condvar.notify_all();
 		s_tms->start_threads_nolock();
@@ -175,6 +180,9 @@ namespace crucible {
 	{
 		THROW_CHECK0(runtime_error, task);
 		unique_lock<mutex> lock(s_tms->m_mutex);
+		if (s_tms->m_cancelled) {
+			return;
+		}
 		s_tms->m_queue.push_front(task);
 		s_tms->m_condvar.notify_all();
 		s_tms->start_threads_nolock();
@@ -226,6 +234,11 @@ namespace crucible {
 	size_t
 	TaskMasterState::calculate_thread_count_nolock()
 	{
+		if (m_cancelled) {
+			// No threads running while cancelled
+			return 0;
+		}
+
 		if (m_load_target == 0) {
 			// No limits, no stats, use configured thread count
 			return m_configured_thread_max;
@@ -296,6 +309,10 @@ namespace crucible {
 	TaskMasterState::set_thread_count(size_t thread_max)
 	{
 		unique_lock<mutex> lock(m_mutex);
+		// XXX: someday we might want to uncancel, and this would be the place to do it
+		if (m_cancelled) {
+			return;
+		}
 		m_configured_thread_max = thread_max;
 		lock.unlock();
 		adjust_thread_count();
@@ -309,9 +326,32 @@ namespace crucible {
 	}
 
 	void
+	TaskMasterState::cancel()
+	{
+		unique_lock<mutex> lock(m_mutex);
+		m_cancelled = true;
+		m_configured_thread_max = m_thread_min = m_thread_max = 0;
+		decltype(m_queue) empty_queue;
+		m_queue.swap(empty_queue);
+		m_condvar.notify_all();
+		lock.unlock();
+		start_stop_threads();
+	}
+
+	void
+	TaskMaster::cancel()
+	{
+		s_tms->cancel();
+	}
+
+	void
 	TaskMasterState::set_thread_min_count(size_t thread_min)
 	{
 		unique_lock<mutex> lock(m_mutex);
+		// XXX: someday we might want to uncancel, and this would be the place to do it
+		if (m_cancelled) {
+			return;
+		}
 		m_thread_min = thread_min;
 		lock.unlock();
 		adjust_thread_count();
@@ -328,7 +368,7 @@ namespace crucible {
 	TaskMasterState::loadavg_thread_fn()
 	{
 		pthread_setname_np(pthread_self(), "load_tracker");
-		while (true) {
+		while (!m_cancelled) {
 			adjust_thread_count();
 			nanosleep(5.0);
 		}
@@ -340,6 +380,9 @@ namespace crucible {
 		THROW_CHECK1(out_of_range, target, target >= 0);
 
 		unique_lock<mutex> lock(m_mutex);
+		if (m_cancelled) {
+			return;
+		}
 		m_load_target = target;
 		m_prev_loadavg = getloadavg1();
 
@@ -440,8 +483,8 @@ namespace crucible {
 	TaskConsumer::consumer_thread()
 	{
 		auto master_locked = m_master.lock();
-		while (true) {
-			unique_lock<mutex> lock(master_locked->m_mutex);
+		unique_lock<mutex> lock(master_locked->m_mutex);
+		while (!master_locked->m_cancelled) {
 			if (master_locked->m_thread_max < master_locked->m_threads.size()) {
 				break;
 			}
@@ -461,7 +504,6 @@ namespace crucible {
 			m_current_task.reset();
 		}
 
-		unique_lock<mutex> lock(master_locked->m_mutex);
 		m_thread.detach();
 		master_locked->m_threads.erase(shared_from_this());
 		master_locked->m_condvar.notify_all();

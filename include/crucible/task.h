@@ -55,27 +55,29 @@ namespace crucible {
 
 	class TaskMaster {
 	public:
-		// Blocks until the running thread count reaches this number
+		/// Blocks until the running thread count reaches this number
 		static void set_thread_count(size_t threads);
 
-		// Sets minimum thread count when load average tracking enabled
+		/// Sets minimum thread count when load average tracking enabled
 		static void set_thread_min_count(size_t min_threads);
 
-		// Calls set_thread_count with default
+		/// Calls set_thread_count with default
 		static void set_thread_count();
 
-		// Creates thread to track load average and adjust thread count dynamically
+		/// Creates thread to track load average and adjust thread count dynamically
 		static void set_loadavg_target(double target);
 
-		// Writes the current non-executing Task queue
+		/// Writes the current non-executing Task queue
 		static ostream & print_queue(ostream &);
 
-		// Writes the current executing Task for each worker
+		/// Writes the current executing Task for each worker
 		static ostream & print_workers(ostream &);
 
-		// Gets the current number of queued Tasks
+		/// Gets the current number of queued Tasks
 		static size_t get_queue_count();
 
+		/// Forcibly drop the queue and stop accepting new entries
+		static void cancel();
 	};
 
 	// Barrier executes waiting Tasks once the last BarrierLock
