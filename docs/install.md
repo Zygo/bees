@@ -4,7 +4,7 @@ Building bees
 Dependencies
 ------------
 
-* C++11 compiler (tested with GCC 4.9, 6.2.0, 8.1.0)
+* C++11 compiler (tested with GCC 4.9, 6.3.0, 8.1.0)
 
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
