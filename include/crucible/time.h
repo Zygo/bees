@@ -42,6 +42,7 @@ namespace crucible {
 		RateLimiter(double rate, double burst);
 		RateLimiter(double rate);
 		void sleep_for(double cost = 1.0);
+		double sleep_time(double cost = 1.0);
 		bool is_ready();
 		void borrow(double cost = 1.0);
 	};

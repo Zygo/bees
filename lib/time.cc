@@ -116,23 +116,26 @@ namespace crucible {
 		}
 	}
 
+	double
+	RateLimiter::sleep_time(double cost)
+	{
+		borrow(cost);
+		unique_lock<mutex> lock(m_mutex);
+		update_tokens();
+		if (m_tokens >= 0) {
+			return 0;
+		}
+		return -m_tokens / m_rate;
+	}
+
 	void
 	RateLimiter::sleep_for(double cost)
 	{
-		borrow(cost);
-		while (1) {
-			unique_lock<mutex> lock(m_mutex);
-			update_tokens();
-			if (m_tokens >= 0) {
-				return;
-			}
-			double sleep_time(-m_tokens / m_rate);
-			lock.unlock();
-			if (sleep_time > 0.0) {
-				nanosleep(sleep_time);
-			} else {
-				return;
-			}
+		double time_to_sleep = sleep_time(cost);
+		if (time_to_sleep > 0.0) {
+			nanosleep(time_to_sleep);
+		} else {
+			return;
 		}
 	}
 
