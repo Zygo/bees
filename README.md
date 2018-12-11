@@ -15,7 +15,7 @@ Strengths
 ---------
 
  * Space-efficient hash table and matching algorithms - can use as little as 1 GB hash table per 10 TB unique data (0.1GB/TB)
- * Incremental realtime dedupe of new data using btrfs tree search
+ * Daemon incrementally dedupes new data using btrfs tree search
  * Works with btrfs compression - dedupe any combination of compressed and uncompressed files
  * **NEW** [Works around `btrfs send` problems with dedupe and incremental parent shapshots](docs/options.md)
  * Works around btrfs filesystem structure to free more disk space
@@ -29,7 +29,6 @@ Weaknesses
 ----------
 
  * Whole-filesystem dedupe - has no include/exclude filters, does not accept file lists
- * Runs continuously as a daemon - no quick start/stop
  * Requires root privilege (or `CAP_SYS_ADMIN`)
  * First run may require temporary disk space for extent reorganization
  * [First run may increase metadata space usage if many snapshots exist](docs/gotchas.md)

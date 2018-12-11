@@ -6,11 +6,6 @@ some tunables hardcoded in the source that could eventually become
 configuration options.  There's also an incomplete option parser
 (patches welcome!).
 
-* There's no way to *stop* the bees daemon.  Use SIGKILL, SIGTERM, or
-Ctrl-C for now.  Some of the destructors are unreachable and have never
-been tested.  bees checkpoints its progress every 15 minutes (also not
-configurable, patches welcome) and will repeat some work when restarted.
-
 * The bees process doesn't fork and writes its log to stdout/stderr.
 A shell wrapper is required to make it behave more like a daemon.
 
