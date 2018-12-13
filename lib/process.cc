@@ -14,6 +14,10 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
+#ifndef SIGUNUSED
+#define SIGUNUSED SIGSYS
+#endif
+
 namespace crucible {
 	using namespace std;
 
