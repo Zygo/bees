@@ -13,6 +13,7 @@ namespace crucible {
 
 	using TaskId = uint64_t;
 
+	/// A unit of work to be scheduled by TaskMaster.
 	class Task {
 		shared_ptr<TaskState> m_task_state;
 
@@ -20,34 +21,45 @@ namespace crucible {
 
 	public:
 
-		// create empty Task object
+		/// Create empty Task object.
 		Task() = default;
 
-		// create Task object containing closure and description
+		/// Create Task object containing closure and description.
 		Task(string title, function<void()> exec_fn);
 
-		// schedule Task at end of queue.
-		// May run Task in current thread or in other thread.
-		// May run Task before or after returning.
+		/// Insert at tail of queue (default).
+		void queue_at_tail() const;
+
+		/// Insert at head of queue instead of tail.
+		/// May insert onto current thread/CPU core's queue.
+		void queue_at_head() const;
+
+		// Add other insertion points here (same CPU, time delay, etc).
+
+		/// Schedule Task at designated queue position.
+		/// May run Task in current thread or in other thread.
+		/// May run Task before or after returning.
+		///
+		/// Only one instance of a Task may execute at a time.
+		/// If a Task is already scheduled, run() does nothing.
+		/// If a Task is already running, run() reschedules the
+		/// task after the currently running instance returns.
 		void run() const;
 
-		// schedule Task before other queued tasks
-		void run_earlier() const;
-
-		// describe Task as text
+		/// Describe Task as text.
 		string title() const;
 
-		// Returns currently executing task if called from exec_fn.
-		// Usually used to reschedule the currently executing Task.
+		/// Returns currently executing task if called from exec_fn.
+		/// Usually used to reschedule the currently executing Task.
 		static Task current_task();
 
-		// Ordering for containers
+		/// Ordering operator for containers
 		bool operator<(const Task &that) const;
 
-		// Null test
+		/// Null test
 		operator bool() const;
 
-		// Unique non-repeating(ish) ID for task
+		/// Unique non-repeating(ish) ID for task
 		TaskId id() const;
 	};
 
@@ -76,7 +88,10 @@ namespace crucible {
 		/// Gets the current number of queued Tasks
 		static size_t get_queue_count();
 
-		/// Forcibly drop the queue and stop accepting new entries
+		/// Drop the current queue and discard new Tasks without
+		/// running them.  Currently executing tasks are not
+		/// affected (use set_thread_count(0) to wait for those
+		/// to complete).
 		static void cancel();
 	};
 
@@ -153,9 +168,9 @@ namespace crucible {
 		// objects it holds, and exit its Task function.
 		ExclusionLock try_lock();
 
-		// Execute Task when Exclusion is unlocked (possibly immediately).
-		// First Task is scheduled with run_earlier(), all others are
-		// scheduled with run().
+		// Execute Task when Exclusion is unlocked (possibly
+		// immediately).  First Task is scheduled at head,
+		// all others are scheduled at tail.
 		void insert_task(Task t);
 	};
 
