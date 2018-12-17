@@ -128,6 +128,7 @@ namespace crucible {
 		static void push_back(shared_ptr<TaskState> task);
 		static void push_front(shared_ptr<TaskState> task);
 		size_t get_queue_count();
+		size_t get_thread_count();
 	};
 
 	class TaskConsumer : public enable_shared_from_this<TaskConsumer> {
@@ -322,6 +323,13 @@ namespace crucible {
 	{
 		unique_lock<mutex> lock(s_tms->m_mutex);
 		return s_tms->m_queue.size();
+	}
+
+	size_t
+	TaskMaster::get_thread_count()
+	{
+		unique_lock<mutex> lock(s_tms->m_mutex);
+		return s_tms->m_threads.size();
 	}
 
 	ostream &

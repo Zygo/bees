@@ -99,7 +99,7 @@ BeesContext::dump_status()
 		ofs << "RATES:\n";
 		ofs << "\t" << avg_rates << "\n";
 
-		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " tasks):\n";
+		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " tasks, " << TaskMaster::get_thread_count() << " workers):\n";
 		for (auto t : BeesNote::get_status()) {
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}

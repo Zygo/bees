@@ -88,6 +88,9 @@ namespace crucible {
 		/// Gets the current number of queued Tasks
 		static size_t get_queue_count();
 
+		/// Gets the current number of active workers
+		static size_t get_thread_count();
+
 		/// Drop the current queue and discard new Tasks without
 		/// running them.  Currently executing tasks are not
 		/// affected (use set_thread_count(0) to wait for those
