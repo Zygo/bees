@@ -1,6 +1,54 @@
 bees Gotchas
 ============
 
+C++ Exceptions
+--------------
+
+bees is very paranoid about the data it gets from btrfs, and if btrfs
+does anything bees does not expect, bees will throw an exception and move
+on without touching the offending data.  This will trigger a stack trace
+to the log containing data which is useful for developers to understand
+what happened.
+
+In all cases C++ exceptions in bees are harmless to data on the
+filesystem.  bees handles most exceptions by aborting processing of
+the current extent and moving to the next extent.  In some cases an
+exception may occur in a critical bees thread, which will stop the bees
+process from making any further progress; however, these cases are rare
+and are typically caused by unusual filesystem conditions (e.g. [freshly
+formatted filesystem with no
+data](https://github.com/Zygo/bees/issues/93)) or lack of memory or
+other resources.
+
+The following are common cases that users may encounter:
+
+* If a snapshot is deleted, bees will generate a burst of exceptions for
+references to files in the snapshot that no longer exist.  This lasts
+until the FD caches are cleared, usually a few minutes with default
+btrfs mount options.  These generally look like:
+
+	`std::system_error: BTRFS_IOC_TREE_SEARCH_V2: [path] at fs.cc:844: No such file or directory`
+
+* If data is modified at the same time it is being scanned, bees will get
+an inconsistent version of the data layout in the filesystem, causing
+the `ExtentWalker` class to throw various constraint-check exceptions.
+The exception causes bees to retry the extent in a later filesystem scan
+(hopefully when the file is no longer being modified).  The exception
+text is similar to:
+
+	`std::runtime_error: fm.rbegin()->flags() = 776 failed constraint check (fm.rbegin()->flags() & FIEMAP_EXTENT_LAST) at extentwalker.cc:229`
+
+  but the line number or specific code fragment may vary.
+
+* If there are too many possible matching blocks within a pair of extents,
+bees will loop billions of times considering all possibilities.  This is
+a waste of time, so an exception is currently used to break out of such
+loops early.  The exception text in this case is:
+
+	`FIXME: bailing out here, need to fix this further up the call stack`
+
+
+
 Snapshots
 ---------
 
@@ -101,7 +149,3 @@ Other Gotchas
   images), the deletion of the file can be delayed indefinitely.
   To limit this delay, bees closes all FDs in its file FD cache every
   10 btrfs transactions.
-
-* If a snapshot is deleted, bees will generate a burst of exceptions
-  for references to files in the snapshot that no longer exist.  This
-  lasts until the FD caches are cleared.
