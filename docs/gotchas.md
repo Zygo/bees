@@ -48,6 +48,77 @@ loops early.  The exception text in this case is:
 	`FIXME: bailing out here, need to fix this further up the call stack`
 
 
+Terminating bees with SIGTERM
+-----------------------------
+
+bees is designed to survive host crashes, so it is safe to terminate
+bees using SIGKILL; however, when bees next starts up, it will repeat
+some work that was performed between the last bees crawl state save point
+and the SIGKILL (up to 15 minutes).  If bees is stopped and started less
+than once per day, then this is not a problem as the proportional impact
+is quite small; however, users who stop and start bees daily or even
+more often may prefer to have a clean shutdown with SIGTERM so bees can
+restart faster.
+
+bees handling of SIGTERM can take a long time on machines with some or
+all of:
+
+   * Large RAM and `vm.dirty_ratio`
+   * Large number of active bees worker threads
+   * Large number of bees temporary files (proportional to thread count)
+   * Large hash table size
+   * Large filesystem size
+   * High IO latency, especially "low power" spinning disks
+   * High filesystem activity, especially duplicate data writes
+
+Each of these factors individually increases the total time required
+to perform a clean bees shutdown.  When combined, the factors can
+multiply with each other, dramatically increasing the time required to
+flush bees state to disk.
+
+On a large system with many of the above factors present, a "clean"
+bees shutdown can take more than 20 minutes.  Even a small machine
+(16GB RAM, 1GB hash table, 1TB NVME disk) can take several seconds to
+complete a SIGTERM shutdown.
+
+The shutdown procedure performs potentially long-running tasks in
+this order:
+
+   1.  Worker threads finish executing their current Task and exit.
+       Threads executing `LOGICAL_INO` ioctl calls usually finish quickly,
+       but btrfs imposes no limit on the ioctl's running time, so it
+       can take several minutes in rare bad cases.  If there is a btrfs
+       commit already in progress on the filesystem, then most worker
+       threads will be blocked until the btrfs commit is finished.
+
+   2.  Crawl state is saved to `$BEESHOME`.  This normally completes
+       relatively quickly (a few seconds at most).  This is the most
+       important bees state to save to disk as it directly impacts
+       restart time, so it is done as early as possible (but no earlier).
+
+   3.  Hash table is written to disk.  Normally the hash table is
+       trickled back to disk at a rate of about 2GB per hour;
+       however, SIGTERM causes bees to attempt to flush the whole table
+       immediately.  If bees has recently been idle then the hash table is
+       likely already flushed to disk, so this step will finish quickly;
+       however, if bees has recently been active and the hash table is
+       large relative to RAM size, the blast of rapidly written data
+       can force the Linux VFS to block all writes to the filesystem
+       for sufficient time to complete all pending btrfs metadata
+       writes which accumulated during the btrfs commit before bees
+       received SIGTERM...and _then_ let bees write out the hash table.
+       The time spent here depends on the size of RAM, speed of disks,
+       and aggressiveness of competing filesystem workloads.
+
+   4.  bees temporary files are closed, which implies deletion of their
+       inodes.  These are files which consist entirely of shared extent
+       structures, and btrfs takes an unusually long time to delete such
+       files (up to a few minutes for each on slow spinning disks).
+
+If bees is terminated with SIGKILL, only step #1 and #4 are performed (the
+kernel performs these automatically if bees exits).  This reduces the
+shutdown time at the cost of increased startup time.
+
 
 Snapshots
 ---------
