@@ -78,41 +78,58 @@ do_cmd_help(char *argv[])
 // tracing ----------------------------------------
 
 thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
+thread_local bool BeesTracer::tl_silent = false;
 
 BeesTracer::~BeesTracer()
 {
-	if (uncaught_exception()) {
+	if (!tl_silent && uncaught_exception()) {
 		try {
 			m_func();
 		} catch (exception &e) {
-			BEESLOGERR("Nested exception: " << e.what());
+			BEESLOGNOTICE("Nested exception: " << e.what());
 		} catch (...) {
-			BEESLOGERR("Nested exception ...");
+			BEESLOGNOTICE("Nested exception ...");
 		}
 		if (!m_next_tracer) {
-			BEESLOGERR("---  END  TRACE --- exception ---");
+			BEESLOGNOTICE("---  END  TRACE --- exception ---");
 		}
 	}
 	tl_next_tracer = m_next_tracer;
+	if (!m_next_tracer) {
+		tl_silent = false;
+	}
 }
 
-BeesTracer::BeesTracer(function<void()> f) :
+BeesTracer::BeesTracer(function<void()> f, bool silent) :
 	m_func(f)
 {
 	m_next_tracer = tl_next_tracer;
 	tl_next_tracer = this;
+	tl_silent = silent;
 }
 
 void
 BeesTracer::trace_now()
 {
 	BeesTracer *tp = tl_next_tracer;
-	BEESLOGERR("--- BEGIN TRACE ---");
+	BEESLOGNOTICE("--- BEGIN TRACE ---");
 	while (tp) {
 		tp->m_func();
 		tp = tp->m_next_tracer;
 	}
-	BEESLOGERR("---  END  TRACE ---");
+	BEESLOGNOTICE("---  END  TRACE ---");
+}
+
+bool
+BeesTracer::get_silent()
+{
+	return tl_silent;
+}
+
+void
+BeesTracer::set_silent()
+{
+	tl_silent = true;
 }
 
 thread_local BeesNote *BeesNote::tl_next = nullptr;
@@ -721,8 +738,13 @@ int
 bees_main(int argc, char *argv[])
 {
 	set_catch_explainer([&](string s) {
-		BEESLOGERR("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
-		BEESCOUNT(exception_caught);
+		if (BeesTracer::get_silent()) {
+			BEESLOGDEBUG("exception (ignored): " << s);
+			BEESCOUNT(exception_caught_silent);
+		} else {
+			BEESLOGNOTICE("\n\n*** EXCEPTION ***\n\t" << s << "\n***\n");
+			BEESCOUNT(exception_caught);
+		}
 	});
 
 	// The thread name for the main function is also what the kernel
@@ -921,6 +943,7 @@ main(int argc, char *argv[])
 	catch_and_explain([&]() {
 		rv = bees_main(argc, argv);
 	});
+	BEESLOGNOTICE("Exiting with status " << rv << " " << (rv ? "(failure)" : "(success)"));
 	return rv;
 }
 

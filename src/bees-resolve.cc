@@ -415,6 +415,7 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
 		if (bbd.addr().get_physical_or_zero() == src_bbd.addr().get_physical_or_zero()) {
 			BEESCOUNT(replacedst_same);
 			// stop looping here, all the other srcs will probably fail this test too
+			BeesTracer::set_silent();
 			throw runtime_error("FIXME: bailing out here, need to fix this further up the call stack");
 		}
 

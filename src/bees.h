@@ -183,10 +183,13 @@ class BeesTracer {
 	BeesTracer *m_next_tracer = 0;
 
 	thread_local static BeesTracer *tl_next_tracer;
+	thread_local static bool tl_silent;
 public:
-	BeesTracer(function<void()> f);
+	BeesTracer(function<void()> f, bool silent = false);
 	~BeesTracer();
 	static void trace_now();
+	static bool get_silent();
+	static void set_silent();
 };
 
 class BeesNote {
