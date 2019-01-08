@@ -119,6 +119,50 @@ If bees is terminated with SIGKILL, only step #1 and #4 are performed (the
 kernel performs these automatically if bees exits).  This reduces the
 shutdown time at the cost of increased startup time.
 
+Balances
+--------
+
+A btrfs balance relocates data on disk by making a new copy of the
+data, replacing all references to the old data with references to the
+new copy, and deleting the old copy.  To bees, this is the same as any
+other combination of new and deleted data (e.g. from defrag, or ordinary
+file operations):  some new data has appeared (to be scanned) and some
+old data has disappeared (to be removed from the hash table when it is
+detected).
+
+As bees scans the newly balanced data, it will get hits on the hash
+table pointing to the old data (it's identical data, so it would look
+like a duplicate).  These old hash table entries will not be valid any
+more, so when bees tries to compare new data with old data, it will not
+be able to find the old data at the old address, and bees will delete
+the hash table entries.  If no other duplicates are found, bees will
+then insert new hash table entries pointing to the new data locations.
+The erase is performed before the insert, so the new data simply replaces
+the old and there is (little or) no impact on hash table entry lifetimes
+(depending on how overcommitted the hash table is).  Each block is
+processed one at a time, which can be slow if there are many of them.
+
+Routine btrfs maintenance balances rarely need to relocate more than 0.1%
+of the total filesystem data, so the impact on bees is small even after
+taking into account the extra work bees has to do.
+
+If the filesystem must undergo a full balance (e.g. because disks were
+added or removed, or to change RAID profiles), then every data block on
+the filesystem will be relocated to a new address, which invalidates all
+the data in the bees hash table at once.  bees and the full balance will
+both work correctly if they are both allowed to run at the same time,
+but it is quite slow.  In such cases it is a good idea to:
+
+  1.  Stop bees before the full balance starts,
+  2.  Wipe the `$BEESHOME` directory (or delete and recreate `beeshash.dat`),
+  3.  Restart bees after the full balance is finished.
+
+bees will perform a full filesystem scan automatically after the balance
+since all the data has "new" btrfs transids.  bees won't waste any time
+invalidating stale hash table data after the balance if the hash table
+is empty.  This can considerably improve the performance of both bees
+(since it has no stale hash table entries to invalidate) and btrfs balance
+(since it's not competing with bees for iops).
 
 Snapshots
 ---------
