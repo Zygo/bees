@@ -31,6 +31,7 @@ using namespace crucible;
 using namespace std;
 
 int bees_log_level = 8;
+bool bees_tmpfile_compression_disabled = false;
 
 void
 do_cmd_help(char *argv[])
@@ -56,6 +57,7 @@ do_cmd_help(char *argv[])
 		"\n"
 		"Workarounds:\n"
 		"    -a, --workaround-btrfs-send    Workaround for btrfs send\n"
+		"    -N, --no-tmpfile-compression   Disable compression for temporary files\n"
 		"\n"
 		"Logging options:\n"
 		"    -t, --timestamps      Show timestamps in log output (default)\n"
@@ -513,11 +515,13 @@ BeesTempFile::create()
 	m_ctx->insert_root_ino(m_fd);
 
 	// Set compression attribute
-	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
-	int flags = ioctl_iflags_get(m_fd);
-	flags |= FS_COMPR_FL;
-	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	ioctl_iflags_set(m_fd, flags);
+	if(!bees_tmpfile_compression_disabled) {
+		BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
+		int flags = ioctl_iflags_get(m_fd);
+		flags |= FS_COMPR_FL;
+		BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
+		ioctl_iflags_set(m_fd, flags);
+	}
 
 	// Always leave first block empty to avoid creating a file with an inline extent
 	m_end_offset = BLOCK_SIZE_CLONE;
@@ -779,6 +783,7 @@ bees_main(int argc, char *argv[])
 		{ "strip-paths",           no_argument,       NULL, 'P' },
 		{ "no-timestamps",         no_argument,       NULL, 'T' },
 		{ "workaround-btrfs-send", no_argument,       NULL, 'a' },
+		{ "no-tmpfile-compression", no_argument,      NULL, 'N' },
 		{ "thread-count",          required_argument, NULL, 'c' },
 		{ "loadavg-target",        required_argument, NULL, 'g' },
 		{ "help",                  no_argument,       NULL, 'h' },
@@ -831,6 +836,9 @@ bees_main(int argc, char *argv[])
 				break;
 			case 'a':
 				workaround_btrfs_send = true;
+				break;
+			case 'N':
+				bees_tmpfile_compression_disabled = true;
 				break;
 			case 'c':
 				thread_count = stoul(optarg);
