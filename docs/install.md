@@ -9,8 +9,12 @@ Dependencies
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
 
-* btrfs-progs (tested with 4.1..4.15.1) or libbtrfs-dev
-  (tested with version 4.16.1)
+  Note that the C++ standard--and GCC's implementation of it--is evolving.
+  There may be problems when building with newer compiler versions.
+  Build failure reports welcome!
+
+* btrfs-progs (tested with 4.1..4.20.2) or libbtrfs-dev
+  (tested with version 4.20.2)
 
   Needed for btrfs.h and ctree.h during compile.
   Also needed by the service wrapper script.
