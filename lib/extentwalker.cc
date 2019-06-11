@@ -470,7 +470,7 @@ namespace crucible {
 	BtrfsExtentWalker::Vec
 	BtrfsExtentWalker::get_extent_map(off_t pos)
 	{
-		BtrfsIoctlSearchKey sk(sc_extent_fetch_max * (sizeof(btrfs_file_extent_item) + sizeof(btrfs_ioctl_search_header)));
+		BtrfsIoctlSearchKey sk(65536);
 		if (!m_root_fd) {
 			m_root_fd = m_fd;
 		}
