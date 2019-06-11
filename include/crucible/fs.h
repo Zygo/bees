@@ -39,11 +39,6 @@ namespace crucible {
 		vector<BtrfsExtentInfo> m_info;
 	};
 
-	struct BtrfsExtentSameByClone : public BtrfsExtentSame {
-		using BtrfsExtentSame::BtrfsExtentSame;
-		void do_ioctl() override;
-	};
-
 	ostream & operator<<(ostream &os, const btrfs_ioctl_same_extent_info *info);
 	ostream & operator<<(ostream &os, const btrfs_ioctl_same_args *info);
 	ostream & operator<<(ostream &os, const BtrfsExtentSame &bes);

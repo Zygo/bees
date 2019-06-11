@@ -136,51 +136,6 @@ namespace crucible {
 		DIE_IF_MINUS_ONE(ioctl(dst_fd, BTRFS_IOC_CLONE_RANGE, &args));
 	}
 
-	// Userspace emulation of extent-same ioctl to work around kernel bugs
-	// (a memory leak, a deadlock, inability to cope with unaligned EOF, and a length limit)
-	// The emulation is incomplete:  no locking, and we always change ctime
-	void
-	BtrfsExtentSameByClone::do_ioctl()
-	{
-		if (length <= 0) {
-			throw out_of_range(string("length = 0 in ") + __PRETTY_FUNCTION__);
-		}
-		vector<char> cmp_buf_common(length);
-		vector<char> cmp_buf_iter(length);
-		pread_or_die(m_fd, cmp_buf_common.data(), length, logical_offset);
-		for (auto i = m_info.begin(); i != m_info.end(); ++i) {
-			i->status = -EIO;
-			i->bytes_deduped = 0;
-
-			// save atime/ctime for later
-			Stat target_stat(i->fd);
-
-			pread_or_die(i->fd, cmp_buf_iter.data(), length, i->logical_offset);
-			if (cmp_buf_common == cmp_buf_iter) {
-
-				// This never happens, so stop checking.
-				// assert(!memcmp(cmp_buf_common.data(), cmp_buf_iter.data(), length));
-
-				btrfs_clone_range(m_fd, logical_offset, length, i->fd, i->logical_offset);
-				i->status = 0;
-				i->bytes_deduped = length;
-
-				// The extent-same ioctl does not change mtime (as of patch v4)
-				struct timespec restore_ts[2] = {
-					target_stat.st_atim,
-					target_stat.st_mtim
-				};
-
-				// Ignore futimens failure as the real extent-same ioctl would never raise it
-				futimens(i->fd, restore_ts);
-
-			} else {
-				assert(memcmp(cmp_buf_common.data(), cmp_buf_iter.data(), length));
-				i->status = BTRFS_SAME_DATA_DIFFERS;
-			}
-		}
-	}
-
 	void
 	BtrfsExtentSame::do_ioctl()
 	{
