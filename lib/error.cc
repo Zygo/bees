@@ -32,7 +32,7 @@ namespace crucible {
 
 	// FIXME:  could probably avoid some of these levels of indirection
 	static
-	function<void(string s)> current_catch_explainer = [&](string s) {
+	function<void(string s)> current_catch_explainer = [](string s) {
 		cerr << s << endl;
 	};
 
