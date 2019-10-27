@@ -8,9 +8,11 @@
 #include <utility>
 
 // for gettid()
+#ifndef SYS_GETTID
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#endif // SYS_GETTID
 #include <unistd.h>
 #include <sys/syscall.h>
 
@@ -114,11 +116,13 @@ namespace crucible {
 	template<>
 	struct ResourceHandle<Process::id, Process>;
 
+#ifndef SYS_GETTID
 	pid_t
 	gettid()
 	{
 		return syscall(SYS_gettid);
 	}
+#endif // SYS_GETTID
 
 	double
 	getloadavg1()

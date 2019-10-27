@@ -10,6 +10,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 30) || __GLIBC__ > 2
+#define SYS_GETTID 1
+#endif  // __GLIBC__ && __GLIBC_MINOR__
+
 namespace crucible {
 	using namespace std;
 
@@ -73,7 +77,9 @@ namespace crucible {
 
 	typedef ResourceHandle<Process::id, Process> Pid;
 
+#ifndef SYS_GETTID
 	pid_t gettid();
+#endif  // SYS_GETTID
 	double getloadavg1();
 	double getloadavg5();
 	double getloadavg15();
