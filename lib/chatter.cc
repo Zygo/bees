@@ -69,14 +69,14 @@ namespace crucible {
 			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &ltm));
 
 			header_stream << buf;
-			header_stream << " " << getpid() << "." << gettid() << "<" << m_loglevel << ">";
+			header_stream << " " << getpid() << "." << crucible::gettid() << "<" << m_loglevel << ">";
 			if (!m_name.empty()) {
 				header_stream << " " << m_name;
 			}
 		} else {
 			header_stream << "<" << m_loglevel << ">";
 			header_stream << (m_name.empty() ? "thread" : m_name);
-			header_stream << "[" << gettid() << "]";
+			header_stream << "[" << crucible::gettid() << "]";
 		}
 
 		header_stream << ": ";
