@@ -943,7 +943,6 @@ BeesContext::stop()
 {
 	Timer stop_timer;
 	BEESLOGNOTICE("Stopping bees...");
-	BEESLOGWARN("WARNING: This feature is EXPERIMENTAL and may not work!");
 
 	BEESNOTE("setting stop_request flag");
 
