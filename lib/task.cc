@@ -594,6 +594,8 @@ namespace crucible {
 	void
 	TaskMasterState::loadavg_thread_fn()
 	{
+		sched_param param = { .sched_priority = 0 };
+		pthread_setschedparam(pthread_self(), SCHED_ISO, &param);
 		pthread_setname_np(pthread_self(), "load_tracker");
 		while (!m_cancelled) {
 			adjust_thread_count();
