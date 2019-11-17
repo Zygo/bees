@@ -572,7 +572,7 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 void
 BeesRoots::start()
 {
-	m_crawl_thread.exec([&]() {
+	m_crawl_thread.exec(SCHED_IDLE, [&]() {
 		// Measure current transid before creating any crawlers
 		catch_all([&]() {
 			m_transid_re.update(transid_max_nocache());
@@ -583,7 +583,7 @@ BeesRoots::start()
 			state_load();
 		});
 
-		m_writeback_thread.exec([&]() {
+		m_writeback_thread.exec(SCHED_IDLE, [&]() {
 			writeback_thread();
 		});
 		crawl_thread();

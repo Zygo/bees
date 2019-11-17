@@ -980,10 +980,10 @@ BeesContext::start()
 
 	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_status_thread = make_shared<BeesThread>("status_report");
-	m_progress_thread->exec([=]() {
+	m_progress_thread->exec(SCHED_OTHER, [=]() {
 		show_progress();
 	});
-	m_status_thread->exec([=]() {
+	m_status_thread->exec(SCHED_OTHER, [=]() {
 		dump_status();
 	});
 
