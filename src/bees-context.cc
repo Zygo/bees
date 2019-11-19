@@ -812,26 +812,67 @@ BeesResolveAddrResult::BeesResolveAddrResult()
 {
 }
 
+void
+BeesContext::wait_for_balance()
+{
+	Timer balance_timer;
+	BEESNOTE("WORKAROUND: waiting for balance to stop");
+	while (true) {
+		btrfs_ioctl_balance_args args;
+		memset_zero<btrfs_ioctl_balance_args>(&args);
+		const int ret = ioctl(root_fd(), BTRFS_IOC_BALANCE_PROGRESS, &args);
+		if (ret < 0) {
+			// Either can't get balance status or not running, exit either way
+			break;
+		}
+
+		if (!(args.state & BTRFS_BALANCE_STATE_RUNNING)) {
+			// Balance not running, doesn't matter if paused or cancelled
+			break;
+		}
+
+		BEESLOGDEBUG("WORKAROUND: Waiting " << balance_timer << "s for balance to stop");
+		unique_lock<mutex> lock(m_abort_mutex);
+		if (m_abort_requested) {
+			// Force the calling function to stop.	We cannot
+			// proceed to LOGICAL_INO while balance is running
+			// until the bugs are fixed, and it's probably
+			// not going to be particularly fast to have
+			// both bees and balance banging the disk anyway.
+			BeesTracer::set_silent();
+			throw std::runtime_error("Stop requested while balance running");
+		}
+		m_abort_condvar.wait_for(lock, chrono::duration<double>(BEES_BALANCE_POLL_INTERVAL));
+	}
+}
+
 BeesResolveAddrResult
 BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
 	THROW_CHECK1(invalid_argument, addr, !addr.is_magic());
 	THROW_CHECK0(invalid_argument, !!root_fd());
 
-#if 0
 	// If we look at per-thread CPU usage we get a better estimate of
 	// how badly btrfs is performing without confounding factors like
 	// transaction latency, competing threads, and freeze/SIGSTOP
 	// pausing the bees process.
 
+#if 0
 	// There can be only one of these running at a time, or the slow
 	// backrefs bug will kill the whole system.  Also it looks like there
 	// are so many locks held while LOGICAL_INO runs that there is no
 	// point in trying to run two of them on the same filesystem.
+	// ...but it works most of the time, and the performance hit from
+	// not running resolve in multiple threads is significant.
 	BEESNOTE("waiting to resolve addr " << addr);
 	static mutex s_resolve_mutex;
 	unique_lock<mutex> lock(s_resolve_mutex);
 #endif
+
+	// Is there a bug where resolve and balance cause a crash (BUG_ON at fs/btrfs/ctree.c:1227)?
+	// Apparently yes, and more than one.
+	// Wait for the balance to finish before we run LOGICAL_INO
+	wait_for_balance();
 
 	// Time how long this takes
 	Timer resolve_timer;
@@ -944,12 +985,18 @@ BeesContext::stop()
 	Timer stop_timer;
 	BEESLOGNOTICE("Stopping bees...");
 
-	BEESNOTE("setting stop_request flag");
+	BEESNOTE("aborting blocked tasks");
+	BEESLOGDEBUG("Aborting blocked tasks");
+	unique_lock<mutex> abort_lock(m_abort_mutex);
+	m_abort_requested = true;
+	m_abort_condvar.notify_all();
+	abort_lock.unlock();
 
 	BEESNOTE("pausing work queue");
 	BEESLOGDEBUG("Pausing work queue");
 	TaskMaster::set_thread_count(0);
 
+	BEESNOTE("setting stop_request flag");
 	BEESLOGDEBUG("Setting stop_request flag");
 	unique_lock<mutex> lock(m_stop_mutex);
 	m_stop_requested = true;
