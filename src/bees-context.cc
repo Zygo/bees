@@ -773,11 +773,42 @@ BeesResolveAddrResult::BeesResolveAddrResult()
 {
 }
 
+void
+BeesContext::wait_for_balance()
+{
+	Timer balance_timer;
+	BEESNOTE("WORKAROUND: waiting for balance to stop");
+	while (true) {
+		btrfs_ioctl_balance_args args;
+		memset_zero<btrfs_ioctl_balance_args>(&args);
+		const int ret = ioctl(root_fd(), BTRFS_IOC_BALANCE_PROGRESS, &args);
+		if (ret < 0) {
+			// Either can't get balance status or not running, exit either way
+			break;
+		}
+
+		if (!(args.state & BTRFS_BALANCE_STATE_RUNNING)) {
+			// Balance not running, doesn't matter if paused or cancelled
+			break;
+		}
+
+		BEESLOGDEBUG("WORKAROUND: Waiting " << balance_timer << "s for balance to stop");
+		sleep(BEES_BALANCE_POLL_INTERVAL);
+	}
+}
+
 BeesResolveAddrResult
 BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
 	THROW_CHECK1(invalid_argument, addr, !addr.is_magic());
 	THROW_CHECK0(invalid_argument, !!root_fd());
+
+	// Is there a bug where resolve and balance cause a crash (BUG_ON at fs/btrfs/ctree.c:1227)?
+	// Apparently yes, and more than one.
+	// Wait for the balance to finish before we run LOGICAL_INO
+	wait_for_balance();
+
+	// Time how long this takes
 	Timer resolve_timer;
 
 	// There is no performance benefit if we restrict the buffer size.

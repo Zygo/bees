@@ -117,6 +117,9 @@ const size_t BEES_TRANSID_FACTOR = 10;
 // The actual limit in LOGICAL_INO seems to be 2730, but let's leave a little headroom
 const size_t BEES_MAX_EXTENT_REF_COUNT = 2560;
 
+// Wait this long for a balance to stop
+const double BEES_BALANCE_POLL_INTERVAL = 60.0;
+
 // Flags
 const int FLAGS_OPEN_COMMON   = O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC | O_NOATIME | O_LARGEFILE | O_NOCTTY;
 const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;
@@ -716,6 +719,7 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	void set_root_fd(Fd fd);
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
+	void wait_for_balance();
 
 	BeesFileRange scan_one_extent(const BeesFileRange &bfr, const Extent &e);
 	void rewrite_file_range(const BeesFileRange &bfr);
