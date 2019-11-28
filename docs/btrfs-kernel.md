@@ -1,10 +1,13 @@
 Recommended kernel version
 ==========================
 
-Currently 5.0.4, 5.1, and *chronologically* later versions are recommended
-to avoid all currently known and fixed kernel issues and obtain best
-performance.  Older kernel versions can be used with bees with some
-caveats (see below).
+Currently 5.0.21, 5.3.4, and *chronologically* later versions are
+recommended to avoid all currently known and fixed kernel issues and
+obtain best performance.  Older kernel versions can be used with bees
+with some caveats (see below).
+
+Kernels 5.1.21 and 5.2.21 are *not recommended* due to possible conflicts
+between LOGICAL_INO and btrfs balance.
 
 All unmaintained kernel trees (those which do not receive -stable updates)
 should be avoided due to potential data corruption bugs.
@@ -61,14 +64,50 @@ Later, when rsync renames the modified temporary file over the original
 file, the rename in rsync can occasionally deadlock with the dedupe
 in bees.
 
-This bug is **fixed** in the following kernel versions:
-
-* **5.1 or later** versions.
-
-* **5.0.4 or later 5.0.y** versions.
+This bug is **fixed** in 5.0.4 and later kernel versions.
 
 The commit that fixes this bug is 4ea748e1d2c9f8a27332b949e8210dbbf392987e
 "btrfs: fix deadlock between clone/dedupe and rename".
+
+
+LOGICAL_INO and btrfs balance WARNING
+-------------------------------------
+
+There are at least two bugs that can be triggered by running the
+`LOGICAL_INO` ioctl (which bees uses heavily) and btrfs balance at
+the same time.  One of these is fixed as of kernel 5.3.4 with commit
+efad8a853ad2057f96664328a0d327a05ce39c76 "Btrfs: fix use-after-free when
+using the tree modification log".
+
+The other bug(s) still cause crashes in testing, their root cause is
+unknown, and no fix is currently available as of 5.3.13.
+
+As a workaround, bees will simply detect that a btrfs balance is running,
+and pause bees execution until the balance is done.  This avoids running
+both the `LOGICAL_INO` ioctl and btrfs balance at the same time, which so
+far seems to prevent the bug from occurring.
+
+Note that in the worst cases, this bug is believed to cause filesystem
+metadata corruption on 5.1.21 and 5.2.21 kernels (i.e. metadata corruption
+definitely happens on these kernels, and it seems to happen under the
+same conditions as other crashes, though the connection between the
+known behavior and unknown bug(s) is unknown).
+
+Kernel 5.2 will detect the metadata corruption before writing it to disk,
+and force a transaction abort, leaving the filesystem mounted read-only.
+Kernel 5.1 has no such detection capability, and will corrupt the metadata
+on disk.  Once metadata corruption is persisted on disk, a `btrfs check
+--repair` often repairs the damage.  Note that `btrfs check --repair` is a
+high-risk operation, so make a backup of the disk, or copy all of the data
+with `btrfs restore`, before attempting to run `btrfs check --repair`.
+
+So far, 5.0 and earlier kernels will only crash when encountering these
+bugs, no metadata corruption has yet been observed.  The known bug
+affects kernels 3.10 and later (i.e. every kernel that can run bees).
+The unknown bug's age is unknown, it has only been easily reproducible
+after the first bug was fixed.
+
+
 
 
 
@@ -78,6 +117,11 @@ A Brief List Of btrfs Kernel Bugs
 Unfixed kernel bugs (as of 5.0.21):
 
 Minor kernel problems with workarounds:
+
+* **Conflicts between `LOGICAL_INO` ioctl and btrfs balance**:
+  bees will simply check to see if a balance is running immediately
+  before invoking the `LOGICAL_INO` ioctl, and delay execution until
+  the balance is no longer running.
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
   if the number of references to a single shared extent grows too high,
@@ -121,22 +165,6 @@ Minor kernel problems with workarounds:
   [`--thread-count` option](options.md).  It is possible this is the
   same bug as the next one:
 
-* **Storm of Soft Lockups**, a bug that occurs when running the
-  `LOGICAL_INO` ioctl in a large number of threads, leads to a soft lockup
-  on all CPUs.  Some details and analysis is available on [the btrfs
-  mailing list](https://www.spinics.net/lists/linux-btrfs/msg89326.html).
-  This occurs after hitting a BUG_ON in `fs/btrfs/ctree.c`:
-
-        switch (tm->op) {
-                case MOD_LOG_KEY_REMOVE_WHILE_FREEING:
-                        BUG_ON(tm->slot < n);
-                        /* Fallthrough */
-
-  The rate of incidence of this bug seems to depend on the total number
-  of bees threads running on the system, although occasionally other
-  processes such as `rsync` or `btrfs balance` are involved.  A workaround
-  is to run only 1 bees thread, i.e.  [`--thread-count=1`](options.md).
-
 * **Spurious warnings in `fs/fs-writeback.c`** on kernel 4.15 and later
   when filesystem is mounted with `flushoncommit`.  These
   seem to be harmless (there are other locks which prevent
@@ -157,4 +185,5 @@ Minor kernel problems with workarounds:
   This also seems harmless, but there have been [no comments
   since this issue was reported to the `linux-btrfs` mailing
   list](https://www.spinics.net/lists/linux-btrfs/msg89061.html).
+  Later kernels do not produce this warning.
   Workaround:  patch kernel to remove the warning.

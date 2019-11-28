@@ -122,6 +122,10 @@ shutdown time at the cost of increased startup time.
 Balances
 --------
 
+First, read [`LOGICAL_INO` and btrfs balance WARNING](btrfs-kernel.md).
+bees will suspend operations during a btrfs balance to work around
+kernel bugs.
+
 A btrfs balance relocates data on disk by making a new copy of the
 data, replacing all references to the old data with references to the
 new copy, and deleting the old copy.  To bees, this is the same as any
@@ -149,9 +153,7 @@ taking into account the extra work bees has to do.
 If the filesystem must undergo a full balance (e.g. because disks were
 added or removed, or to change RAID profiles), then every data block on
 the filesystem will be relocated to a new address, which invalidates all
-the data in the bees hash table at once.  bees and the full balance will
-both work correctly if they are both allowed to run at the same time,
-but it is quite slow.  In such cases it is a good idea to:
+the data in the bees hash table at once.  In such cases it is a good idea to:
 
   1.  Stop bees before the full balance starts,
   2.  Wipe the `$BEESHOME` directory (or delete and recreate `beeshash.dat`),
