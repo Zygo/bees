@@ -21,24 +21,14 @@
 using namespace crucible;
 using namespace std;
 
-// until we reboot some machines
-// it's time to reboot some machines
-// not until the latest memory leak is fixed
-// OK Go
-#if 1
 #define EXTENT_SAME_CLASS BtrfsExtentSame
 static const bool ALWAYS_ALIGN = false;
-#else
-#define EXTENT_SAME_CLASS BtrfsExtentSameByClone
-static const bool ALWAYS_ALIGN = false;
-#endif
 
 static const int EXTENT_ALIGNMENT = 4096;
 
-// Not much point in exceeding this.  btrfs should (?)  merge adjacent
-// extents, non-adjacent extents have to be separate anyway, and it has
-// really nasty latency when it gets big.
 // const off_t max_step_size = BTRFS_MAX_DEDUPE_LEN;
+// btrfs maximum extent size is 128M, there is nothing to gain by going larger;
+// however, going smaller will create a bunch of adjacent split extent refs.
 const off_t max_step_size = 128 * 1024 * 1024;
 
 // Not a good idea to go below 4K
