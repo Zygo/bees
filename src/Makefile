@@ -1,5 +1,7 @@
 BEES = ../bin/bees
 PROGRAMS = \
+	../bin/bees \
+	../bin/btrsame \
 	../bin/fiemap \
 	../bin/fiewalk \
 
@@ -35,7 +37,7 @@ depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
 
 include depends.mk
 
-$(BEES_OBJS) fiemap.o fiewalk.o: %.o: %.cc
+$(BEES_OBJS) fiemap.o fiewalk.o btrsame.o: %.o: %.cc
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
 $(PROGRAMS): ../bin/%: %.o
@@ -45,6 +47,9 @@ bees-version.o: %.o: %.c
 	$(CC) $(BEES_CFLAGS) -o $@ -c $<
 
 $(BEES): $(BEES_OBJS) bees-version.o
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
+
+../bin/btrsame: btrsame.o
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
