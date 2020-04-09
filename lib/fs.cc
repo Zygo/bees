@@ -316,14 +316,14 @@ namespace crucible {
 	BtrfsIoctlLogicalInoArgs::set_flags(uint64_t new_flags)
 	{
 		// We are still supporting building with old headers that don't have .flags yet
-		reserved[3] = new_flags;
+		*(&reserved[0] + 3) = new_flags;
 	}
 
 	uint64_t
 	BtrfsIoctlLogicalInoArgs::get_flags() const
 	{
 		// We are still supporting building with old headers that don't have .flags yet
-		return reserved[3];
+		return *(&reserved[0] + 3);
 	}
 
 	bool
