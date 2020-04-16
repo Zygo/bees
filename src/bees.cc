@@ -187,10 +187,12 @@ BeesNote::get_name()
 	// OK try the pthread name next.
 	char buf[24];
 	memset(buf, '\0', sizeof(buf));
+#ifdef _GNU_SOURCE
 	int err = pthread_getname_np(pthread_self(), buf, sizeof(buf));
 	if (err) {
 		return string("pthread_getname_np: ") + strerror(err);
 	}
+#endif
 	buf[sizeof(buf) - 1] = '\0';
 
 	// thread_getname_np returns process name
