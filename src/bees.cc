@@ -31,6 +31,7 @@ using namespace crucible;
 using namespace std;
 
 int bees_log_level = 8;
+int bees_initialized = 0;
 
 void
 do_cmd_help(char *argv[])
@@ -755,13 +756,6 @@ bees_main(int argc, char *argv[])
 
 	THROW_CHECK1(invalid_argument, argc, argc >= 0);
 
-	// Have to block signals now before we create a bunch of threads
-	// so the threads will also have the signals blocked.
-	block_term_signal();
-
-	// Create a context so we can apply configuration to it
-	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
-
 	string cwd(readlink_or_die("/proc/self/cwd"));
 
 	// Defaults
@@ -771,6 +765,7 @@ bees_main(int argc, char *argv[])
 	unsigned thread_min = 0;
 	double load_target = 0;
 	bool workaround_btrfs_send = false;
+	int scan_mode = BeesRoots::SCAN_MODE_ZERO;
 
 	// Configure getopt_long
 	static const struct option long_options[] = {
@@ -839,7 +834,7 @@ bees_main(int argc, char *argv[])
 				load_target = stod(optarg);
 				break;
 			case 'm':
-				bc->roots()->set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
+				scan_mode = stoul(optarg);
 				break;
 			case 'p':
 				crucible::set_relative_path("");
@@ -869,7 +864,20 @@ bees_main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	bees_initialized++;
+
+	// Have to block signals now before we create a bunch of threads
+	// so the threads will also have the signals blocked.
+	block_term_signal();
+
+	// Initialization done, now finally set the logger settings
 	Chatter::enable_timestamp(chatter_prefix_timestamp);
+
+	// Create a context so we can apply configuration to it
+	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
+
+	// Set scan mode
+	bc->roots()->set_scan_mode(static_cast<BeesRoots::ScanMode>(scan_mode));
 
 	if (!relative_path().empty()) {
 		BEESLOGINFO("using relative path " << relative_path() << "\n");
@@ -943,7 +951,11 @@ main(int argc, char *argv[])
 	catch_and_explain([&]() {
 		rv = bees_main(argc, argv);
 	});
-	BEESLOGNOTICE("Exiting with status " << rv << " " << (rv ? "(failure)" : "(success)"));
+
+	// Do not write a final log message unless successfully initialized
+	if (bees_initialized)
+		BEESLOGNOTICE("Exiting with status " << rv << " " << (rv ? "(failure)" : "(success)"));
+
 	return rv;
 }
 
