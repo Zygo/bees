@@ -667,6 +667,7 @@ bees_main(int argc, char *argv[])
 	unsigned thread_min = 0;
 	double load_target = 0;
 	bool workaround_btrfs_send = false;
+	BeesRoots::ScanMode root_scan_mode = BeesRoots::SCAN_MODE_ZERO;
 
 	// Configure getopt_long
 	static const struct option long_options[] = {
@@ -735,7 +736,7 @@ bees_main(int argc, char *argv[])
 				load_target = stod(optarg);
 				break;
 			case 'm':
-				bc->roots()->set_scan_mode(static_cast<BeesRoots::ScanMode>(stoul(optarg)));
+				root_scan_mode = static_cast<BeesRoots::ScanMode>(stoul(optarg));
 				break;
 			case 'p':
 				crucible::set_relative_path("");
@@ -806,11 +807,16 @@ bees_main(int argc, char *argv[])
 	BEESLOGNOTICE("setting worker thread pool maximum size to " << thread_count);
 	TaskMaster::set_thread_count(thread_count);
 
+	// Set root path
+	string root_path = argv[optind++];
+	BEESLOGNOTICE("setting root path to '" << root_path << "'");
+	bc->set_root_path(root_path);
+
 	// Workaround for btrfs send
 	bc->roots()->set_workaround_btrfs_send(workaround_btrfs_send);
 
-	// Create a context and start crawlers
-	bc->set_root_path(argv[optind++]);
+	// Set root scan mode
+	bc->roots()->set_scan_mode(root_scan_mode);
 
 	BeesThread status_thread("status", [&]() {
 		bc->dump_status();
