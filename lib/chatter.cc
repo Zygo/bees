@@ -146,7 +146,7 @@ namespace crucible {
 
 	ChatterUnwinder::~ChatterUnwinder()
 	{
-		if (uncaught_exception()) {
+		if (current_exception()) {
 			m_func();
 		}
 	}

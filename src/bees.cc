@@ -82,7 +82,7 @@ thread_local bool BeesTracer::tl_silent = false;
 
 BeesTracer::~BeesTracer()
 {
-	if (!tl_silent && uncaught_exception()) {
+	if (!tl_silent && current_exception()) {
 		try {
 			m_func();
 		} catch (exception &e) {
