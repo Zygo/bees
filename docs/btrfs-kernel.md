@@ -30,8 +30,8 @@ Kernel Bug Tracking Table
 
 These bugs are particularly popular among bees users:
 
-First bad kernel | Last bad kernel | Issue Description | Fixed Kernel Versions | Fix Commit
-:---: | :---: | --- | :---: | ---
+| First bad kernel | Last bad kernel | Issue Description | Fixed Kernel Versions | Fix Commit
+| :---: | :---: | --- | :---: | ---
 | - | 4.10 | garbage inserted in read data when reading compressed inline extent followed by a hole | 3.18.89, 4.1.49, 4.4.107, 4.9.71, 4.11 and later | e1699d2d7bf6 btrfs: add missing memset while reading compressed inline extents
 | - | 4.14 | spurious warnings from `fs/btrfs/backref.c` in `find_parent_nodes` | 3.16.57, 4.14.29, 4.15.12, 4.16 and later | c8195a7b1ad5 btrfs: remove spurious WARN_ON(ref->count < 0) in find_parent_nodes
 | 4.15 | 4.18 | compression ratio and performance regression on bees test corpus | improved in 4.19 | 4.14 performance not fully restored yet
