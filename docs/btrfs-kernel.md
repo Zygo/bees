@@ -1,127 +1,89 @@
-Recommended kernel version
-==========================
+Recommended Kernel Version for bees
+===================================
 
-Currently 5.0.21, 5.3.4, and *chronologically* later versions are
-recommended to avoid all currently known and fixed kernel issues and
-obtain best performance.  Older kernel versions can be used with bees
-with some caveats (see below).
+First, a warning that is not specific to bees:
 
-Kernels 5.1.21 and 5.2.21 are *not recommended* due to possible conflicts
-between LOGICAL_INO and btrfs balance.
+> **Kernel 5.1, 5.2, and 5.3 should not be used with btrfs due to a
+severe regression that can lead to fatal metadata corruption.**
+This issue is fixed in kernel 5.4.14 and later.
 
-All unmaintained kernel trees (those which do not receive -stable updates)
-should be avoided due to potential data corruption bugs.
+**Recommended kernel versions for bees are 4.19, 5.4, 5.7, or 5.8, with
+recent LTS and -stable updates.** The latest released kernel as of this
+writing is 5.8.14.
 
-**Kernels older than 4.2 cannot run bees at all** due to missing features.
+4.14, 4.9, and 4.4 LTS kernels with recent updates are OK, but older
+kernels will be somewhat slower, and not all fixes are backported.
+Obsolete non-LTS kernels have a variety of unfixed issues.  For details
+see the table below.
 
-DATA CORRUPTION WARNING
------------------------
+bees requires btrfs kernel API version 4.2 or higher, and does not work
+on older kernels.
 
-There is a data corruption bug in older Linux kernel versions that can
-be triggered by bees.  The bug can be triggered in other ways, but bees
-will trigger it especially often.
-
-This bug is **fixed** in the following kernel versions:
-
-* **5.1 or later** versions.
-
-* **5.0.4 or later 5.0.y** versions.
-
-* **4.19.31 or later 4.19.y** LTS versions.
-
-* **4.14.108 or later 4.14.y** LTS versions.
-
-* **4.9.165 or later 4.9.y** LTS versions.
-
-* **4.4.177 or later 4.4.y** LTS versions.
-
-* **v3.18.137 or later 3.18.y** LTS versions (note these versions cannot
-run bees).
-
-All older kernel versions (including 4.20.17, 4.18.20, 4.17.19, 4.16.18,
-4.15.18) have the data corruption bug.
-
-The commit that fixes the last known data corruption bug is
-8e928218780e2f1cf2f5891c7575e8f0b284fcce "btrfs: fix corruption reading
-shared and compressed extents after hole punching".
-
-
-Lockup/hang WARNING
--------------------
-
-Kernel versions prior to 5.0.4 have a deadlock bug when file A is
-renamed to replace B while both files A and B are referenced in a
-dedupe operation.  This situation may arise often while bees is running,
-which will make processes accessing the filesystem hang while writing.
-A reboot is required to recover.  No data is lost when this occurs
-(other than unflushed writes due to the reboot).
-
-A common problem case is rsync receiving updates to large files when not
-in `--inplace` mode.  If the file is sufficiently large, bees will start
-to dedupe the original file and rsync's temporary modified version of
-the file while rsync is still writing the modified version of the file.
-Later, when rsync renames the modified temporary file over the original
-file, the rename in rsync can occasionally deadlock with the dedupe
-in bees.
-
-This bug is **fixed** in 5.0.4 and later kernel versions.
-
-The commit that fixes this bug is 4ea748e1d2c9f8a27332b949e8210dbbf392987e
-"btrfs: fix deadlock between clone/dedupe and rename".
-
-
-LOGICAL_INO and btrfs balance WARNING
--------------------------------------
-
-There are at least two bugs that can be triggered by running the
-`LOGICAL_INO` ioctl (which bees uses heavily) and btrfs balance at
-the same time.  One of these is fixed as of kernel 5.3.4 with commit
-efad8a853ad2057f96664328a0d327a05ce39c76 "Btrfs: fix use-after-free when
-using the tree modification log".
-
-The other bug(s) still cause crashes in testing, their root cause is
-unknown, and no fix is currently available as of 5.3.13.
-
-As a workaround, bees will simply detect that a btrfs balance is running,
-and pause bees execution until the balance is done.  This avoids running
-both the `LOGICAL_INO` ioctl and btrfs balance at the same time, which so
-far seems to prevent the bug from occurring.
-
-Note that in the worst cases, this bug is believed to cause filesystem
-metadata corruption on 5.1.21 and 5.2.21 kernels (i.e. metadata corruption
-definitely happens on these kernels, and it seems to happen under the
-same conditions as other crashes, though the connection between the
-known behavior and unknown bug(s) is unknown).
-
-Kernel 5.2 will detect the metadata corruption before writing it to disk,
-and force a transaction abort, leaving the filesystem mounted read-only.
-Kernel 5.1 has no such detection capability, and will corrupt the metadata
-on disk.  Once metadata corruption is persisted on disk, a `btrfs check
---repair` often repairs the damage.  Note that `btrfs check --repair` is a
-high-risk operation, so make a backup of the disk, or copy all of the data
-with `btrfs restore`, before attempting to run `btrfs check --repair`.
-
-So far, 5.0 and earlier kernels will only crash when encountering these
-bugs, no metadata corruption has yet been observed.  The known bug
-affects kernels 3.10 and later (i.e. every kernel that can run bees).
-The unknown bug's age is unknown, it has only been easily reproducible
-after the first bug was fixed.
+bees will detect and use btrfs kernel API up to version 4.15 if present.
+In some future bees release, this API version may become mandatory.
 
 
 
 
+Kernel Bug Tracking Table
+-------------------------
 
-A Brief List Of btrfs Kernel Bugs
+These bugs are particularly popular among bees users:
+
+First bad kernel | Last bad kernel | Issue Description | Fixed Kernel Versions | Fix Commit
+:---: | :---: | --- | :---: | ---
+| - | 4.10 | garbage inserted in read data when reading compressed inline extent followed by a hole | 3.18.89, 4.1.49, 4.4.107, 4.9.71, 4.11 and later | e1699d2d7bf6 btrfs: add missing memset while reading compressed inline extents
+| - | 4.14 | spurious warnings from `fs/btrfs/backref.c` in `find_parent_nodes` | 3.16.57, 4.14.29, 4.15.12, 4.16 and later | c8195a7b1ad5 btrfs: remove spurious WARN_ON(ref->count < 0) in find_parent_nodes
+| 4.15 | 4.18 | compression ratio and performance regression on bees test corpus | improved in 4.19 | 4.14 performance not fully restored yet
+| - | 5.0 | silently corrupted data returned when reading compressed extents around a punched hole (bees dedupes all-zero data blocks with holes which can produce a similar effect to hole punching) | 3.16.70, 3.18.137, 4.4.177, 4.9.165, 4.14.108, 4.19.31, 5.0.4, 5.1 and later | 8e928218780e Btrfs: fix corruption reading shared and compressed extents after hole punching
+| - | 5.0 | deadlock when dedupe and rename are used simultaneously on the same files | 5.0.4, 5.1 and later | 4ea748e1d2c9 Btrfs: fix deadlock between clone/dedupe and rename
+| - | 5.1 | send failure or kernel crash while running send and dedupe on same snapshot at same time | 5.0.18, 5.1.4, 5.2 and later | 62d54f3a7fa2 Btrfs: fix race between send and deduplication that lead to failures and crashes
+| - | 5.2 | alternating send and dedupe results in incremental send failure | 4.9.188, 4.14.137, 4.19.65, 5.2.7, 5.3 and later | b4f9a1a87a48 Btrfs: fix incremental send failure after deduplication
+| - | 5.3 | balance convert to single rejected with error on 32-bit CPUs | 5.3.7, 5.4 and later | 7a54789074a5 btrfs: fix balance convert to single on 32-bit host CPUs
+| - | 5.4 | send performance failure when shared extents have too many references | 4.9.207, 4.14.159, 4.19.90, 5.3.17, 5.4.4, 5.5 and later | fd0ddbe25095 Btrfs: send, skip backreference walking for extents with many references
+| 5.1 | 5.4 | metadata corruption resulting in loss of filesystem when a write operation occurs while balance starts a new block group.  **Do not use kernel 5.1 with btrfs.**  Kernel 5.2 and 5.3 have workarounds that may detect corruption in progress and abort before it becomes permanent, but do not prevent corruption from occurring. | 5.4.14, 5.5 and later | 6282675e6708 btrfs: relocation: fix reloc_root lifespan and access
+| 4.5, backported to 3.18.31, 4.1.22, 4.4.4 | 5.5 | `df` incorrectly reports 0 free space while data space is available.  Triggered by changes in metadata size, including those typical of large-scale dedupe.  Occurs more often starting in 5.3 and especially 5.4 | 4.4.213, 4.9.213, 4.14.170, 4.19.102, 5.4.18, 5.5.2, 5.6 and later | d55966c4279b btrfs: do not zero f_bavail if we have available space
+| - | 5.5 | kernel crashes due to various tree mod log issues (often triggered by bees) | 3.16.84, 4.4.214, 4.9.214, 4.14.171, 4.19.103, 5.4.19, 5.5.3, 5.6 and later | at least 3, last is 7227ff4de55d Btrfs: fix race between adding and putting tree mod seq elements and nodes
+| 5.0 | 5.5 | last extent in file not removed by dedupe if file size is not a multiple of 4K | 5.4.19, 5.5.3, 5.6 and later | 831d2fa25ab8 Btrfs: make deduplication with range including the last block work
+| - | 5.6 | deadlock when enumerating file references to physical extent addresses while some references still exist in deleted subvols | 5.7 and later | 39dba8739c4e btrfs: do not resolve backrefs for roots that are being deleted
+| - | 5.6 | deadlock when many extent reference updates are pending and available memory is low | 4.14.177, 4.19.116, 5.4.33, 5.5.18, 5.6.5, 5.7 and later | 351cbf6e4410 btrfs: use nofs allocations for running delayed items
+| - | 5.6 | excessive CPU usage and btrfs write latency when translating from extent physical address to list of referencing files and offsets (`LOGICAL_INO` ioctl) | 5.7 and later | many backref code changes in kernel 5.7, also improvements in many earlier kernels
+| - | 5.7 | filesystem becomes read-only if out of space while deleting snapshot | 4.9.238, 4.14.200, 4.19.149, 5.4.69, 5.8 and later | 7c09c03091ac btrfs: don't force read-only after error in drop snapshot
+| 5.1 | 5.7 | balance, device delete, or filesystem shrink operations loop endlessly on a single block group, extent count does not decrease | 5.4.54, 5.7.11, 5.8 and later | 1dae7e0e58b4 btrfs: reloc: clear DEAD\_RELOC\_TREE bit for orphan roots to prevent runaway balance
+| - | 5.8 | deadlock in `TREE_SEARCH` ioctl (core component of bees filesystem scanner), followed by regression in deadlock fix | 4.4.237, 4.9.237, 4.14.199, 4.19.146, 5.4.66, 5.8.10 and later | a48b73eca4ce btrfs: fix potential deadlock in the search ioctl, 1c78544eaa46 btrfs: fix wrong address when faulting in pages in the search ioctl
+| 4.15 | - | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | - | workaround:  comment out the `WARN_ON`
+| 5.7 | - | kernel crash if balance receives fatal signal at wrong point during start of new block group | - | workaround:  keep `btrfs balance` from being killed or Ctrl-Ced
+
+"Last bad kernel" refers to that version's last stable update from
+kernel.org.  Distro kernels may backport additional fixes.  Consult
+your distro's kernel support for details.
+
+When the same version appears in both "last bad kernel" and "fixed kernel
+version" columns, it means the bug appears in the `.0` release and is
+fixed in the stated `.y` release.  e.g.  a "last bad kernel" of 5.4 and
+a "fixed kernel version" of 5.4.14 has the bug in kernel versions 5.4.0
+through 5.4.13 inclusive.
+
+A "-" for "first bad kernel" indicates the bug has been present since
+the relevant feature first appeared in btrfs.
+
+A "-" for "last bad kernel" indicates the bug has not yet been fixed as
+of 5.8.14.
+
+In cases where issues are fixed by commits spread out over multiple
+kernel versions, "fixed kernel version" refers to the version that
+contains all components of the fix.
+
+
+Workarounds for known kernel bugs
 ---------------------------------
 
-Unfixed kernel bugs (as of 5.0.21):
+* **Tree mod log issues**:  bees will detect that a btrfs balance is
+  running, and pause bees activity until the balance is done.  This avoids
+  running both the `LOGICAL_INO` ioctl and btrfs balance at the same time,
+  which avoids kernel crashes on old kernel versions.
 
-Minor kernel problems with workarounds:
-
-* **Conflicts between `LOGICAL_INO` ioctl and btrfs balance**:
-  bees will simply check to see if a balance is running immediately
-  before invoking the `LOGICAL_INO` ioctl, and delay execution until
-  the balance is no longer running.
+  This workaround is not necessary for kernels 5.4.19, 5.5.3, 5.6 and later.
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
   if the number of references to a single shared extent grows too high,
@@ -136,34 +98,42 @@ Minor kernel problems with workarounds:
   extents.  This seems to affect all dedupe agents on btrfs; at this
   time of writing only bees has a workaround for this bug.
 
-* **btrfs send** has bugs that are triggered when bees is
-  deduping snapshots.  bees provides the [`--workaround-btrfs-send`
-  option](options.md) which should be used whenever `btrfs send` and
-  bees are run on the same filesystem.
+  Update (5.8.14):  this issue may be a race condition that occurs if
+  two or more threads attempt to modify the same extent or immediately
+  adjacent extents.  It has not been observed on a kernel version later
+  than 5.7 (after backref code changes in the kernel).
 
-  Note `btrfs receive` is not affected, nor is any other btrfs operation
-  except `send`.  It is OK to run bees with no workarounds on a filesystem
-  that receives btrfs snapshots.
+* **`btrfs send` is incompatible with dedupe in old kernels**.
+  The bees option `--workaround-btrfs-send` prevents any modification
+  of read-only subvols in order to avoid breaking `btrfs send`.
 
-  A fix for one problem has been [merged into kernel
-  5.2-rc1](https://github.com/torvalds/linux/commit/62d54f3a7fa27ef6a74d6cdf643ce04beba3afa7).
-  bees has not been updated to handle the new EAGAIN case optimally,
-  but the excess error messages that are produced are harmless.
+  This workaround is not necessary for kernels 4.9.188, 4.14.137, 4.19.65,
+  5.2.7, 5.3 and later.
 
-  The other problem is that [parent snapshots for incremental sends
-  are broken by bees](https://github.com/Zygo/bees/issues/115), even
-  when the snapshots are deduped while send is not running.
+Unfixed kernel bugs
+-------------------
 
-* **btrfs send** also seems to have severe performance issues with
-  dedupe agents that produce toxic extents.  bees has a workaround to
-  prevent this where possible.
+As of 5.8.14:
 
-* **Systems with many CPU cores** may [lock up when bees runs with one
-  worker thread for every core](https://github.com/Zygo/bees/issues/91).
-  bees limits the number of threads it will try to create based on
-  detected CPU core count.  Users may override this limit with the
-  [`--thread-count` option](options.md).  It is possible this is the
-  same bug as the next one:
+* **`btrfs send` still cannot run at the same time as dedupe**, even
+  with all current fixes.  Recent kernels refuse the dedupe operation with
+  error `EAGAIN`.  If `btrfs send` is invoked at the instant when a dedupe
+  operation is running, `send` will fail to start and return an error.
+
+  bees has not been updated to handle the new dedupe behavior optimally.
+  Optimal behavior is to defer dedupe operations until after the send is
+  finished.  Current bees behavior is to complain loudly about the dedupe
+  failure in log messages, and abandon the duplicate data references
+  in the sending snapshot.  A future bees version shall have better
+  handling for this situation.
+
+  Workaround:  send `SIGSTOP` to bees, or terminate the bees process,
+  while `btrfs send` is running.  This workaround is not required if
+  snapshot is deleted after sending--in that case, any duplicate data
+  blocks that were not removed by dedupe will be removed by snapshot
+  delete instead.
+
+  `btrfs receive` is not affected by these issues.
 
 * **Spurious warnings in `fs/fs-writeback.c`** on kernel 4.15 and later
   when filesystem is mounted with `flushoncommit`.  These
@@ -171,6 +141,9 @@ Minor kernel problems with workarounds:
   concurrent umount of the filesystem), but the underlying
   problems that trigger the `WARN_ON` are [not trivial to
   fix](https://www.spinics.net/lists/linux-btrfs/msg87752.html).
+
+  The warnings can be especially voluminous when bees is running.
+
   Workarounds:
 
   1. mount with `-o noflushoncommit`
@@ -180,10 +153,3 @@ Minor kernel problems with workarounds:
   for this issue, because kernels 4.14 and earlier will eventually
   deadlock when a filesystem is mounted with `-o flushoncommit` (a single
   commit fixes one bug and introduces the other).
-
-* **Spurious kernel warnings in `fs/btrfs/delayed-ref.c`** on 5.0.x.
-  This also seems harmless, but there have been [no comments
-  since this issue was reported to the `linux-btrfs` mailing
-  list](https://www.spinics.net/lists/linux-btrfs/msg89061.html).
-  Later kernels do not produce this warning.
-  Workaround:  patch kernel to remove the warning.
