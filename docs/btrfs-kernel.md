@@ -44,15 +44,15 @@ These bugs are particularly popular among bees users:
 | 5.1 | 5.4 | metadata corruption resulting in loss of filesystem when a write operation occurs while balance starts a new block group.  **Do not use kernel 5.1 with btrfs.**  Kernel 5.2 and 5.3 have workarounds that may detect corruption in progress and abort before it becomes permanent, but do not prevent corruption from occurring. | 5.4.14, 5.5 and later | 6282675e6708 btrfs: relocation: fix reloc_root lifespan and access
 | 4.5, backported to 3.18.31, 4.1.22, 4.4.4 | 5.5 | `df` incorrectly reports 0 free space while data space is available.  Triggered by changes in metadata size, including those typical of large-scale dedupe.  Occurs more often starting in 5.3 and especially 5.4 | 4.4.213, 4.9.213, 4.14.170, 4.19.102, 5.4.18, 5.5.2, 5.6 and later | d55966c4279b btrfs: do not zero f_bavail if we have available space
 | - | 5.5 | kernel crashes due to various tree mod log issues (often triggered by bees) | 3.16.84, 4.4.214, 4.9.214, 4.14.171, 4.19.103, 5.4.19, 5.5.3, 5.6 and later | at least 3, last is 7227ff4de55d Btrfs: fix race between adding and putting tree mod seq elements and nodes
-| 5.0 | 5.5 | last extent in file not removed by dedupe if file size is not a multiple of 4K | 5.4.19, 5.5.3, 5.6 and later | 831d2fa25ab8 Btrfs: make deduplication with range including the last block work
+| 5.0 | 5.5 | dedupe fails to remove the last extent in a file if the file size is not a multiple of 4K | 5.4.19, 5.5.3, 5.6 and later | 831d2fa25ab8 Btrfs: make deduplication with range including the last block work
 | - | 5.6 | deadlock when enumerating file references to physical extent addresses while some references still exist in deleted subvols | 5.7 and later | 39dba8739c4e btrfs: do not resolve backrefs for roots that are being deleted
 | - | 5.6 | deadlock when many extent reference updates are pending and available memory is low | 4.14.177, 4.19.116, 5.4.33, 5.5.18, 5.6.5, 5.7 and later | 351cbf6e4410 btrfs: use nofs allocations for running delayed items
-| - | 5.6 | excessive CPU usage and btrfs write latency when translating from extent physical address to list of referencing files and offsets (`LOGICAL_INO` ioctl) | 5.7 and later | many backref code changes in kernel 5.7, also improvements in many earlier kernels
+| - | 5.6 | excessive CPU usage in `LOGICAL_INO` ioctl and increased btrfs write latency in other processes when bees translates from extent physical address to list of referencing files and offsets | 5.7 and later | b25b0b871f20 btrfs: backref, use correct count to resolve normal data refs, plus 3 parent commits.  Some improvements also in earlier kernels.
 | - | 5.7 | filesystem becomes read-only if out of space while deleting snapshot | 4.9.238, 4.14.200, 4.19.149, 5.4.69, 5.8 and later | 7c09c03091ac btrfs: don't force read-only after error in drop snapshot
-| 5.1 | 5.7 | balance, device delete, or filesystem shrink operations loop endlessly on a single block group, extent count does not decrease | 5.4.54, 5.7.11, 5.8 and later | 1dae7e0e58b4 btrfs: reloc: clear DEAD\_RELOC\_TREE bit for orphan roots to prevent runaway balance
+| 5.1 | 5.7 | balance, device delete, or filesystem shrink operations loop endlessly on a single block group without decreasing extent count | 5.4.54, 5.7.11, 5.8 and later | 1dae7e0e58b4 btrfs: reloc: clear DEAD\_RELOC\_TREE bit for orphan roots to prevent runaway balance
 | - | 5.8 | deadlock in `TREE_SEARCH` ioctl (core component of bees filesystem scanner), followed by regression in deadlock fix | 4.4.237, 4.9.237, 4.14.199, 4.19.146, 5.4.66, 5.8.10 and later | a48b73eca4ce btrfs: fix potential deadlock in the search ioctl, 1c78544eaa46 btrfs: fix wrong address when faulting in pages in the search ioctl
 | 4.15 | - | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | - | workaround:  comment out the `WARN_ON`
-| 5.7 | - | kernel crash if balance receives fatal signal at wrong point during start of new block group | - | workaround:  keep `btrfs balance` from being killed or Ctrl-Ced
+| 5.7 | - | kernel crash if balance receives fatal signal at wrong moment during start of new block group | - | workaround:  keep `btrfs balance` from being killed or Ctrl-Ced
 
 "Last bad kernel" refers to that version's last stable update from
 kernel.org.  Distro kernels may backport additional fixes.  Consult
@@ -86,54 +86,60 @@ Workarounds for known kernel bugs
   This workaround is not necessary for kernels 5.4.19, 5.5.3, 5.6 and later.
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
-  if the number of references to a single shared extent grows too high,
-  the kernel consumes more and more CPU while holding locks that block
-  access to the filesystem.  bees avoids this bug by measuring the time
-  the kernel spends performing `LOGICAL_INO` operations and permanently
-  blacklisting any extent or hash involved where the kernel starts
-  to get slow.  In the bees log, such blocks are labelled as 'toxic'
-  hash/block addresses.  Toxic extents are rare (about 1 in 100,000
-  extents become toxic), but toxic extents can become 8 orders of
-  magnitude more expensive to process than the fastest non-toxic
-  extents.  This seems to affect all dedupe agents on btrfs; at this
-  time of writing only bees has a workaround for this bug.
+  if the number of references to a single shared extent grows too
+  high, the kernel consumes more and more CPU while also holding locks
+  that delay write access to the filesystem.  bees avoids this bug
+  by measuring the time the kernel spends performing `LOGICAL_INO`
+  operations and permanently blacklisting any extent or hash involved
+  where the kernel starts to get slow.  In the bees log, such blocks
+  are labelled as 'toxic' hash/block addresses.  Toxic extents are
+  rare (about 1 in 100,000 extents become toxic), but toxic extents can
+  become 8 orders of magnitude more expensive to process than the fastest
+  non-toxic extents.  This seems to affect all dedupe agents on btrfs;
+  at this time of writing only bees has a workaround for this bug.
 
   Update (5.8.14):  this issue may be a race condition that occurs if
   two or more threads attempt to modify the same extent or immediately
   adjacent extents.  It has not been observed on a kernel version later
   than 5.7 (after backref code changes in the kernel).
 
-* **`btrfs send` is incompatible with dedupe in old kernels**.
-  The bees option `--workaround-btrfs-send` prevents any modification
-  of read-only subvols in order to avoid breaking `btrfs send`.
+* **dedupe breaks `btrfs send` in old kernels**.  The bees option
+  `--workaround-btrfs-send` prevents any modification of read-only subvols
+  in order to avoid breaking `btrfs send`.
 
-  This workaround is not necessary for kernels 4.9.188, 4.14.137, 4.19.65,
-  5.2.7, 5.3 and later.
+  This workaround is no longer necessary to avoid kernel crashes
+  and send performance failure on kernel 4.9.207, 4.14.159, 4.19.90,
+  5.3.17, 5.4.4, 5.5 and later; however, some conflict between send
+  and dedupe still remains, so the workaround is still useful.
+
+  `btrfs receive` is not affected by this issue.
 
 Unfixed kernel bugs
 -------------------
 
 As of 5.8.14:
 
-* **`btrfs send` still cannot run at the same time as dedupe**, even
-  with all current fixes.  Recent kernels refuse the dedupe operation with
-  error `EAGAIN`.  If `btrfs send` is invoked at the instant when a dedupe
-  operation is running, `send` will fail to start and return an error.
+* **The kernel does not permit `btrfs send` and dedupe to run at the
+  same time**.  Recent kernels no longer crash, but now refuse one
+  operation with an error if the other operation was already running.
 
   bees has not been updated to handle the new dedupe behavior optimally.
-  Optimal behavior is to defer dedupe operations until after the send is
-  finished.  Current bees behavior is to complain loudly about the dedupe
-  failure in log messages, and abandon the duplicate data references
-  in the sending snapshot.  A future bees version shall have better
-  handling for this situation.
+  Optimal behavior is to defer dedupe operations when send is detected,
+  and resume after the send is finished.  Current bees behavior is to
+  complain loudly about each individual dedupe failure in log messages,
+  and abandon duplicate data references in the snapshot that send is
+  processing.  A future bees version shall have better handling for
+  this situation.
 
   Workaround:  send `SIGSTOP` to bees, or terminate the bees process,
-  while `btrfs send` is running.  This workaround is not required if
-  snapshot is deleted after sending--in that case, any duplicate data
-  blocks that were not removed by dedupe will be removed by snapshot
-  delete instead.
+  before running `btrfs send`.
 
-  `btrfs receive` is not affected by these issues.
+  This workaround is not strictly required if snapshot is deleted after
+  sending.  In that case, any duplicate data blocks that were not removed
+  by dedupe will be removed by snapshot delete instead.  The workaround
+  still saves some IO.
+
+  `btrfs receive` is not affected by this issue.
 
 * **Spurious warnings in `fs/fs-writeback.c`** on kernel 4.15 and later
   when filesystem is mounted with `flushoncommit`.  These
