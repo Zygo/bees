@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <list>
 #include <map>
 #include <mutex>
 #include <tuple>
@@ -20,25 +21,24 @@ namespace crucible {
 		using Func = function<Return(Arguments...)>;
 	private:
 		struct Value {
-			Value *fp = nullptr;
-			Value *bp = nullptr;
 			Key key;
 			Return ret;
-			Value(Key k, Return r) : key(k), ret(r) { }
-			// Crash early!
-			~Value() { fp = bp = nullptr; };
 		};
 
-		Func		m_fn;
-		map<Key, Value>	m_map;
-		LockSet<Key>	m_lockset;
-		size_t		m_max_size;
-		mutex		m_mutex;
-		Value		*m_last = nullptr;
+		using ListIter = typename list<Value>::iterator;
+
+		Func			m_fn;
+		list<Value>		m_list;
+		map<Key, ListIter>	m_map;
+		LockSet<Key>		m_lockset;
+		size_t			m_max_size;
+		mutex			m_mutex;
 
 		void check_overflow();
-		void move_to_front(Value *vp);
-		void erase_one(Value *vp);
+		void recent_use(ListIter vp);
+		void erase_item(ListIter vp);
+		void erase_key(const Key &k);
+		Return insert_item(Func fn, Arguments... args);
 	public:
 		LRUCache(Func f = Func(), size_t max_size = 100);
 
@@ -48,7 +48,6 @@ namespace crucible {
 		Return operator()(Arguments... args);
 		Return refresh(Arguments... args);
 		void expire(Arguments... args);
-		void prune(function<bool(const Return &)> predicate);
 		void insert(const Return &r, Arguments... args);
 		void clear();
 	};
@@ -61,30 +60,81 @@ namespace crucible {
 	}
 
 	template <class Return, class... Arguments>
-	void
-	LRUCache<Return, Arguments...>::erase_one(Value *vp)
+	Return
+	LRUCache<Return, Arguments...>::insert_item(Func fn, Arguments... args)
 	{
-		THROW_CHECK0(invalid_argument, vp);
-		Value *vp_bp = vp->bp;
-		THROW_CHECK0(runtime_error, vp_bp);
-		Value *vp_fp = vp->fp;
-		THROW_CHECK0(runtime_error, vp_fp);
-		vp_fp->bp = vp_bp;
-		vp_bp->fp = vp_fp;
-		// If we delete the head of the list then advance the head by one
-		if (vp == m_last) {
-			// If the head of the list is also the tail of the list then clear m_last
-			if (vp_fp == m_last) {
-				m_last = nullptr;
-			} else {
-				m_last = vp_fp;
+		Key k(args...);
+
+		// Do we have it cached?
+		unique_lock<mutex> lock(m_mutex);
+		auto found = m_map.find(k);
+		if (found == m_map.end()) {
+			// No, release cache lock and acquire key lock
+			lock.unlock();
+			auto key_lock = m_lockset.make_lock(k);
+
+			// Did item appear in cache while we were waiting for key?
+			lock.lock();
+			found = m_map.find(k);
+			if (found == m_map.end()) {
+
+				// No, we now hold key and cache locks, but item not in cache.
+				// Release cache lock and call the function
+				lock.unlock();
+
+				// Create new value
+				Value v {
+					.key = k,
+					.ret = fn(args...),
+				};
+
+				// Reacquire cache lock
+				lock.lock();
+
+				// Make room
+				check_overflow();
+
+				// Insert return value at back of LRU list (hot end)
+				auto new_item = m_list.insert(m_list.end(), v);
+
+				// Insert return value in map
+				bool inserted = false;
+				tie(found, inserted) = m_map.insert(make_pair(v.key, new_item));
+
+				// We (should be) holding a lock on this key so we are the ones to insert it
+				THROW_CHECK0(runtime_error, inserted);
 			}
-		}
-		m_map.erase(vp->key);
-		if (!m_last) {
-			THROW_CHECK0(runtime_error, m_map.empty());
+
+			// Item should be in cache now
+			THROW_CHECK0(runtime_error, found != m_map.end());
 		} else {
-			THROW_CHECK0(runtime_error, !m_map.empty());
+			// Move to end of LRU
+			recent_use(found->second);
+		}
+
+		// Return cached object
+		return found->second->ret;
+	}
+
+	template <class Return, class... Arguments>
+	void
+	LRUCache<Return, Arguments...>::erase_item(ListIter vp)
+	{
+		if (vp != m_list.end()) {
+			m_map.erase(vp->key);
+			m_list.erase(vp);
+		}
+	}
+
+	template <class Return, class... Arguments>
+	void
+	LRUCache<Return, Arguments...>::erase_key(const Key &k)
+	{
+		auto map_item = m_map.find(k);
+		if (map_item != m_map.end()) {
+			auto list_item = map_item->second;
+			m_map.erase(map_item);
+			m_list.erase(list_item);
 		}
 	}
 
@@ -92,46 +142,20 @@ namespace crucible {
 	void
 	LRUCache<Return, Arguments...>::check_overflow()
 	{
-		while (m_map.size() >= m_max_size) {
-			THROW_CHECK0(runtime_error, m_last);
-			THROW_CHECK0(runtime_error, m_last->bp);
-			erase_one(m_last->bp);
+		// Erase items at front of LRU list (cold end) until max size reached or list empty
+		while (m_map.size() >= m_max_size && !m_list.empty()) {
+			erase_item(m_list.begin());
 		}
 	}
 
 	template <class Return, class... Arguments>
 	void
-	LRUCache<Return, Arguments...>::move_to_front(Value *vp)
+	LRUCache<Return, Arguments...>::recent_use(ListIter vp)
 	{
-		if (!m_last) {
-			// Create new LRU list
-			m_last = vp->fp = vp->bp = vp;
-		} else if (m_last != vp) {
-			Value *vp_fp = vp->fp;
-			Value *vp_bp = vp->bp;
-			if (vp_fp && vp_bp) {
-				// There are at least two and we are removing one that isn't m_last
-				// Connect adjacent nodes to each other (has no effect if vp is new), removing vp from list
-				vp_fp->bp = vp_bp;
-				vp_bp->fp = vp_fp;
-			} else {
-				// New insertion, both must be null
-				THROW_CHECK0(runtime_error, !vp_fp);
-				THROW_CHECK0(runtime_error, !vp_bp);
-			}
-			// Splice new node into list
-			Value *last_bp = m_last->bp;
-			THROW_CHECK0(runtime_error, last_bp);
-			// New element points to both ends of list
-			vp->fp = m_last;
-			vp->bp = last_bp;
-			// Insert vp as fp from the end of the list
-			last_bp->fp = vp;
-			// Insert vp as bp from the second from the start of the list
-			m_last->bp = vp;
-			// Update start of list
-			m_last = vp;
-		}
+		// Splice existing items at back of LRU list (hot end)
+		auto next_vp = vp;
+		++next_vp;
+		m_list.splice(m_list.end(), m_list, vp, next_vp);
 	}
 
 	template <class Return, class... Arguments>
@@ -158,93 +182,29 @@ namespace crucible {
 	void
 	LRUCache<Return, Arguments...>::clear()
 	{
-		// Move the map onto the stack, then destroy it after we've released the lock.
+		// Move the map and list onto the stack, then destroy it after we've released the lock
+		// so that we don't block other threads if the list's destructors are expensive
+		decltype(m_list) new_list;
 		decltype(m_map) new_map;
 		unique_lock<mutex> lock(m_mutex);
+		m_list.swap(new_list);
 		m_map.swap(new_map);
-		m_last = nullptr;
-	}
-
-	template <class Return, class... Arguments>
-	void
-	LRUCache<Return, Arguments...>::prune(function<bool(const Return &)> pred)
-	{
-		unique_lock<mutex> lock(m_mutex);
-		for (auto it = m_map.begin(); it != m_map.end(); ) {
-			auto next_it = ++it;
-			if (pred(it.second.ret)) {
-				erase_one(&it.second);
-			}
-			it = next_it;
-		}
+		lock.unlock();
 	}
 
 	template<class Return, class... Arguments>
 	Return
 	LRUCache<Return, Arguments...>::operator()(Arguments... args)
 	{
-		Key k(args...);
-		bool inserted = false;
-
-		// Do we have it cached?
-		unique_lock<mutex> lock(m_mutex);
-		auto found = m_map.find(k);
-		if (found == m_map.end()) {
-			// No, release cache lock and acquire key lock
-			lock.unlock();
-			auto key_lock = m_lockset.make_lock(k);
-
-			// Did item appear in cache while we were waiting for key?
-			lock.lock();
-			found = m_map.find(k);
-			if (found == m_map.end()) {
-
-				// No, we hold key and cache locks, but item not in cache.
-				// Release cache lock and call function
-				lock.unlock();
-
-				// Create new value
-				Value v(k, m_fn(args...));
-
-				// Reacquire cache lock
-				lock.lock();
-
-				// Make room
-				check_overflow();
-
-				// Reacquire cache lock and insert return value
-				tie(found, inserted) = m_map.insert(make_pair(k, v));
-
-				// We hold a lock on this key so we are the ones to insert it
-				THROW_CHECK0(runtime_error, inserted);
-
-				// Release key lock, keep the cache lock
-				key_lock.unlock();
-
-			}
-		}
-
-		// Item should be in cache now
-		THROW_CHECK0(runtime_error, found != m_map.end());
-
-		// (Re)insert at head of LRU
-		move_to_front(&(found->second));
-
-		// Make copy before releasing lock
-		auto rv = found->second.ret;
-		return rv;
+		return insert_item(m_fn, args...);
 	}
 
 	template<class Return, class... Arguments>
 	void
 	LRUCache<Return, Arguments...>::expire(Arguments... args)
 	{
-		Key k(args...);
 		unique_lock<mutex> lock(m_mutex);
-		auto found = m_map.find(k);
-		if (found != m_map.end()) {
-			erase_one(&found->second);
-		}
+		erase_key(Key(args...));
 	}
 
 	template<class Return, class... Arguments>
@@ -259,40 +219,7 @@ namespace crucible {
 	void
 	LRUCache<Return, Arguments...>::insert(const Return &r, Arguments... args)
 	{
-		Key k(args...);
-		bool inserted = false;
-
-		// Do we have it cached?
-		unique_lock<mutex> lock(m_mutex);
-		auto found = m_map.find(k);
-		if (found == m_map.end()) {
-			// No, release cache lock and acquire key lock
-			lock.unlock();
-			auto key_lock = m_lockset.make_lock(k);
-
-			// Did item appear in cache while we were waiting for key?
-			lock.lock();
-			found = m_map.find(k);
-			if (found == m_map.end()) {
-
-				// Make room
-				check_overflow();
-
-				// No, we hold key and cache locks, but item not in cache.
-				// Insert the provided return value (no need to unlock here)
-				Value v(k, r);
-				tie(found, inserted) = m_map.insert(make_pair(k, v));
-
-				// We hold a lock on this key so we are the ones to insert it
-				THROW_CHECK0(runtime_error, inserted);
-			}
-		}
-
-		// Item should be in cache now
-		THROW_CHECK0(runtime_error, found != m_map.end());
-
-		// (Re)insert at head of LRU
-		move_to_front(&(found->second));
+		insert_item([&](Arguments...) -> Return { return r; }, args...);
 	}
 }
 
