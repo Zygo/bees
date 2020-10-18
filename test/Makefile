@@ -3,6 +3,7 @@ PROGRAMS = \
 	crc64 \
 	fd \
 	limits \
+	namedptr \
 	path \
 	process \
 	progress \
