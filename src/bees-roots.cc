@@ -5,6 +5,7 @@
 #include "crucible/string.h"
 #include "crucible/task.h"
 
+#include <algorithm>
 #include <fstream>
 #include <tuple>
 

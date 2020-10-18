@@ -3,13 +3,11 @@
 
 #include "crucible/lockset.h"
 
-#include <algorithm>
 #include <functional>
 #include <list>
 #include <map>
 #include <mutex>
 #include <tuple>
-#include <vector>
 
 namespace crucible {
 	using namespace std;
