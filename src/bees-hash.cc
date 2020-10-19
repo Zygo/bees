@@ -740,7 +740,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 
 	// Blacklist might fail if the hash table is not stored on a btrfs
 	catch_all([&]() {
-		m_ctx->blacklist_add(BeesFileId(m_fd));
+		m_ctx->blacklist_insert(BeesFileId(m_fd));
 	});
 }
 

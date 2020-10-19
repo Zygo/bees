@@ -796,6 +796,16 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 {
 	BEESTRACE("opening root " << root << " ino " << ino);
 
+	// Check the tmpfiles map first
+	{
+		unique_lock<mutex> lock(m_tmpfiles_mutex);
+		auto found = m_tmpfiles.find(BeesFileId(root, ino));
+		if (found != m_tmpfiles.end()) {
+			BEESCOUNT(open_tmpfile);
+			return found->second;
+		}
+	}
+
 	Fd root_fd = open_root(root);
 	if (!root_fd) {
 		BEESCOUNT(open_no_root);
@@ -920,6 +930,25 @@ RateEstimator &
 BeesRoots::transid_re()
 {
 	return m_transid_re;
+}
+
+void
+BeesRoots::insert_tmpfile(Fd fd)
+{
+	BeesFileId fid(fd);
+	unique_lock<mutex> lock(m_tmpfiles_mutex);
+	auto rv = m_tmpfiles.insert(make_pair(fid, fd));
+	THROW_CHECK1(runtime_error, fd, rv.second);
+}
+
+void
+BeesRoots::erase_tmpfile(Fd fd)
+{
+	BeesFileId fid(fd);
+	unique_lock<mutex> lock(m_tmpfiles_mutex);
+	auto found = m_tmpfiles.find(fid);
+	THROW_CHECK1(runtime_error, fd, found != m_tmpfiles.end());
+	m_tmpfiles.erase(found);
 }
 
 BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) :

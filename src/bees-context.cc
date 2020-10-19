@@ -63,13 +63,6 @@ BeesFdCache::open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t 
 }
 
 void
-BeesFdCache::insert_root_ino(shared_ptr<BeesContext> ctx, Fd fd)
-{
-	BeesFileId fid(fd);
-	return m_file_cache.insert(fd, ctx, fid.root(), fid.ino());
-}
-
-void
 BeesContext::dump_status()
 {
 	auto status_charp = getenv("BEESSTATUS");
@@ -256,11 +249,11 @@ BeesContext::dedup(const BeesRangePair &brp)
 }
 
 BeesRangePair
-BeesContext::dup_extent(const BeesFileRange &src)
+BeesContext::dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile)
 {
 	BEESTRACE("dup_extent " << src);
 	BEESCOUNTADD(dedup_copy, src.size());
-	return BeesRangePair(tmpfile()->make_copy(src), src);
+	return BeesRangePair(tmpfile->make_copy(src), src);
 }
 
 void
@@ -268,7 +261,8 @@ BeesContext::rewrite_file_range(const BeesFileRange &bfr)
 {
 	auto m_ctx = shared_from_this();
 	BEESNOTE("Rewriting bfr " << bfr);
-	BeesRangePair dup_brp(dup_extent(BeesFileRange(bfr.fd(), bfr.begin(), min(bfr.file_size(), bfr.end()))));
+	auto rewrite_tmpfile = tmpfile();
+	BeesRangePair dup_brp(dup_extent(BeesFileRange(bfr.fd(), bfr.begin(), min(bfr.file_size(), bfr.end())), rewrite_tmpfile));
 	// BEESLOG("\tdup_brp " << dup_brp);
 	BeesBlockData orig_bbd(bfr.fd(), bfr.begin(), min(BLOCK_SIZE_SUMS, bfr.size()));
 	// BEESLOG("\torig_bbd " << orig_bbd);
@@ -964,6 +958,16 @@ BeesContext::start()
 	BEESLOGNOTICE("Starting bees main loop...");
 	BEESNOTE("starting BeesContext");
 
+	// Set up temporary file pool
+	m_tmpfile_pool.generator([=]() -> shared_ptr<BeesTempFile> {
+		return make_shared<BeesTempFile>(shared_from_this());
+	});
+	m_tmpfile_pool.checkin([](const shared_ptr<BeesTempFile> &btf) {
+		catch_all([&](){
+			btf->reset();
+		});
+	});
+
 	// Force these to exist now so we don't have recursive locking
 	// operations trying to access them
 	fd_cache();
@@ -1022,7 +1026,7 @@ BeesContext::stop()
 
 	BEESNOTE("closing tmpfiles");
 	BEESLOGDEBUG("Closing tmpfiles");
-	m_tmpfiles.clear();
+	m_tmpfile_pool.clear();
 
 	BEESNOTE("closing FD caches");
 	BEESLOGDEBUG("Closing FD caches");
@@ -1058,44 +1062,44 @@ BeesContext::stop_requested() const
 }
 
 void
-BeesContext::blacklist_add(const BeesFileId &fid)
+BeesContext::blacklist_insert(const BeesFileId &fid)
 {
 	BEESLOGDEBUG("Adding " << fid << " to blacklist");
 	unique_lock<mutex> lock(m_blacklist_mutex);
 	m_blacklist.insert(fid);
 }
 
+void
+BeesContext::blacklist_erase(const BeesFileId &fid)
+{
+	BEESLOGDEBUG("Removing " << fid << " from blacklist");
+	unique_lock<mutex> lock(m_blacklist_mutex);
+	m_blacklist.erase(fid);
+}
+
 bool
 BeesContext::is_blacklisted(const BeesFileId &fid) const
 {
-	// Everything on root 1 is blacklisted, no locks necessary.
+	// Everything on root 1 is blacklisted (it is mostly free space cache), no locks necessary.
 	if (fid.root() == 1) {
 		return true;
 	}
 	unique_lock<mutex> lock(m_blacklist_mutex);
-	return m_blacklist.count(fid);
+	return m_blacklist.find(fid) != m_blacklist.end();
 }
 
 shared_ptr<BeesTempFile>
 BeesContext::tmpfile()
 {
-	// FIXME: this whole thing leaks FDs (quite slowly).  Make a pool instead.
-
 	unique_lock<mutex> lock(m_stop_mutex);
 
 	if (m_stop_requested) {
 		throw BeesHalt();
 	}
 
-	if (!m_tmpfiles[this_thread::get_id()]) {
-		// We know we are the only possible accessor of this,
-		// so drop the lock to avoid a deadlock loop
-		lock.unlock();
-		auto rv = make_shared<BeesTempFile>(shared_from_this());
-		lock.lock();
-		m_tmpfiles[this_thread::get_id()] = rv;
-	}
-	return m_tmpfiles[this_thread::get_id()];
+	lock.unlock();
+
+	return m_tmpfile_pool();
 }
 
 shared_ptr<BeesFdCache>
@@ -1146,10 +1150,4 @@ BeesContext::set_root_path(string path)
 	BEESLOGINFO("set_root_path " << path);
 	m_root_path = path;
 	set_root_fd(open_or_die(m_root_path, FLAGS_OPEN_DIR));
-}
-
-void
-BeesContext::insert_root_ino(Fd fd)
-{
-	fd_cache()->insert_root_ino(shared_from_this(), fd);
 }

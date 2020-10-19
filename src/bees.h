@@ -8,6 +8,7 @@
 #include "crucible/fd.h"
 #include "crucible/fs.h"
 #include "crucible/lockset.h"
+#include "crucible/pool.h"
 #include "crucible/progress.h"
 #include "crucible/time.h"
 #include "crucible/task.h"
@@ -546,6 +547,9 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	bool					m_workaround_btrfs_send = false;
 	LRUCache<bool, uint64_t>		m_root_ro_cache;
 
+	mutex					m_tmpfiles_mutex;
+	map<BeesFileId, Fd>			m_tmpfiles;
+
 	mutex					m_stop_mutex;
 	condition_variable			m_stop_condvar;
 	bool					m_stop_requested = false;
@@ -572,9 +576,12 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	RateEstimator& transid_re();
 	size_t crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
+	void insert_tmpfile(Fd fd);
+	void erase_tmpfile(Fd fd);
 
 friend class BeesFdCache;
 friend class BeesCrawl;
+friend class BeesTempFile;
 
 public:
 	BeesRoots(shared_ptr<BeesContext> ctx);
@@ -668,10 +675,10 @@ friend ostream & operator<<(ostream &os, const BeesRangePair &brp);
 
 class BeesTempFile {
 	shared_ptr<BeesContext> m_ctx;
+	shared_ptr<BeesRoots>   m_roots;
 	Fd			m_fd;
 	off_t			m_end_offset;
 
-	void create();
 	void realign();
 	void resize(off_t new_end_offset);
 
@@ -680,6 +687,7 @@ public:
 	BeesTempFile(shared_ptr<BeesContext> ctx);
 	BeesFileRange make_hole(off_t count);
 	BeesFileRange make_copy(const BeesFileRange &src);
+	void reset();
 };
 
 class BeesFdCache {
@@ -692,7 +700,6 @@ public:
 	BeesFdCache();
 	Fd open_root(shared_ptr<BeesContext> ctx, uint64_t root);
 	Fd open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino);
-	void insert_root_ino(shared_ptr<BeesContext> ctx, Fd fd);
 	void clear();
 };
 
@@ -715,7 +722,7 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	shared_ptr<BeesFdCache>				m_fd_cache;
 	shared_ptr<BeesHashTable>			m_hash_table;
 	shared_ptr<BeesRoots>				m_roots;
-	map<thread::id, shared_ptr<BeesTempFile>>	m_tmpfiles;
+	Pool<BeesTempFile>				m_tmpfile_pool;
 
 	LRUCache<BeesResolveAddrResult, BeesAddress>	m_resolve_cache;
 
@@ -763,10 +770,11 @@ public:
 	BeesFileRange scan_forward(const BeesFileRange &bfr);
 
 	bool is_root_ro(uint64_t root);
-	BeesRangePair dup_extent(const BeesFileRange &src);
+	BeesRangePair dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile);
 	bool dedup(const BeesRangePair &brp);
 
-	void blacklist_add(const BeesFileId &fid);
+	void blacklist_insert(const BeesFileId &fid);
+	void blacklist_erase(const BeesFileId &fid);
 	bool is_blacklisted(const BeesFileId &fid) const;
 
 	BeesResolveAddrResult resolve_addr(BeesAddress addr);
@@ -786,9 +794,6 @@ public:
 
 	const Timer &total_timer() const { return m_total_timer; }
 	LockSet<uint64_t> &extent_lock_set() { return m_extent_lock_set; }
-
-	// TODO: move the rest of the FD cache methods here
-	void insert_root_ino(Fd fd);
 };
 
 class BeesResolver {

@@ -444,47 +444,11 @@ BeesStringFile::write(string contents)
 }
 
 void
-BeesTempFile::create()
-{
-	// BEESLOG("creating temporary file in " << m_ctx->root_path());
-	BEESNOTE("creating temporary file in " << m_ctx->root_path());
-	BEESTOOLONG("creating temporary file in " << m_ctx->root_path());
-
-	Timer create_timer;
-	DIE_IF_MINUS_ONE(m_fd = openat(m_ctx->root_fd(), ".", FLAGS_OPEN_TMPFILE, S_IRUSR | S_IWUSR));
-	BEESCOUNT(tmp_create);
-
-	// Can't reopen this file, so don't allow any resolves there
-	// Resolves won't work there anyway.  There are lots of tempfiles
-	// and they're short-lived, so this ends up being just a memory leak
-	// m_ctx->blacklist_add(BeesFileId(m_fd));
-
-	// Put this inode in the cache so we can resolve it later
-	m_ctx->insert_root_ino(m_fd);
-
-	// Set compression attribute
-	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
-	int flags = ioctl_iflags_get(m_fd);
-	flags |= FS_COMPR_FL;
-	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	ioctl_iflags_set(m_fd, flags);
-
-	// Always leave first block empty to avoid creating a file with an inline extent
-	m_end_offset = BLOCK_SIZE_CLONE;
-
-	// Count time spent here
-	BEESCOUNTADD(tmp_create_ms, create_timer.age() * 1000);
-}
-
-void
 BeesTempFile::resize(off_t offset)
 {
 	BEESTOOLONG("Resizing temporary file to " << to_hex(offset));
 	BEESNOTE("Resizing temporary file " << name_fd(m_fd) << " to " << to_hex(offset));
 	BEESTRACE("Resizing temporary file " << name_fd(m_fd) << " to " << to_hex(offset));
-
-	// Ensure that file covers m_end_offset..offset
-	THROW_CHECK2(invalid_argument, m_end_offset, offset, m_end_offset < offset);
 
 	// Truncate
 	Timer resize_timer;
@@ -498,17 +462,56 @@ BeesTempFile::resize(off_t offset)
 	BEESCOUNTADD(tmp_resize_ms, resize_timer.age() * 1000);
 }
 
+void
+BeesTempFile::reset()
+{
+	// Always leave first block empty to avoid creating a file with an inline extent
+	resize(BLOCK_SIZE_CLONE);
+}
+
+
 BeesTempFile::~BeesTempFile()
 {
-	BEESLOGDEBUG("Destructing BeesTempFile " << this);
+	BEESLOGDEBUG("destroying temporary file " << this << " in " << m_ctx->root_path() << " fd " << name_fd(m_fd));
+
+	// Remove this file from open_root_ino lookup table
+	m_roots->erase_tmpfile(m_fd);
+
+	// Remove from blacklist
+	m_ctx->blacklist_erase(BeesFileId(m_fd));
 }
 
 BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
+	m_roots(ctx->roots()),
 	m_end_offset(0)
 {
-	BEESLOGDEBUG("Constructing BeesTempFile " << this);
-	create();
+	BEESLOGDEBUG("creating temporary file " << this << " in " << m_ctx->root_path());
+	BEESNOTE("creating temporary file in " << m_ctx->root_path());
+	BEESTOOLONG("creating temporary file in " << m_ctx->root_path());
+
+	Timer create_timer;
+	DIE_IF_MINUS_ONE(m_fd = openat(m_ctx->root_fd(), ".", FLAGS_OPEN_TMPFILE, S_IRUSR | S_IWUSR));
+	BEESCOUNT(tmp_create);
+
+	// Don't include this file in new extent scans
+	m_ctx->blacklist_insert(BeesFileId(m_fd));
+
+	// Add this file to open_root_ino lookup table
+	m_roots->insert_tmpfile(m_fd);
+
+	// Set compression attribute
+	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
+	int flags = ioctl_iflags_get(m_fd);
+	flags |= FS_COMPR_FL;
+	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
+	ioctl_iflags_set(m_fd, flags);
+
+	// Count time spent here
+	BEESCOUNTADD(tmp_create_ms, create_timer.age() * 1000);
+
+	// Set initial size
+	reset();
 }
 
 void
@@ -517,12 +520,14 @@ BeesTempFile::realign()
 	if (m_end_offset > BLOCK_SIZE_MAX_TEMP_FILE) {
 		BEESLOGINFO("temporary file size " << to_hex(m_end_offset) << " > max " << BLOCK_SIZE_MAX_TEMP_FILE);
 		BEESCOUNT(tmp_trunc);
-		return create();
+		reset();
+		return;
 	}
 	if (m_end_offset & BLOCK_MASK_CLONE) {
 		// BEESTRACE("temporary file size " << to_hex(m_end_offset) << " not aligned");
 		BEESCOUNT(tmp_realign);
-		return create();
+		reset();
+		return;
 	}
 	// OK as is
 	BEESCOUNT(tmp_aligned);
