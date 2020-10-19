@@ -40,7 +40,7 @@ depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
 
 .version.cc: configure.h Makefile ../makeflags $(CRUCIBLE_OBJS:.o=.cc) ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
-	mv -f $@.new $@
+	if ! cmp "$@.new" "$@"; then mv -fv $@.new $@; fi
 
 include depends.mk
 
