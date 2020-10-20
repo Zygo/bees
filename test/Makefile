@@ -33,7 +33,7 @@ include depends.mk
 $(PROGRAMS:%=%.o): %.o: %.cc ../makeflags Makefile
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
-$(PROGRAMS): %: %.o ../makeflags Makefile
+$(PROGRAMS): %: %.o ../makeflags Makefile ../lib/libcrucible.a
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $< $(LIBS)
 
 %.txt: % Makefile FORCE
