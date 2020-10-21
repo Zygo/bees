@@ -20,6 +20,7 @@
 #define mutex not_mutex
 #include <btrfs/ctree.h>
 // Repair the damage
+#undef crc32c
 #undef min
 #undef max
 #undef mutex
