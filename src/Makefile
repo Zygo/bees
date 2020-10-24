@@ -3,6 +3,8 @@ PROGRAMS = \
 	../bin/fiemap \
 	../bin/fiewalk \
 
+PROGRAM_OBJS = $(foreach b,$(PROGRAMS),$(patsubst ../bin/%,%.o,$(b)))
+
 all: $(BEES) $(PROGRAMS)
 
 include ../makeflags
@@ -19,6 +21,8 @@ BEES_OBJS = \
 	bees-thread.o \
 	bees-types.o \
 
+ALL_OBJS = $(BEES_OBJS) $(PROGRAM_OBJS)
+
 bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
 	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.new.c
 	mv -f bees-version.new.c bees-version.c
@@ -33,13 +37,16 @@ bees-usage.c: bees-usage.txt Makefile
 .depends/%.dep: %.cc Makefile | .depends
 	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
-depends.mk: $(BEES_OBJS:%.o=.depends/%.dep)
+depends.mk: $(ALL_OBJS:%.o=.depends/%.dep)
 	cat $^ > $@.new
 	mv -f $@.new $@
 
 include depends.mk
 
-$(BEES_OBJS) fiemap.o fiewalk.o: %.o: %.cc
+%.o: %.c ../makeflags
+	$(CC) $(BEES_CFLAGS) -o $@ -c $<
+
+%.o: %.cc ../makeflags
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
 
 $(PROGRAMS): ../bin/%: %.o
