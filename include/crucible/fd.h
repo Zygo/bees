@@ -1,7 +1,7 @@
 #ifndef CRUCIBLE_FD_H
 #define CRUCIBLE_FD_H
 
-#include "crucible/resource.h"
+#include "crucible/namedptr.h"
 
 #include <cstring>
 
@@ -34,28 +34,27 @@ namespace crucible {
 		IOHandle(IOHandle &&) = delete;
 		IOHandle& operator=(IOHandle &&) = delete;
 		IOHandle& operator=(const IOHandle &) = delete;
-	protected:
 		int	m_fd;
-		IOHandle& operator=(int that) { m_fd = that; return *this; }
 	public:
 		virtual ~IOHandle();
-		IOHandle(int fd);
-		IOHandle();
-
+		IOHandle(int fd = -1);
+		int get_fd() const;
 		void close();
-		int get_fd() const { return m_fd; }
-		int release_fd();
 	};
 
-        template <>
-        struct ResourceTraits<int, IOHandle> {
-                int get_key(const IOHandle &res) const { return res.get_fd(); }
-                shared_ptr<IOHandle> make_resource(int fd) const { return make_shared<IOHandle>(fd); }
-                bool is_null_key(const int &key) const { return key < 0; }
-                int get_null_key() const { return -1; }
-        };
-
-        typedef ResourceHandle<int, IOHandle> Fd;
+	class Fd {
+		static NamedPtr<IOHandle, int> s_named_ptr;
+		shared_ptr<IOHandle> m_handle;
+	public:
+		using resource_type = IOHandle;
+		Fd();
+		Fd(int fd);
+		Fd &operator=(int fd);
+		Fd &operator=(const shared_ptr<IOHandle> &);
+		operator int() const;
+		bool operator!() const;
+		shared_ptr<IOHandle> operator->() const;
+	};
 
 	void set_relative_path(string path);
 	string relative_path();

@@ -207,8 +207,8 @@ static void test_assign_int_close()
 		assert(j == -1);
 		// Bonus conversion operator tests
 		assert(fd == -1);
-		// Chasing a closed ref now triggers an exception
-		assert(catch_all([&]() { return fd->get_fd() == -1; }));
+		// Chasing a closed ref no longer triggers an exception
+		assert(fd->get_fd() == -1);
 	}
 	assert_is_closed(i, true);
 }
@@ -228,8 +228,8 @@ static void test_assign_int_close_2()
 		assert(j == -1);
 		// Bonus conversion operator tests
 		assert(fd == -1);
-		// Chasing a closed ref now triggers an exception
-		assert(catch_all([&]() { return fd->get_fd() == -1; }));
+		// Chasing a closed ref no longer triggers an exception
+		assert(fd->get_fd() == -1);
 	}
 	assert_is_closed(i, true);
 }
@@ -285,12 +285,22 @@ static void test_shared_close_method()
 
 struct DerivedFdResource : public Fd::resource_type {
 	string	m_name;
-	DerivedFdResource(string name) : m_name(name) {
-		Fd::resource_type::operator=(open(name.c_str(), O_RDONLY));
+	DerivedFdResource(string name) : Fd::resource_type(open(name.c_str(), O_RDONLY)), m_name(name) {
 		assert_is_closed(this->get_fd(), false);
 	}
 	const string &name() const { return m_name; }
 };
+
+template<class T>
+shared_ptr<T>
+cast(const Fd &fd)
+{
+	auto dp = dynamic_pointer_cast<T>(fd.operator->());
+	if (!dp) {
+		throw bad_cast();
+	}
+	return dp;
+}
 
 struct DerivedFd : public Fd {
 	using resource_type = DerivedFdResource;
@@ -299,7 +309,7 @@ struct DerivedFd : public Fd {
 		Fd::operator=(static_pointer_cast<Fd::resource_type>(ptr));
 	}
 	shared_ptr<DerivedFdResource> operator->() const {
-		shared_ptr<DerivedFdResource> rv = cast<DerivedFdResource>();
+		shared_ptr<DerivedFdResource> rv = cast<DerivedFdResource>(*this);
 		THROW_CHECK1(out_of_range, rv, rv);
 		return rv;
 	}
@@ -328,12 +338,12 @@ static void test_derived_cast()
 	Fd fd2(fd);
 	Fd fd3 = open("fd.cc", O_RDONLY);
 	assert(fd->name() == "fd.cc");
-	assert(fd.cast<Fd::resource_type>());
-	assert(fd.cast<DerivedFd::resource_type>());
-	assert(fd2.cast<Fd::resource_type>());
-	assert(fd2.cast<DerivedFd::resource_type>());
-	assert(fd3.cast<Fd::resource_type>());
-	assert(catch_all([&](){ assert(!fd3.cast<DerivedFd::resource_type>()); } ));
+	assert(cast<Fd::resource_type>(fd));
+	assert(cast<DerivedFd::resource_type>(fd));
+	assert(cast<Fd::resource_type>(fd2));
+	assert(cast<DerivedFd::resource_type>(fd2));
+	assert(cast<Fd::resource_type>(fd3));
+	assert(catch_all([&](){ assert(!cast<DerivedFd::resource_type>(fd3)); } ));
 }
 
 static void test_derived_map()

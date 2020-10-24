@@ -107,12 +107,6 @@ namespace crucible {
 		}
 	}
 
-	IOHandle::IOHandle() :
-		m_fd(-1)
-	{
-		CHATTER_TRACE("open fd " << m_fd << " in " << this);
-	}
-
 	IOHandle::IOHandle(int fd) :
 		m_fd(fd)
 	{
@@ -120,12 +114,52 @@ namespace crucible {
 	}
 
 	int
-	IOHandle::release_fd()
+	IOHandle::get_fd() const
 	{
-		CHATTER_TRACE("release fd " << m_fd << " in " << this);
-		int rv = m_fd;
-		m_fd = -1;
-		return rv;
+		return m_fd;
+	}
+
+	NamedPtr<IOHandle, int> Fd::s_named_ptr([](int fd) { return make_shared<IOHandle>(fd); });
+
+	Fd::Fd() :
+		m_handle(s_named_ptr(-1))
+	{
+	}
+
+	Fd::Fd(int fd) :
+		m_handle(s_named_ptr(fd < 0 ? -1 : fd))
+	{
+	}
+
+	Fd &
+	Fd::operator=(int const fd)
+	{
+		m_handle = s_named_ptr(fd < 0 ? -1 : fd);
+		return *this;
+	}
+
+	Fd &
+	Fd::operator=(const shared_ptr<IOHandle> &handle)
+	{
+		m_handle = s_named_ptr.insert(handle, handle->get_fd());
+		return *this;
+	}
+
+	Fd::operator int() const
+	{
+		return m_handle->get_fd();
+	}
+
+	bool
+	Fd::operator!() const
+	{
+		return m_handle->get_fd() < 0;
+	}
+
+	shared_ptr<IOHandle>
+	Fd::operator->() const
+	{
+		return m_handle;
 	}
 
 	// XXX: necessary?  useful?
