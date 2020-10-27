@@ -205,8 +205,27 @@
 #endif
 
 #ifndef BTRFS_IOC_LOGICAL_INO_V2
-#define BTRFS_IOC_LOGICAL_INO_V2 _IOWR(BTRFS_IOCTL_MAGIC, 59, struct btrfs_ioctl_logical_ino_args)
-#define BTRFS_LOGICAL_INO_ARGS_IGNORE_OFFSET (1ULL << 0)
+	#define BTRFS_IOC_LOGICAL_INO_V2 _IOWR(BTRFS_IOCTL_MAGIC, 59, struct btrfs_ioctl_logical_ino_args)
+	#define BTRFS_LOGICAL_INO_ARGS_IGNORE_OFFSET (1ULL << 0)
 #endif
+
+#ifndef BTRFS_FS_INFO_FLAG_CSUM_INFO
+	/* Request information about checksum type and size */
+	#define BTRFS_FS_INFO_FLAG_CSUM_INFO                    (1 << 0)
+#endif
+
+struct btrfs_ioctl_fs_info_args_v2 {
+	__u64 max_id;                           /* out */
+	__u64 num_devices;                      /* out */
+	__u8 fsid[BTRFS_FSID_SIZE];             /* out */
+	__u32 nodesize;                         /* out */
+	__u32 sectorsize;                       /* out */
+	__u32 clone_alignment;                  /* out */
+	/* See BTRFS_FS_INFO_FLAG_* */
+	__u16 csum_type;                        /* out */
+	__u16 csum_size;                        /* out */
+	__u64 flags;                            /* in/out */
+	__u8 reserved[968];                     /* pad to 1k */
+};
 
 #endif // CRUCIBLE_BTRFS_H
