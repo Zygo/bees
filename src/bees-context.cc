@@ -1043,8 +1043,8 @@ BeesContext::stop()
 
 	// XXX: nobody can see this BEESNOTE because we are killing the
 	// thread that publishes it
-	BEESNOTE("waiting for progress thread");
-	BEESLOGDEBUG("Waiting for progress thread");
+	BEESNOTE("waiting for status thread");
+	BEESLOGDEBUG("Waiting for status thread");
 	lock.lock();
 	m_stop_status = true;
 	m_stop_condvar.notify_all();
