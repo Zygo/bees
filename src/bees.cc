@@ -598,13 +598,12 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 	}
 	BEESCOUNTADD(tmp_copy_ms, copy_timer.age() * 1000);
 
-	// We seem to get lockups without this!
 	if (did_block_write) {
 #if 0
-		// Is this fixed by "Btrfs: fix deadlock between dedup on same file and starting writeback"?
-		// No.
-		// Is this fixed in kernel 4.14.34?
-		// No.
+		// There were a lot of kernel bugs leading to lockups.
+		// Most of them are fixed now.
+		// Unnecessary sync makes us slow, but maybe it has some robustness utility.
+		// TODO:  make this configurable.
 		bees_sync(m_fd);
 #endif
 	}
