@@ -61,7 +61,7 @@ namespace crucible {
 		decltype(elem_cnt) get_elem_cnt() const;
 		decltype(elem_missed) get_elem_missed() const;
 
-		vector<char> m_data;
+		vector<uint8_t> m_data;
 	};
 
 	struct BtrfsIoctlLogicalInoArgs : public btrfs_ioctl_logical_ino_args {
@@ -164,8 +164,8 @@ namespace crucible {
 
 	struct BtrfsIoctlSearchHeader : public btrfs_ioctl_search_header {
 		BtrfsIoctlSearchHeader();
-		vector<char> m_data;
-		size_t set_data(const vector<char> &v, size_t offset);
+		vector<uint8_t> m_data;
+		size_t set_data(const vector<uint8_t> &v, size_t offset);
 		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
 
@@ -200,9 +200,9 @@ namespace crucible {
 	uint64_t btrfs_get_root_id(int fd);
 	uint64_t btrfs_get_root_transid(int fd);
 
-	template<class T>
+	template<class T, class V>
 	const T*
-	get_struct_ptr(vector<char> &v, size_t offset = 0)
+	get_struct_ptr(const V &v, size_t offset = 0)
 	{
 		// OK so sometimes btrfs overshoots a little
 		if (offset + sizeof(T) > v.size()) {
@@ -212,11 +212,11 @@ namespace crucible {
 		return reinterpret_cast<const T*>(v.data() + offset);
 	}
 
-	template<class A, class R>
+	template<class A, class R, class V>
 	R
-	call_btrfs_get(R (*func)(const A*), vector<char> &v, size_t offset = 0)
+	call_btrfs_get(R (*func)(const A*), const V &v, size_t offset = 0)
 	{
-		return func(get_struct_ptr<A>(v, offset));
+		return func(get_struct_ptr<A, V>(v, offset));
 	}
 
 	template <class T> struct btrfs_get_le;
@@ -237,13 +237,13 @@ namespace crucible {
 		uint8_t operator()(const void *p) { return get_unaligned_le8(p); }
 	};
 
-	template<class S, class T>
+	template<class S, class T, class V>
 	T
-	btrfs_get_member(T S::* member, vector<char> &v, size_t offset = 0)
+	btrfs_get_member(T S::* member, V &v, size_t offset = 0)
 	{
-		const S *sp = reinterpret_cast<const S*>(NULL);
-		const T *spm = &(sp->*member);
-		auto member_offset = reinterpret_cast<const char *>(spm) - reinterpret_cast<const char *>(sp);
+		const S *const sp = nullptr;
+		const T *const spm = &(sp->*member);
+		auto member_offset = reinterpret_cast<const uint8_t *>(spm) - reinterpret_cast<const uint8_t *>(sp);
 		return btrfs_get_le<T>()(get_struct_ptr<S>(v, offset + member_offset));
 	}
 
@@ -256,7 +256,7 @@ namespace crucible {
 		unsigned long available() const;
 	};
 
-	ostream &hexdump(ostream &os, const vector<char> &v);
+	template<class V> ostream &hexdump(ostream &os, const V &v);
 
 	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v2 {
 		BtrfsIoctlFsInfoArgs();

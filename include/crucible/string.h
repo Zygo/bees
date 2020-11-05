@@ -19,13 +19,13 @@ namespace crucible {
 		memset(that, 0, sizeof(Base));
 	}
 
-	// Copy a base class object (usually a C struct) into a vector<char>
+	// Copy a base class object (usually a C struct) into a vector<uint8_t>
 	template <class Base>
-	vector<char>
+	vector<uint8_t>
 	vector_copy_struct(Base *that)
 	{
-		const char *begin_that = reinterpret_cast<const char *>(static_cast<const Base *>(that));
-		return vector<char>(begin_that, begin_that + sizeof(Base));
+		const uint8_t *begin_that = reinterpret_cast<const uint8_t *>(static_cast<const Base *>(that));
+		return vector<uint8_t>(begin_that, begin_that + sizeof(Base));
 	}
 
 	// int->hex conversion with sprintf
@@ -60,7 +60,7 @@ namespace crucible {
 	ptrdiff_t
 	pointer_distance(const P1 *a, const P2 *b)
 	{
-		return reinterpret_cast<const char *>(a) - reinterpret_cast<const char *>(b);
+		return reinterpret_cast<const uint8_t *>(a) - reinterpret_cast<const uint8_t *>(b);
 	}
 };
 

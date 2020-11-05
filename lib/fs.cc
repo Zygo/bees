@@ -140,7 +140,7 @@ namespace crucible {
 	BtrfsExtentSame::do_ioctl()
 	{
 		dest_count = m_info.size();
-		vector<char> ioctl_arg = vector_copy_struct<btrfs_ioctl_same_args>(this);
+		vector<uint8_t> ioctl_arg = vector_copy_struct<btrfs_ioctl_same_args>(this);
 		ioctl_arg.resize(sizeof(btrfs_ioctl_same_args) + dest_count * sizeof(btrfs_ioctl_same_extent_info), 0);
 		btrfs_ioctl_same_args *ioctl_ptr = reinterpret_cast<btrfs_ioctl_same_args *>(ioctl_arg.data());
 		size_t count = 0;
@@ -677,7 +677,7 @@ namespace crucible {
 		THROW_CHECK1(out_of_range, m_min_count, m_min_count <= m_max_count);
 
 		auto extent_count = m_min_count;
-		vector<char> ioctl_arg = vector_copy_struct<fiemap>(this);
+		vector<uint8_t> ioctl_arg = vector_copy_struct<fiemap>(this);
 
 		ioctl_arg.resize(sizeof(fiemap) + extent_count * sizeof(fiemap_extent), 0);
 
@@ -746,13 +746,13 @@ namespace crucible {
 	}
 
 	size_t
-	BtrfsIoctlSearchHeader::set_data(const vector<char> &v, size_t offset)
+	BtrfsIoctlSearchHeader::set_data(const vector<uint8_t> &v, size_t offset)
 	{
 		THROW_CHECK2(invalid_argument, offset, v.size(), offset + sizeof(btrfs_ioctl_search_header) <= v.size());
 		*static_cast<btrfs_ioctl_search_header *>(this) = *reinterpret_cast<const btrfs_ioctl_search_header *>(&v[offset]);
 		offset += sizeof(btrfs_ioctl_search_header);
 		THROW_CHECK2(invalid_argument, offset + len, v.size(), offset + len <= v.size());
-		m_data = vector<char>(&v[offset], &v[offset + len]);
+		m_data = vector<uint8_t>(&v[offset], &v[offset + len]);
 		return offset + len;
 	}
 
@@ -765,7 +765,7 @@ namespace crucible {
 		// Keep the ioctl buffer from one run to the next to save on malloc costs
 		size_t target_buf_size = sizeof(btrfs_ioctl_search_args_v2) + m_buf_size;
 
-		vector<char> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
+		vector<uint8_t> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
 		ioctl_arg.resize(target_buf_size);
 
 		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(ioctl_arg.data());
@@ -812,14 +812,16 @@ namespace crucible {
 		}
 	}
 
-	ostream &hexdump(ostream &os, const vector<char> &v)
+	template <class V>
+	ostream &
+	hexdump(ostream &os, const V &v)
 	{
-		os << "vector<char> { size = " << v.size() << ", data:\n";
+		os << "vector<uint8_t> { size = " << v.size() << ", data:\n";
 		for (size_t i = 0; i < v.size(); i += 8) {
 			string hex, ascii;
 			for (size_t j = i; j < i + 8; ++j) {
 				if (j < v.size()) {
-					unsigned char c = v[j];
+					uint8_t c = v[j];
 					char buf[8];
 					sprintf(buf, "%02x ", c);
 					hex += buf;
