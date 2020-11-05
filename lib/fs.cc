@@ -409,7 +409,7 @@ namespace crucible {
 		btrfs_ioctl_ino_path_args *p = static_cast<btrfs_ioctl_ino_path_args *>(this);
 		BtrfsDataContainer container(m_container_size);
 		fspath = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
-		size = m_container_size;
+		size = container.get_size();
 
 		m_paths.clear();
 
