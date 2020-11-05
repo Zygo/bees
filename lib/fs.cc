@@ -188,7 +188,7 @@ namespace crucible {
 	}
 
 	BtrfsDataContainer::BtrfsDataContainer(size_t buf_size) :
-		m_data(buf_size, 0)
+		m_data(buf_size)
 	{
 	}
 
