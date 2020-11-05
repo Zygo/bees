@@ -16,7 +16,7 @@ namespace crucible {
 	uint64_t
 	from_hex(const string &s)
 	{
-		return stoull(s, 0, 0);
+		return stoull(s, nullptr, 0);
 	}
 
 	vector<string>
