@@ -205,10 +205,10 @@ namespace crucible {
 	get_struct_ptr(const V &v, size_t offset = 0)
 	{
 		// OK so sometimes btrfs overshoots a little
-		if (offset + sizeof(T) > v.size()) {
-			v.resize(offset + sizeof(T), 0);
-		}
-		THROW_CHECK2(invalid_argument, v.size(), offset + sizeof(T), offset + sizeof(T) <= v.size());
+		// if (offset + sizeof(T) > v.size()) {
+			// v.resize(offset + sizeof(T), 0);
+		// }
+		// THROW_CHECK2(invalid_argument, v.size(), offset + sizeof(T), offset + sizeof(T) <= v.size());
 		return reinterpret_cast<const T*>(v.data() + offset);
 	}
 
