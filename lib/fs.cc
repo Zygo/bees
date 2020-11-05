@@ -752,7 +752,7 @@ namespace crucible {
 		*static_cast<btrfs_ioctl_search_header *>(this) = *reinterpret_cast<const btrfs_ioctl_search_header *>(&v[offset]);
 		offset += sizeof(btrfs_ioctl_search_header);
 		THROW_CHECK2(invalid_argument, offset + len, v.size(), offset + len <= v.size());
-		m_data = vector<uint8_t>(&v[offset], &v[offset + len]);
+		m_data = Spanner<const uint8_t>(&v[offset], &v[offset + len]);
 		return offset + len;
 	}
 
@@ -765,14 +765,14 @@ namespace crucible {
 		// Keep the ioctl buffer from one run to the next to save on malloc costs
 		size_t target_buf_size = sizeof(btrfs_ioctl_search_args_v2) + m_buf_size;
 
-		vector<uint8_t> ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
-		ioctl_arg.resize(target_buf_size);
-
-		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(ioctl_arg.data());
-
-		ioctl_ptr->buf_size = m_buf_size;
+		m_ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
+		m_ioctl_arg.resize(target_buf_size);
 
 		m_result.clear();
+
+		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(m_ioctl_arg.data());
+
+		ioctl_ptr->buf_size = m_buf_size;
 
 		// Don't bother supporting V1.  Kernels that old have other problems.
 		int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_ptr);
@@ -785,7 +785,7 @@ namespace crucible {
 		size_t offset = pointer_distance(ioctl_ptr->buf, ioctl_ptr);
 		for (decltype(nr_items) i = 0; i < nr_items; ++i) {
 			BtrfsIoctlSearchHeader item;
-			offset = item.set_data(ioctl_arg, offset);
+			offset = item.set_data(m_ioctl_arg, offset);
 			m_result.insert(item);
 		}
 

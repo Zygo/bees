@@ -2,6 +2,7 @@
 #define CRUCIBLE_FS_H
 
 #include "crucible/error.h"
+#include "crucible/spanner.h"
 
 // Terribly Linux-specific FS-wrangling functions
 
@@ -164,7 +165,7 @@ namespace crucible {
 
 	struct BtrfsIoctlSearchHeader : public btrfs_ioctl_search_header {
 		BtrfsIoctlSearchHeader();
-		vector<uint8_t> m_data;
+		Spanner<const uint8_t> m_data;
 		size_t set_data(const vector<uint8_t> &v, size_t offset);
 		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
@@ -187,6 +188,7 @@ namespace crucible {
 		void next_min(const BtrfsIoctlSearchHeader& ref);
 
 		size_t m_buf_size;
+		vector<uint8_t> m_ioctl_arg;
 		set<BtrfsIoctlSearchHeader> m_result;
 
 	};
