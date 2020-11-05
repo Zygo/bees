@@ -1,0 +1,35 @@
+Usage: %s [options] fs-root-path
+Performs best-effort extent-same deduplication on btrfs.
+
+fs-root-path MUST be the root of a btrfs filesystem tree (subvol id 5).
+Other directories will be rejected.
+
+Options:
+    -h, --help            Show this help
+
+Load management options:
+    -c, --thread-count    Worker thread count (default CPU count * factor)
+    -C, --thread-factor   Worker thread factor (default 1)
+    -G, --thread-min      Minimum worker thread count (default 0)
+    -g, --loadavg-target  Target load average for worker threads (default none)
+
+Filesystem tree traversal options:
+    -m, --scan-mode       Scanning mode (0..2, default 0)
+
+Workarounds:
+    -a, --workaround-btrfs-send    Workaround for btrfs send
+                                   (ignore RO snapshots)
+
+Logging options:
+    -t, --timestamps      Show timestamps in log output (default)
+    -T, --no-timestamps   Omit timestamps in log output
+    -p, --absolute-paths  Show absolute paths (default)
+    -P, --strip-paths     Strip $CWD from beginning of all paths in the log
+    -v, --verbose         Set maximum log level (0..8, default 8)
+
+Optional environment variables:
+    BEESHOME    Path to hash table and configuration files
+                (default is .beeshome/ in the root of the filesystem).
+
+    BEESSTATUS  File to write status to (tmpfs recommended, e.g. /run).
+                No status is written if this variable is unset.

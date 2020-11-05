@@ -1,2 +1,3 @@
+*.new.c
+bees-usage.c
 bees-version.[ch]
-bees-version.new.c

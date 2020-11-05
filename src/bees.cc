@@ -7,6 +7,7 @@
 
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 
 #include <iostream>
 #include <memory>
@@ -35,44 +36,7 @@ int bees_log_level = 8;
 void
 do_cmd_help(char *argv[])
 {
-	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	cerr << "Usage: " << argv[0] << " [options] fs-root-path [fs-root-path-2...]\n"
-		"Performs best-effort extent-same deduplication on btrfs.\n"
-		"\n"
-		"fs-root-path MUST be the root of a btrfs filesystem tree (id 5).\n"
-		"Other directories will be rejected.\n"
-		"\n"
-		"Options:\n"
-		"    -h, --help            Show this help\n"
-		"\n"
-		"Load management options:\n"
-		"    -c, --thread-count    Worker thread count (default CPU count * factor)\n"
-		"    -C, --thread-factor   Worker thread factor (default " << BEES_DEFAULT_THREAD_FACTOR << ")\n"
-		"    -G, --thread-min      Minimum worker thread count (default 0)\n"
-		"    -g, --loadavg-target  Target load average for worker threads (default none)\n"
-		"\n"
-		"Filesystem tree traversal options:\n"
-		"    -m, --scan-mode       Scanning mode (0..2, default 0)\n"
-		"\n"
-		"Workarounds:\n"
-		"    -a, --workaround-btrfs-send    Workaround for btrfs send\n"
-		"\n"
-		"Logging options:\n"
-		"    -t, --timestamps      Show timestamps in log output (default)\n"
-		"    -T, --no-timestamps   Omit timestamps in log output\n"
-		"    -p, --absolute-paths  Show absolute paths (default)\n"
-		"    -P, --strip-paths     Strip $CWD from beginning of all paths in the log\n"
-		"    -v, --verbose         Set maximum log level (0..8, default 8)\n"
-		"\n"
-		"Optional environment variables:\n"
-		"    BEESHOME    Path to hash table and configuration files\n"
-		"                (default is .beeshome/ in the root of each filesystem).\n"
-		"\n"
-		"    BEESSTATUS  File to write status to (tmpfs recommended, e.g. /run).\n"
-		"                No status is written if this variable is unset.\n"
-		"\n"
-	// 80col 01234567890123456789012345678901234567890123456789012345678901234567890123456789
-	<< endl;
+	fprintf(stderr, BEES_USAGE, argv[0]);
 }
 
 // tracing ----------------------------------------

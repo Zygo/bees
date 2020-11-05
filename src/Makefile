@@ -23,6 +23,10 @@ bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
 	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.new.c
 	mv -f bees-version.new.c bees-version.c
 
+bees-usage.c: bees-usage.txt Makefile
+	(echo 'const char *BEES_USAGE = '; sed -r 's/^(.*)$$/"\1\\n"/' < bees-usage.txt; echo ';') > bees-usage.new.c
+	mv -f bees-usage.new.c bees-usage.c
+
 .depends:
 	mkdir -p $@
 
@@ -41,10 +45,9 @@ $(BEES_OBJS) fiemap.o fiewalk.o: %.o: %.cc
 $(PROGRAMS): ../bin/%: %.o
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $< $(LIBS)
 
-bees-version.o: %.o: %.c
-	$(CC) $(BEES_CFLAGS) -o $@ -c $<
+$(PROGRAMS): ../lib/libcrucible.a
 
-$(BEES): $(BEES_OBJS) bees-version.o
+$(BEES): $(BEES_OBJS) bees-version.o bees-usage.o
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
