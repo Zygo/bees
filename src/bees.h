@@ -101,7 +101,10 @@ const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 const size_t BEES_MAX_QUEUE_SIZE = 128;
 
 // Read this many items at a time in SEARCHv2
-const size_t BEES_MAX_CRAWL_SIZE = 1024;
+const size_t BEES_MAX_CRAWL_ITEMS = 8;
+
+// Read this many bytes at a time in SEARCHv2 (one maximum-sized metadata page)
+const size_t BEES_MAX_CRAWL_BYTES = 64 * 1024;
 
 // Insert this many items before switching to a new subvol
 const size_t BEES_MAX_CRAWL_BATCH = 128;

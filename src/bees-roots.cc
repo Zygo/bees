@@ -995,7 +995,7 @@ BeesCrawl::fetch_extents()
 
 	Timer crawl_timer;
 
-	BtrfsIoctlSearchKey sk(BEES_MAX_CRAWL_SIZE * (sizeof(btrfs_file_extent_item) + sizeof(btrfs_ioctl_search_header)));
+	BtrfsIoctlSearchKey sk(BEES_MAX_CRAWL_BYTES);
 	sk.tree_id = old_state.m_root;
 	sk.min_objectid = old_state.m_objectid;
 	sk.min_type = sk.max_type = BTRFS_EXTENT_DATA_KEY;
@@ -1006,7 +1006,7 @@ BeesCrawl::fetch_extents()
 	// the filesystem while slowing us down.
 	// sk.max_transid = old_state.m_max_transid;
 	sk.max_transid = numeric_limits<uint64_t>::max();
-	sk.nr_items = BEES_MAX_CRAWL_SIZE;
+	sk.nr_items = BEES_MAX_CRAWL_ITEMS;
 
 	// Lock in the old state
 	set_state(old_state);
