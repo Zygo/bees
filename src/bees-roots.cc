@@ -1024,7 +1024,7 @@ BeesCrawl::fetch_extents()
 	if (ioctl_ok) {
 		BEESCOUNT(crawl_search);
 	} else {
-		BEESLOGWARN("Search ioctl failed: " << strerror(errno));
+		BEESLOGWARN("Search ioctl(" << sk << ") failed: " << strerror(errno));
 		BEESCOUNT(crawl_fail);
 	}
 
