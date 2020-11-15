@@ -116,6 +116,12 @@ const size_t BEES_TRANSID_FACTOR = 10;
 // Wait this long for a balance to stop
 const double BEES_BALANCE_POLL_INTERVAL = 60.0;
 
+// Workaround for backref bugs
+const bool BEES_SERIALIZE_RESOLVE = false;
+
+// Workaround for tree mod log bugs
+const bool BEES_SERIALIZE_BALANCE = false;
+
 // Flags
 const int FLAGS_OPEN_COMMON   = O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC | O_NOATIME | O_LARGEFILE | O_NOCTTY;
 const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;

@@ -803,6 +803,10 @@ BeesResolveAddrResult::BeesResolveAddrResult()
 void
 BeesContext::wait_for_balance()
 {
+	if (!BEES_SERIALIZE_BALANCE) {
+		return;
+	}
+
 	Timer balance_timer;
 	BEESNOTE("WORKAROUND: waiting for balance to stop");
 	while (true) {
@@ -845,17 +849,21 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// transaction latency, competing threads, and freeze/SIGSTOP
 	// pausing the bees process.
 
-#if 0
-	// There can be only one of these running at a time, or the slow
-	// backrefs bug will kill the whole system.  Also it looks like there
+	// There can be only one of these running at a time, or some lingering
+	// backref bug will kill the whole system.  Also it looks like there
 	// are so many locks held while LOGICAL_INO runs that there is no
 	// point in trying to run two of them on the same filesystem.
 	// ...but it works most of the time, and the performance hit from
 	// not running resolve in multiple threads is significant.
-	BEESNOTE("waiting to resolve addr " << addr);
+	// But "most of the time" really just means "between forced reboots",
+	// and with recent improvements in kernel uptime, this is now in the
+	// top 3 crash causes.
 	static mutex s_resolve_mutex;
-	unique_lock<mutex> lock(s_resolve_mutex);
-#endif
+	unique_lock<mutex> lock(s_resolve_mutex, defer_lock);
+	if (BEES_SERIALIZE_RESOLVE) {
+		BEESNOTE("waiting to resolve addr " << addr);
+		lock.lock();
+	}
 
 	// Is there a bug where resolve and balance cause a crash (BUG_ON at fs/btrfs/ctree.c:1227)?
 	// Apparently yes, and more than one.
