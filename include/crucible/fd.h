@@ -57,7 +57,6 @@ namespace crucible {
 
         typedef ResourceHandle<int, IOHandle> Fd;
 
-	static string __relative_path;
 	void set_relative_path(string path);
 	string relative_path();
 

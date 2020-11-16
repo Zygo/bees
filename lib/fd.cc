@@ -529,6 +529,8 @@ namespace crucible {
 		THROW_ERROR(runtime_error, "readlink: maximum buffer size exceeded");
 	}
 
+	static string __relative_path;
+
 	string
 	relative_path()
 	{
