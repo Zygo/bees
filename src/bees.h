@@ -866,6 +866,7 @@ public:
 
 // And now, a giant pile of extern declarations
 extern int bees_log_level;
+extern bool bees_tmpfile_compression_disabled;
 extern const char *BEES_VERSION;
 string pretty(double d);
 void bees_sync(int fd);
