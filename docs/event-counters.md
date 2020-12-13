@@ -151,7 +151,6 @@ The `dedup` event group consists of operations that deduplicate data.
  * `dedup_prealloc_hit`: Total number of successfully eliminated `PREALLOC` extent references.
  * `dedup_prealloc_hit`: Total number of unsuccessfully eliminated `PREALLOC` extent references (i.e. filesystem data changed between scan and dedupe).
  * `dedup_try`: Total number of pairs of extent references submitted for deduplication.
- * `dedup_unique_bytes`: Total bytes in extent data items deduplicated.  The implementation of this counter is wrong.
  * `dedup_workaround_btrfs_send`: Total number of extent reference pairs submitted for deduplication that were discarded to workaround `btrfs send` bugs.
 
 exception

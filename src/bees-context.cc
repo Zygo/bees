@@ -258,11 +258,6 @@ BeesContext::dedup(const BeesRangePair &brp)
 	if (rv) {
 		BEESCOUNT(dedup_hit);
 		BEESCOUNTADD(dedup_bytes, brp.first.size());
-		thread_local BeesFileRange last_src_bfr;
-		if (!last_src_bfr.overlaps(brp.first)) {
-			BEESCOUNTADD(dedup_unique_bytes, brp.first.size());
-			last_src_bfr = brp.first;
-		}
 	} else {
 		BEESCOUNT(dedup_miss);
 		BEESLOGWARN("NO Dedup! " << brp);
