@@ -221,20 +221,6 @@ BeesNote::get_status()
 
 // static inline helpers ----------------------------------------
 
-static inline
-bool
-bees_addr_check(uint64_t v)
-{
-	return !(v & (1ULL << 63));
-}
-
-static inline
-bool
-bees_addr_check(int64_t v)
-{
-	return !(v & (1ULL << 63));
-}
-
 string
 pretty(double d)
 {
