@@ -99,7 +99,7 @@ test_barrier(size_t count)
 		oss << "task #" << c;
 		Task t(
 			oss.str(),
-			[c, &task_done, &mtx, &cv, bl]() mutable {
+			[c, &task_done, &mtx, bl]() mutable {
 				// cerr << "Task #" << c << endl;
 				unique_lock<mutex> lock(mtx);
 				task_done.at(c) = true;
@@ -166,8 +166,9 @@ test_exclusion(size_t count)
 		oss << "task #" << c;
 		Task t(
 			oss.str(),
-			[c, &only_one, &mtx, &excl, bl]() mutable {
+			[c, &only_one, &excl, bl]() mutable {
 				// cerr << "Task #" << c << endl;
+				(void)c;
 				auto lock = excl.try_lock();
 				if (!lock) {
 					excl.insert_task(Task::current_task());
