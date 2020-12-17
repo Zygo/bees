@@ -14,7 +14,6 @@ namespace crucible {
 	// fm_start, fm_length, fm_flags, m_extents
 	// fe_logical, fe_physical, fe_length, fe_flags
 
-	static const off_t MAX_OFFSET = numeric_limits<off_t>::max();
 	static const off_t FIEMAP_BLOCK_SIZE = 4096;
 
 	static bool __ew_do_log = getenv("EXTENTWALKER_DEBUG");
