@@ -110,9 +110,6 @@ namespace crucible {
 		}
 	}
 
-	template<>
-	struct ResourceHandle<Process::id, Process>;
-
 	pid_t
 	gettid()
 	{

@@ -11,17 +11,6 @@
 using namespace crucible;
 using namespace std;
 
-static inline
-const char *
-getenv_or_die(const char *name)
-{
-	const char *rv = getenv(name);
-	if (!rv) {
-		THROW_ERROR(runtime_error, "Environment variable " << name << " not defined");
-	}
-	return rv;
-}
-
 BeesFdCache::BeesFdCache()
 {
 	m_root_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root) -> Fd {
