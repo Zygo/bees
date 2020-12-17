@@ -124,6 +124,7 @@ namespace crucible {
 		} else if (!chatter_names->empty()) {
 			cerr << "CRUCIBLE_CHATTER does not list '" << m_file << "' or '" << m_pretty_function << "'" << endl;
 		}
+		(void)m_line; // not implemented yet
 		// cerr << "ChatterBox " << reinterpret_cast<void*>(this) << " constructed" << endl;
 	}
 
