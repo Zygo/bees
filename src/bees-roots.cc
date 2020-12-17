@@ -1011,7 +1011,7 @@ BeesCrawl::fetch_extents()
 	// Lock in the old state
 	set_state(old_state);
 
-	BEESTRACE("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
+	BEESTRACE("Searching crawl sk " << sk);
 	bool ioctl_ok = false;
 	{
 		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
