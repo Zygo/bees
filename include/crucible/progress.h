@@ -13,7 +13,7 @@ namespace crucible {
 
 	template <class T>
 	class ProgressTracker {
-		class ProgressTrackerState;
+		struct ProgressTrackerState;
 		class ProgressHolderState;
 	public:
 		using value_type = T;

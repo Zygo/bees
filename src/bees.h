@@ -173,7 +173,7 @@ public:
 	T at(string idx) const;
 
 friend ostream& operator<< <>(ostream &os, const BeesStatTmpl<T> &bs);
-friend class BeesStats;
+friend struct BeesStats;
 };
 
 using BeesRates = BeesStatTmpl<double>;
