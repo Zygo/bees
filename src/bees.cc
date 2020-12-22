@@ -633,7 +633,7 @@ operator<<(ostream &os, const siginfo_t &si)
 		<< "addr = " << si.si_addr << ", "
 		<< "band = " << si.si_band << ", "
 		<< "fd = " << si.si_fd << ", "
-		<< "addr_lsb = " << si.si_addr_lsb << ", "
+		// << "addr_lsb = " << si.si_addr_lsb << ", "
 		// << "lower = " << si.si_lower << ", "
 		// << "upper = " << si.si_upper << ", "
 		// << "pkey = " << si.si_pkey << ", "
