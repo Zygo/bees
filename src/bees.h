@@ -86,9 +86,6 @@ const size_t BEES_OPEN_FILE_LIMIT = (BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACH
 // Worker thread factor (multiplied by detected number of CPU cores)
 const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
 
-// Don't use more than this number of threads unless explicitly configured
-const size_t BEES_DEFAULT_THREAD_LIMIT = 8;
-
 // Log warnings when an operation takes too long
 const double BEES_TOO_LONG = 5.0;
 

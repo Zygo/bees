@@ -16,12 +16,6 @@
  below 1.0 to leave some cores idle, or above 1.0 if there are more
  disks than CPUs in the filesystem.
 
- If the computed thread count is higher than `BEES_DEFAULT_THREAD_LIMIT`
- (currently 8), then only that number of threads will be created.
- This limit can be overridden by the `--thread-count` option; however,
- be aware that there are [kernel issues with systems that have many CPU
- cores](btrfs-kernel.md) when users try to run bees on all of them.
-
 * `--loadavg-target LOADAVG` or `-g`
 
  Specify load average target for dynamic worker threads.  Default is
