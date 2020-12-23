@@ -202,6 +202,7 @@ BeesRoots::transid_max_nocache()
 
 	while (true) {
 		sk.nr_items = 1024;
+		BEESTRACE("transid_max search sk " << sk);
 		sk.do_ioctl(m_ctx->root_fd());
 
 		if (sk.m_result.empty()) {
@@ -390,13 +391,15 @@ BeesRoots::crawl_thread()
 	BEESNOTE("tracking transid");
 	auto last_count = m_transid_re.count();
 	while (!m_stop_requested) {
-		// Measure current transid
+		BEESTRACE("Measure current transid");
 		catch_all([&]() {
+			BEESTRACE("calling transid_max_nocache");
 			m_transid_re.update(transid_max_nocache());
 		});
 
-		// Make sure we have a full complement of crawlers
+		BEESTRACE("Make sure we have a full complement of crawlers");
 		catch_all([&]() {
+			BEESTRACE("calling insert_new_crawl");
 			insert_new_crawl();
 		});
 
@@ -478,19 +481,24 @@ BeesRoots::insert_new_crawl()
 	unique_lock<mutex> lock(m_mutex);
 	set<uint64_t> excess_roots;
 	for (auto i : m_root_crawl_map) {
+		BEESTRACE("excess_roots.insert(" << i.first << ")");
 		excess_roots.insert(i.first);
 	}
 	lock.unlock();
 
 	while (new_bcs.m_root) {
+		BEESTRACE("excess_roots.erase(" << new_bcs.m_root << ")");
 		excess_roots.erase(new_bcs.m_root);
+		BEESTRACE("insert_root(" << new_bcs << ")");
 		insert_root(new_bcs);
 		BEESCOUNT(crawl_create);
+		BEESTRACE("next_root(" << new_bcs.m_root << ")");
 		new_bcs.m_root = next_root(new_bcs.m_root);
 	}
 
 	for (auto i : excess_roots) {
 		new_bcs.m_root = i;
+		BEESTRACE("crawl_state_erase(" << new_bcs << ")");
 		crawl_state_erase(new_bcs);
 	}
 }
