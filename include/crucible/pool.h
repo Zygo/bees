@@ -37,28 +37,26 @@ namespace crucible {
 		void clear();
 
 	private:
-		using ListType = list<Ptr>;
-		struct ListRep {
-			ListType	m_list;
+		struct PoolRep {
+			list<Ptr>	m_list;
 			mutex		m_mutex;
-			bool		m_destroyed = false;
 			Checker		m_checkin;
-			ListRep(Checker checkin);
+			PoolRep(Checker checkin);
 		};
 		struct Handle {
-			shared_ptr<ListRep> m_list_rep;
+			weak_ptr<PoolRep> m_list_rep;
 			Ptr	            m_ret_ptr;
-			Handle(shared_ptr<ListRep> list_rep, Ptr ret_ptr);
+			Handle(shared_ptr<PoolRep> list_rep, Ptr ret_ptr);
 			~Handle();
 		};
 
 		Generator		m_fn;
 		Checker			m_checkout;
-		shared_ptr<ListRep>	m_list_rep;
+		shared_ptr<PoolRep>	m_list_rep;
 	};
 
 	template <class T>
-	Pool<T>::ListRep::ListRep(Checker checkin) :
+	Pool<T>::PoolRep::PoolRep(Checker checkin) :
 		m_checkin(checkin)
 	{
 	}
@@ -67,20 +65,20 @@ namespace crucible {
 	Pool<T>::Pool(Generator f, Checker checkin, Checker checkout) :
 		m_fn(f),
 		m_checkout(checkout),
-		m_list_rep(make_shared<ListRep>(checkin))
+		m_list_rep(make_shared<PoolRep>(checkin))
 	{
 	}
 
 	template <class T>
 	Pool<T>::~Pool()
 	{
-		unique_lock<mutex> lock(m_list_rep->m_mutex);
-		m_list_rep->m_destroyed = true;
-		m_list_rep->m_list.clear();
+		auto list_rep = m_list_rep;
+		unique_lock<mutex> lock(list_rep->m_mutex);
+		m_list_rep.reset();
 	}
 
 	template <class T>
-	Pool<T>::Handle::Handle(shared_ptr<ListRep> list_rep, Ptr ret_ptr) :
+	Pool<T>::Handle::Handle(shared_ptr<PoolRep> list_rep, Ptr ret_ptr) :
 		m_list_rep(list_rep),
 		m_ret_ptr(ret_ptr)
 	{
@@ -89,25 +87,25 @@ namespace crucible {
 	template <class T>
 	Pool<T>::Handle::~Handle()
 	{
-		unique_lock<mutex> lock(m_list_rep->m_mutex);
-
 		// Checkin prepares the object for storage and reuse.
 		// Neither of those will happen if there is no Pool.
 		// If the Pool was destroyed, just let m_ret_ptr expire.
-		if (!m_list_rep->m_destroyed) {
-
-			// If a checkin function is defined, call it
-			auto checkin = m_list_rep->m_checkin;
-			if (checkin) {
-				lock.unlock();
-				checkin(m_ret_ptr);
-				lock.lock();
-			}
-
-			// Place object back in pool
-			m_list_rep->m_list.push_front(m_ret_ptr);
-
+		auto list_rep = m_list_rep.lock();
+		if (!list_rep) {
+			return;
 		}
+
+		unique_lock<mutex> lock(list_rep->m_mutex);
+		// If a checkin function is defined, call it
+		auto checkin = list_rep->m_checkin;
+		if (checkin) {
+			lock.unlock();
+			checkin(m_ret_ptr);
+			lock.lock();
+		}
+
+		// Place object back in pool
+		list_rep->m_list.push_front(m_ret_ptr);
 	}
 
 	template <class T>
@@ -132,7 +130,7 @@ namespace crucible {
 			lock.unlock();
 		}
 
-		// rv now points to a new T object that is not in the list.
+		// rv now points to a T object that is not in the list.
 		THROW_CHECK0(runtime_error, rv);
 
 		// Construct a shared_ptr for Handle which will refcount the Handle objects
