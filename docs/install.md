@@ -83,6 +83,20 @@ within a temporary runtime directory.
 ### Ubuntu 14.04:
 You can try to carry on the work done here: <https://gist.github.com/dagelf/99ee07f5638b346adb8c058ab3d57492>
 
+### openSUSE Tumbleweed:
+
+> If you're running transactional server, first chroot into snapshot by
+> issuing `$ transactional-update shell`. It's also recommended that you don't put bees executables into read-write area if you did. 
+
+    $ zypper install libbtrfs-devel uuid-devel
+    $ zypper install -t pattern devel_C_C++
+    $ make
+
+By default `./scripts/beesd.in` isn't compatible with openSUSE. Fix it by editing:
+
+    readonly CONFIG_DIR="# Path to configurations directory; Use absolue path #"
+    readonly bees_bin="# Path to bees executable; Use absolue path #"
+
 Packaging
 ---------
 
