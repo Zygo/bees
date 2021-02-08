@@ -6,6 +6,7 @@ PROGRAMS = \
 all: $(PROGRAMS)
 
 include ../makeflags
+-include ../localconf
 
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib

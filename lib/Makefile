@@ -20,6 +20,7 @@ CRUCIBLE_OBJS = \
 	uuid.o \
 
 include ../makeflags
+-include ../localconf
 include ../Defines.mk
 
 configure.h: configure.h.in

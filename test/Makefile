@@ -14,6 +14,7 @@ test: $(PROGRAMS:%=%.txt) Makefile
 FORCE:
 
 include ../makeflags
+-include ../localconf
 
 LIBS = -lcrucible -lpthread
 LDFLAGS = -L../lib -Wl,-rpath=$(shell realpath ../lib)
