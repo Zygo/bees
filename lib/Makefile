@@ -21,6 +21,7 @@ CRUCIBLE_OBJS = \
 	uuid.o \
 
 include ../makeflags
+-include ../localconf
 include ../Defines.mk
 
 BEES_LDFLAGS = $(LDFLAGS)

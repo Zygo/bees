@@ -15,6 +15,7 @@ test: $(PROGRAMS:%=%.txt) Makefile
 FORCE:
 
 include ../makeflags
+-include ../localconf
 
 LIBS = -lcrucible -lpthread
 BEES_LDFLAGS = -L../lib $(LDFLAGS)

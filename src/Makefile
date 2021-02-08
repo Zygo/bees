@@ -8,6 +8,7 @@ PROGRAM_OBJS = $(foreach b,$(PROGRAMS),$(patsubst ../bin/%,%.o,$(b)))
 all: $(BEES) $(PROGRAMS)
 
 include ../makeflags
+-include ../localconf
 
 LIBS = -lcrucible -luuid -lpthread
 BEES_LDFLAGS = -L../lib $(LDFLAGS)
