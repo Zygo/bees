@@ -649,8 +649,8 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 		for (auto i : sk.m_result) {
 			sk.next_min(i);
 			if (i.type == BTRFS_ROOT_BACKREF_KEY && i.objectid == rootid) {
-				auto dirid = call_btrfs_get(btrfs_stack_root_ref_dirid, i.m_data);
-				auto name_len = call_btrfs_get(btrfs_stack_root_ref_name_len, i.m_data);
+				auto dirid = btrfs_get_member(&btrfs_root_ref::dirid, i.m_data);
+				auto name_len = btrfs_get_member(&btrfs_root_ref::name_len, i.m_data);
 				auto name_start = sizeof(struct btrfs_root_ref);
 				auto name_end = name_len + name_start;
 				THROW_CHECK2(runtime_error, i.m_data.size(), name_end, i.m_data.size() >= name_end);
@@ -1100,7 +1100,7 @@ BeesCrawl::fetch_extents()
 			continue;
 		}
 
-		auto gen = call_btrfs_get(btrfs_stack_file_extent_generation, i.m_data);
+		auto gen = btrfs_get_member(&btrfs_file_extent_item::generation, i.m_data);
 		if (gen < get_state_end().m_min_transid) {
 			BEESCOUNT(crawl_gen_low);
 			++count_low;
@@ -1126,7 +1126,7 @@ BeesCrawl::fetch_extents()
 			continue;
 		}
 
-		auto type = call_btrfs_get(btrfs_stack_file_extent_type, i.m_data);
+		auto type = btrfs_get_member(&btrfs_file_extent_item::type, i.m_data);
 		switch (type) {
 			default:
 				BEESLOGDEBUG("Unhandled file extent type " << type << " in root " << get_state_end().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
@@ -1144,10 +1144,10 @@ BeesCrawl::fetch_extents()
 				BEESCOUNT(crawl_prealloc);
 				// fallthrough
 			case BTRFS_FILE_EXTENT_REG: {
-				auto physical = call_btrfs_get(btrfs_stack_file_extent_disk_bytenr, i.m_data);
-				auto ram = call_btrfs_get(btrfs_stack_file_extent_ram_bytes, i.m_data);
-				auto len = call_btrfs_get(btrfs_stack_file_extent_num_bytes, i.m_data);
-				auto offset = call_btrfs_get(btrfs_stack_file_extent_offset, i.m_data);
+				auto physical = btrfs_get_member(&btrfs_file_extent_item::disk_bytenr, i.m_data);
+				auto ram = btrfs_get_member(&btrfs_file_extent_item::ram_bytes, i.m_data);
+				auto len = btrfs_get_member(&btrfs_file_extent_item::num_bytes, i.m_data);
+				auto offset = btrfs_get_member(&btrfs_file_extent_item::offset, i.m_data);
 				BEESTRACE("Root " << get_state_end().m_root << " ino " << i.objectid << " physical " << to_hex(physical)
 					<< " logical " << to_hex(i.offset) << ".." << to_hex(i.offset + len)
 					<< " gen " << gen);

@@ -1,6 +1,7 @@
 #ifndef CRUCIBLE_FS_H
 #define CRUCIBLE_FS_H
 
+#include "crucible/endian.h"
 #include "crucible/error.h"
 #include "crucible/spanner.h"
 
@@ -206,38 +207,10 @@ namespace crucible {
 	const T*
 	get_struct_ptr(const V &v, size_t offset = 0)
 	{
-		// OK so sometimes btrfs overshoots a little
-		// if (offset + sizeof(T) > v.size()) {
-			// v.resize(offset + sizeof(T), 0);
-		// }
-		// THROW_CHECK2(invalid_argument, v.size(), offset + sizeof(T), offset + sizeof(T) <= v.size());
-		return reinterpret_cast<const T*>(v.data() + offset);
+		THROW_CHECK2(out_of_range, v.size(), offset + sizeof(T), offset + sizeof(T) <= v.size());
+		const uint8_t *const data_ptr = v.data();
+		return reinterpret_cast<const T*>(data_ptr + offset);
 	}
-
-	template<class A, class R, class V>
-	R
-	call_btrfs_get(R (*func)(const A*), const V &v, size_t offset = 0)
-	{
-		return func(get_struct_ptr<A, V>(v, offset));
-	}
-
-	template <class T> struct btrfs_get_le;
-
-	template<> struct btrfs_get_le<__le64> {
-		uint64_t operator()(const void *p) { return get_unaligned_le64(p); }
-	};
-
-	template<> struct btrfs_get_le<__le32> {
-		uint32_t operator()(const void *p) { return get_unaligned_le32(p); }
-	};
-
-	template<> struct btrfs_get_le<__le16> {
-		uint16_t operator()(const void *p) { return get_unaligned_le16(p); }
-	};
-
-	template<> struct btrfs_get_le<__le8> {
-		uint8_t operator()(const void *p) { return get_unaligned_le8(p); }
-	};
 
 	template<class S, class T, class V>
 	T
@@ -245,8 +218,10 @@ namespace crucible {
 	{
 		const S *const sp = nullptr;
 		const T *const spm = &(sp->*member);
-		auto member_offset = reinterpret_cast<const uint8_t *>(spm) - reinterpret_cast<const uint8_t *>(sp);
-		return btrfs_get_le<T>()(get_struct_ptr<S>(v, offset + member_offset));
+		const auto member_offset = reinterpret_cast<const uint8_t *>(spm) - reinterpret_cast<const uint8_t *>(sp);
+		const void *struct_ptr = get_struct_ptr<T>(v, offset + member_offset);
+		const T unaligned_t = get_unaligned<T>(struct_ptr);
+		return le_to_cpu(unaligned_t);
 	}
 
 	struct Statvfs : public statvfs {

@@ -13,20 +13,22 @@
 // __u64 typedef and friends
 #include <linux/types.h>
 
-// try Linux headers first
-#include <btrfs/ioctl.h>
+// the btrfs headers
+#include <linux/btrfs.h>
+#include <linux/btrfs_tree.h>
 
-// Supply any missing definitions
-#define mutex not_mutex
-#include <btrfs/ctree.h>
-// Repair the damage
-#undef crc32c
-#undef min
-#undef max
-#undef mutex
-#undef swap
+// And now all the things that have been missing in some version of
+// the headers.
 
-#ifndef BTRFS_FIRST_FREE_OBJECTID
+enum btrfs_compression_type {
+	BTRFS_COMPRESS_NONE,
+	BTRFS_COMPRESS_ZLIB,
+	BTRFS_COMPRESS_LZO,
+	BTRFS_COMPRESS_ZSTD,
+};
+
+// BTRFS_CSUM_ITEM_KEY is not defined in include/uapi
+#ifndef BTRFS_CSUM_ITEM_KEY
 
 	#define BTRFS_ROOT_TREE_OBJECTID 1ULL
 	#define BTRFS_EXTENT_TREE_OBJECTID 2ULL

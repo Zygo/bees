@@ -512,20 +512,20 @@ namespace crucible {
 
 			Extent e;
 			e.m_begin = i.offset;
-			auto compressed = call_btrfs_get(btrfs_stack_file_extent_compression, i.m_data);
+			auto compressed = btrfs_get_member(&btrfs_file_extent_item::compression, i.m_data);
 			// FIEMAP told us about compressed extents and we can too
 			if (compressed) {
 				e.m_flags |= FIEMAP_EXTENT_ENCODED;
 			}
 
-			auto type = call_btrfs_get(btrfs_stack_file_extent_type, i.m_data);
+			auto type = btrfs_get_member(&btrfs_file_extent_item::type, i.m_data);
 			off_t len = -1;
 			switch (type) {
 				default:
 					cerr << "Unhandled file extent type " << type << " in root " << m_tree_id << " ino " << m_stat.st_ino << endl;
 					break;
 				case BTRFS_FILE_EXTENT_INLINE:
-					len = ranged_cast<off_t>(call_btrfs_get(btrfs_stack_file_extent_ram_bytes, i.m_data));
+					len = ranged_cast<off_t>(btrfs_get_member(&btrfs_file_extent_item::ram_bytes, i.m_data));
 					e.m_flags |= FIEMAP_EXTENT_DATA_INLINE | FIEMAP_EXTENT_NOT_ALIGNED;
 					// Inline extents are never obscured, so don't bother filling in m_physical_len, etc.
 					break;
@@ -533,17 +533,17 @@ namespace crucible {
 					e.m_flags |= Extent::PREALLOC;
 					// fallthrough
 				case BTRFS_FILE_EXTENT_REG: {
-					e.m_physical = call_btrfs_get(btrfs_stack_file_extent_disk_bytenr, i.m_data);
+					e.m_physical = btrfs_get_member(&btrfs_file_extent_item::disk_bytenr, i.m_data);
 
 					// This is the length of the full extent (decompressed)
-					off_t ram = ranged_cast<off_t>(call_btrfs_get(btrfs_stack_file_extent_ram_bytes, i.m_data));
+					off_t ram = ranged_cast<off_t>(btrfs_get_member(&btrfs_file_extent_item::ram_bytes, i.m_data));
 
 					// This is the length of the part of the extent appearing in the file (decompressed)
-					len = ranged_cast<off_t>(call_btrfs_get(btrfs_stack_file_extent_num_bytes, i.m_data));
+					len = ranged_cast<off_t>(btrfs_get_member(&btrfs_file_extent_item::num_bytes, i.m_data));
 
 					// This is the offset from start of on-disk extent to the part we see in the file (decompressed)
 					// May be negative due to the kind of bug we're stuck with forever, so no cast range check
-					off_t offset = call_btrfs_get(btrfs_stack_file_extent_offset, i.m_data);
+					off_t offset = btrfs_get_member(&btrfs_file_extent_item::offset, i.m_data);
 
 					// If there is a physical address there must be size too
 					if (e.m_physical) {

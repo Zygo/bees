@@ -1018,7 +1018,7 @@ namespace crucible {
 				}
 
 				if (i.objectid == root_id && i.type == BTRFS_ROOT_ITEM_KEY) {
-					rv = max(rv, uint64_t(call_btrfs_get(btrfs_root_generation, i.m_data)));
+					rv = max(rv, uint64_t(btrfs_get_member(&btrfs_root_item::generation, i.m_data)));
 				}
 			}
 			if (sk.min_offset < numeric_limits<decltype(sk.min_offset)>::max()) {
