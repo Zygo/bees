@@ -13,11 +13,9 @@ Dependencies
   There may be problems when building with newer compiler versions.
   Build failure reports welcome!
 
-* btrfs-progs (tested with 4.1..4.20.2) or libbtrfs-dev
-  (tested with version 4.20.2)
+* btrfs-progs
 
-  Needed for btrfs.h and ctree.h during compile.
-  Also needed by the service wrapper script.
+  Needed at runtime by the service wrapper script.
 
 * libuuid-dev
 
@@ -78,7 +76,7 @@ within a temporary runtime directory.
 `$ apt -y install build-essential btrfs-tools uuid-dev markdown && make`
 
 ### Ubuntu 18.10:
-`$ apt -y install build-essential btrfs-progs libbtrfs-dev uuid-dev markdown && make`
+`$ apt -y install build-essential btrfs-progs uuid-dev markdown && make`
 
 ### Ubuntu 14.04:
 You can try to carry on the work done here: <https://gist.github.com/dagelf/99ee07f5638b346adb8c058ab3d57492>
