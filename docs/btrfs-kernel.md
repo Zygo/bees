@@ -53,8 +53,9 @@ These bugs are particularly popular among bees users:
 | - | 5.7 | filesystem becomes read-only if out of space while deleting snapshot | 4.9.238, 4.14.200, 4.19.149, 5.4.69, 5.8 and later | 7c09c03091ac btrfs: don't force read-only after error in drop snapshot
 | 5.1 | 5.7 | balance, device delete, or filesystem shrink operations loop endlessly on a single block group without decreasing extent count | 5.4.54, 5.7.11, 5.8 and later | 1dae7e0e58b4 btrfs: reloc: clear DEAD\_RELOC\_TREE bit for orphan roots to prevent runaway balance
 | - | 5.8 | deadlock in `TREE_SEARCH` ioctl (core component of bees filesystem scanner), followed by regression in deadlock fix | 4.4.237, 4.9.237, 4.14.199, 4.19.146, 5.4.66, 5.8.10 and later | a48b73eca4ce btrfs: fix potential deadlock in the search ioctl, 1c78544eaa46 btrfs: fix wrong address when faulting in pages in the search ioctl
+| 5.7 | 5.10 | kernel crash if balance receives fatal signal e.g. Ctrl-C | 5.4.93, 5.10.11, 5.11 and later | 18d3bff411c8 btrfs: don't get an EINTR during drop_snapshot for reloc
+| 5.10 | 5.10 | 20x write performance regression | 5.10.8, 5.11 and later | e076ab2a2ca7 btrfs: shrink delalloc pages instead of full inodes
 | 4.15 | - | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | - | workaround:  comment out the `WARN_ON`
-| 5.7 | - | kernel crash if balance receives fatal signal at wrong moment during start of new block group | - | workaround:  keep `btrfs balance` from being killed or Ctrl-Ced
 
 "Last bad kernel" refers to that version's last stable update from
 kernel.org.  Distro kernels may backport additional fixes.  Consult
