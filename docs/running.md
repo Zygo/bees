@@ -1,6 +1,15 @@
 Running bees
 ============
 
+Simplest Case
+-------------
+
+If you just want to run bees manually on a single btrfs partition that has no sub-volumes, the following bare bones solution should just work. 
+<path-to-bees>/bees  <path-to-btrfs-partition>
+
+This will create a .beeshome folder in the btrfs partition root.
+
+
 Setup
 -----
 
