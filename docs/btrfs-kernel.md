@@ -7,14 +7,17 @@ First, a warning that is not specific to bees:
 severe regression that can lead to fatal metadata corruption.**
 This issue is fixed in kernel 5.4.14 and later.
 
-**Recommended kernel versions for bees are 4.19, 5.4, 5.7, or 5.8, with
-recent LTS and -stable updates.** The latest released kernel as of this
-writing is 5.8.14.
+**Recommended kernel versions for bees are 4.19, 5.4, 5.7, 5.8, 5.9,
+5.10, or 5.11, with recent LTS and -stable updates.**  The latest released
+kernel as of this writing is 5.11.11.
 
-4.14, 4.9, and 4.4 LTS kernels with recent updates are OK, but older
-kernels will be somewhat slower, and not all fixes are backported.
-Obsolete non-LTS kernels have a variety of unfixed issues.  For details
-see the table below.
+4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with
+some issues.  Older kernels will be slower (a little slower or a lot
+slower depending on which issues are triggered).  Not all fixes are
+backported.
+
+Obsolete non-LTS kernels have a variety of unfixed issues and should
+not be used with btrfs.  For details see the table below.
 
 bees requires btrfs kernel API version 4.2 or higher, and does not work
 on older kernels.
@@ -49,7 +52,7 @@ These bugs are particularly popular among bees users:
 | - | 5.5 | kernel crash due to tree mod log issue #3 (often triggered by bees) | 3.16.84, 4.4.214, 4.9.214, 4.14.171, 4.19.103, 5.4.19, 5.5.3, 5.6 and later | 7227ff4de55d Btrfs: fix race between adding and putting tree mod seq elements and nodes
 | - | 5.6 | deadlock when enumerating file references to physical extent addresses while some references still exist in deleted subvols | 5.7 and later | 39dba8739c4e btrfs: do not resolve backrefs for roots that are being deleted
 | - | 5.6 | deadlock when many extent reference updates are pending and available memory is low | 4.14.177, 4.19.116, 5.4.33, 5.5.18, 5.6.5, 5.7 and later | 351cbf6e4410 btrfs: use nofs allocations for running delayed items
-| - | 5.6 | excessive CPU usage in `LOGICAL_INO` ioctl and increased btrfs write latency in other processes when bees translates from extent physical address to list of referencing files and offsets | 5.7 and later | b25b0b871f20 btrfs: backref, use correct count to resolve normal data refs, plus 3 parent commits.  Some improvements also in earlier kernels.
+| - | 5.6 | excessive CPU usage in `LOGICAL_INO` ioctl and increased btrfs write latency in other processes when bees translates from extent physical address to list of referencing files and offsets | 5.4.96, 5.7 and later | b25b0b871f20 btrfs: backref, use correct count to resolve normal data refs, plus 3 parent commits.  Some improvements also in earlier kernels.
 | - | 5.7 | filesystem becomes read-only if out of space while deleting snapshot | 4.9.238, 4.14.200, 4.19.149, 5.4.69, 5.8 and later | 7c09c03091ac btrfs: don't force read-only after error in drop snapshot
 | 5.1 | 5.7 | balance, device delete, or filesystem shrink operations loop endlessly on a single block group without decreasing extent count | 5.4.54, 5.7.11, 5.8 and later | 1dae7e0e58b4 btrfs: reloc: clear DEAD\_RELOC\_TREE bit for orphan roots to prevent runaway balance
 | - | 5.8 | deadlock in `TREE_SEARCH` ioctl (core component of bees filesystem scanner), followed by regression in deadlock fix | 4.4.237, 4.9.237, 4.14.199, 4.19.146, 5.4.66, 5.8.10 and later | a48b73eca4ce btrfs: fix potential deadlock in the search ioctl, 1c78544eaa46 btrfs: fix wrong address when faulting in pages in the search ioctl
@@ -101,10 +104,9 @@ Workarounds for known kernel bugs
   non-toxic extents.  This seems to affect all dedupe agents on btrfs;
   at this time of writing only bees has a workaround for this bug.
 
-  Update (5.8.14):  this issue may be a race condition that occurs if
-  two or more threads attempt to modify the same extent or immediately
-  adjacent extents.  It has not been observed on a kernel version later
-  than 5.7 (after backref code changes in the kernel).
+  This workaround is less necessary for kernels 5.4.96, 5.7 and later,
+  though it can still take 2 ms of CPU to resolve each extent ref on a
+  fast machine.
 
 * **dedupe breaks `btrfs send` in old kernels**.  The bees option
   `--workaround-btrfs-send` prevents any modification of read-only subvols
@@ -120,7 +122,7 @@ Workarounds for known kernel bugs
 Unfixed kernel bugs
 -------------------
 
-As of 5.8.14:
+As of 5.11.11:
 
 * **The kernel does not permit `btrfs send` and dedupe to run at the
   same time**.  Recent kernels no longer crash, but now refuse one
