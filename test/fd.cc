@@ -302,6 +302,7 @@ cast(const Fd &fd)
 {
 	auto dp = dynamic_pointer_cast<T>(fd.operator->());
 	if (!dp) {
+		cerr << "expect bad cast exception: " << flush;
 		throw bad_cast();
 	}
 	return dp;
