@@ -1,6 +1,8 @@
 #ifndef CRUCIBLE_POOL_H
 #define CRUCIBLE_POOL_H
 
+#include "crucible/error.h"
+
 #include <functional>
 #include <list>
 #include <memory>

@@ -1,8 +1,8 @@
 #ifndef CRUCIBLE_LOCKSET_H
 #define CRUCIBLE_LOCKSET_H
 
-#include <crucible/error.h>
-#include <crucible/process.h>
+#include "crucible/error.h"
+#include "crucible/process.h"
 
 #include <cassert>
 
