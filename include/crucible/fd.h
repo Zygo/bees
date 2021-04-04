@@ -35,11 +35,11 @@ namespace crucible {
 		IOHandle& operator=(IOHandle &&) = delete;
 		IOHandle& operator=(const IOHandle &) = delete;
 		int	m_fd;
+		void close();
 	public:
 		virtual ~IOHandle();
 		IOHandle(int fd = -1);
 		int get_fd() const;
-		void close();
 	};
 
 	class Fd {

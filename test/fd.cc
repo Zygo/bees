@@ -37,7 +37,7 @@ test_basic_read()
 	char read_buf[test_string_len];
 	read_or_die(f, read_buf);
 	assert(!strncmp(read_buf, test_string, test_string_len));
-	f->close();
+	f = Fd();
 }
 
 static
@@ -262,24 +262,29 @@ static void test_map()
 	assert_is_closed(c, false);
 }
 
-static void test_close_method()
+static void test_close()
 {
 	Fd fd = open("fd.cc", O_RDONLY);
 	int i = fd;
 	assert_is_closed(i, false);
-	fd->close();
+	fd = Fd();
 	assert_is_closed(i, true);
 }
 
-static void test_shared_close_method()
+static void test_shared_close()
 {
 	Fd fd = open("fd.cc", O_RDONLY);
 	int i = fd;
 	Fd fd2 = fd;
 	assert_is_closed(i, false);
 	assert_is_closed(fd2, false);
-	fd->close();
+	fd2 = Fd();
+	assert_is_closed(i, false);
+	assert_is_closed(fd, false);
+	assert_is_closed(fd2, true);
+	fd = Fd();
 	assert_is_closed(i, true);
+	assert_is_closed(fd, true);
 	assert_is_closed(fd2, true);
 }
 
@@ -391,8 +396,8 @@ int main(int, const char **)
 	RUN_A_TEST(test_assign_int_close());
 	RUN_A_TEST(test_assign_int_close_2());
 	RUN_A_TEST(test_map());
-	RUN_A_TEST(test_close_method());
-	RUN_A_TEST(test_shared_close_method());
+	RUN_A_TEST(test_close());
+	RUN_A_TEST(test_shared_close());
 	RUN_A_TEST(test_derived_resource_type());
 	RUN_A_TEST(test_derived_map());
 	RUN_A_TEST(test_derived_cast());
