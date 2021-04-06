@@ -18,6 +18,7 @@ namespace crucible {
 	static shared_ptr<set<string>> chatter_names;
 	static const char *SPACETAB = " \t";
 	static bool add_prefix_timestamp = true;
+	static bool add_prefix_level = true;
 
 	static
 	void
@@ -55,6 +56,12 @@ namespace crucible {
 		add_prefix_timestamp = prefix_timestamp;
 	}
 
+	void
+	Chatter::enable_level(bool prefix_level)
+	{
+		add_prefix_level = prefix_level;
+	}
+
 	Chatter::~Chatter()
 	{
 		ostringstream header_stream;
@@ -69,12 +76,17 @@ namespace crucible {
 			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &ltm));
 
 			header_stream << buf;
-			header_stream << " " << getpid() << "." << crucible::gettid() << "<" << m_loglevel << ">";
+			header_stream << " " << getpid() << "." << crucible::gettid();
+			if (add_prefix_level) {
+				header_stream << "<" << m_loglevel << ">";
+			}
 			if (!m_name.empty()) {
 				header_stream << " " << m_name;
 			}
 		} else {
-			header_stream << "<" << m_loglevel << ">";
+			if (add_prefix_level) {
+				header_stream << "<" << m_loglevel << ">";
+			}
 			header_stream << (m_name.empty() ? "thread" : m_name);
 			header_stream << "[" << crucible::gettid() << "]";
 		}

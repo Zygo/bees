@@ -50,6 +50,7 @@ namespace crucible {
 		~Chatter();
 
 		static void enable_timestamp(bool prefix_timestamp);
+		static void enable_level(bool prefix_level);
 	};
 
 	template <class Argument>
