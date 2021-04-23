@@ -5,7 +5,6 @@
 #include "crucible/limits.h"
 #include "crucible/ntoa.h"
 #include "crucible/string.h"
-#include "crucible/uuid.h"
 
 // FS_IOC_FIEMAP
 #include <linux/fs.h>
@@ -1071,7 +1070,6 @@ namespace crucible {
 		os << "BtrfsIoctlFsInfoArgs {"
 			<< " max_id = " << a.max_id << ","
 			<< " num_devices = " << a.num_devices << ","
-			<< " fsid = " << a.uuid() << ","
 #if 0
 			<< " nodesize = " << a.nodesize << ","
 			<< " sectorsize = " << a.sectorsize << ","
@@ -1097,12 +1095,6 @@ namespace crucible {
 		if (ioctl(fd, BTRFS_IOC_FS_INFO, p)) {
 			THROW_ERRNO("BTRFS_IOC_FS_INFO: fd " << fd);
 		}
-	}
-
-	string
-	BtrfsIoctlFsInfoArgs::uuid() const
-	{
-		return uuid_unparse(fsid);
 	}
 
 	uint16_t

@@ -734,7 +734,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 
 	string						m_root_path;
 	Fd						m_root_fd;
-	string						m_root_uuid;
 
 	mutable mutex					m_blacklist_mutex;
 	set<BeesFileId>					m_blacklist;
@@ -771,7 +770,6 @@ public:
 	Fd root_fd() const { return m_root_fd; }
 	Fd home_fd();
 	string root_path() const { return m_root_path; }
-	string root_uuid() const { return m_root_uuid; }
 
 	BeesFileRange scan_forward(const BeesFileRange &bfr);
 

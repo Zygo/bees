@@ -17,11 +17,6 @@ Dependencies
 
   Needed at runtime by the service wrapper script.
 
-* libuuid-dev
-
-  This library is only required for a feature that was removed after v0.1.
-  The lingering support code can be removed.
-
 * [Linux kernel version](btrfs-kernel.md) gets its own page.
 
 * markdown for documentation
@@ -73,10 +68,10 @@ Both of the latter use the filesystem UUID to mount the root subvolume
 within a temporary runtime directory.
 
 ### Ubuntu 16.04 - 17.04:
-`$ apt -y install build-essential btrfs-tools uuid-dev markdown && make`
+`$ apt -y install build-essential btrfs-tools markdown && make`
 
 ### Ubuntu 18.10:
-`$ apt -y install build-essential btrfs-progs uuid-dev markdown && make`
+`$ apt -y install build-essential btrfs-progs markdown && make`
 
 ### Ubuntu 14.04:
 You can try to carry on the work done here: <https://gist.github.com/dagelf/99ee07f5638b346adb8c058ab3d57492>

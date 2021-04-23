@@ -941,10 +941,6 @@ BeesContext::set_root_fd(Fd fd)
 	Stat st(fd);
 	THROW_CHECK1(invalid_argument, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
 	m_root_fd = fd;
-	BtrfsIoctlFsInfoArgs fsinfo;
-	fsinfo.do_ioctl(fd);
-	m_root_uuid = fsinfo.uuid();
-	BEESLOGINFO("Filesystem UUID is " << m_root_uuid);
 
 	// 65536 is big enough for two max-sized extents.
 	// Need enough total space in the cache for the maximum number of active threads.
