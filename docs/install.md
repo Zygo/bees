@@ -73,9 +73,6 @@ within a temporary runtime directory.
 ### Ubuntu 18.10:
 `$ apt -y install build-essential btrfs-progs markdown && make`
 
-### Ubuntu 14.04:
-You can try to carry on the work done here: <https://gist.github.com/dagelf/99ee07f5638b346adb8c058ab3d57492>
-
 Packaging
 ---------
 
