@@ -709,7 +709,7 @@ BeesRoots::open_root(uint64_t rootid)
 		return Fd();
 	}
 
-	return m_ctx->fd_cache()->open_root(m_ctx, rootid);
+	return m_ctx->fd_cache()->open_root(rootid);
 }
 
 bool
@@ -906,7 +906,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 Fd
 BeesRoots::open_root_ino(uint64_t root, uint64_t ino)
 {
-	return m_ctx->fd_cache()->open_root_ino(m_ctx, root, ino);
+	return m_ctx->fd_cache()->open_root_ino(root, ino);
 }
 
 RateEstimator &

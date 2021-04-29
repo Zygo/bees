@@ -21,18 +21,19 @@ using namespace crucible;
 using namespace std;
 
 
-BeesFdCache::BeesFdCache()
+BeesFdCache::BeesFdCache(shared_ptr<BeesContext> ctx) :
+	m_ctx(ctx)
 {
-	m_root_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root) -> Fd {
+	m_root_cache.func([&](uint64_t root) -> Fd {
 		Timer open_timer;
-		auto rv = ctx->roots()->open_root_nocache(root);
+		auto rv = m_ctx->roots()->open_root_nocache(root);
 		BEESCOUNTADD(open_root_ms, open_timer.age() * 1000);
 		return rv;
 	});
 	m_root_cache.max_size(BEES_ROOT_FD_CACHE_SIZE);
-	m_file_cache.func([&](shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino) -> Fd {
+	m_file_cache.func([&](uint64_t root, uint64_t ino) -> Fd {
 		Timer open_timer;
-		auto rv = ctx->roots()->open_root_ino_nocache(root, ino);
+		auto rv = m_ctx->roots()->open_root_ino_nocache(root, ino);
 		BEESCOUNTADD(open_ino_ms, open_timer.age() * 1000);
 		return rv;
 	});
@@ -51,15 +52,15 @@ BeesFdCache::clear()
 }
 
 Fd
-BeesFdCache::open_root(shared_ptr<BeesContext> ctx, uint64_t root)
+BeesFdCache::open_root(uint64_t root)
 {
-	return m_root_cache(ctx, root);
+	return m_root_cache(root);
 }
 
 Fd
-BeesFdCache::open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino)
+BeesFdCache::open_root_ino(uint64_t root, uint64_t ino)
 {
-	return m_file_cache(ctx, root, ino);
+	return m_file_cache(root, ino);
 }
 
 void
@@ -1107,7 +1108,7 @@ BeesContext::fd_cache()
 		throw BeesHalt();
 	}
 	if (!m_fd_cache) {
-		m_fd_cache = make_shared<BeesFdCache>();
+		m_fd_cache = make_shared<BeesFdCache>(shared_from_this());
 	}
 	auto rv = m_fd_cache;
 	return rv;

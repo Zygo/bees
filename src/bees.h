@@ -697,15 +697,16 @@ public:
 };
 
 class BeesFdCache {
-	LRUCache<Fd, shared_ptr<BeesContext>, uint64_t>			m_root_cache;
-	LRUCache<Fd, shared_ptr<BeesContext>, uint64_t, uint64_t>	m_file_cache;
-	Timer								m_root_cache_timer;
-	Timer								m_file_cache_timer;
+	shared_ptr<BeesContext> 		m_ctx;
+	LRUCache<Fd, uint64_t>			m_root_cache;
+	LRUCache<Fd, uint64_t, uint64_t>	m_file_cache;
+	Timer					m_root_cache_timer;
+	Timer					m_file_cache_timer;
 
 public:
-	BeesFdCache();
-	Fd open_root(shared_ptr<BeesContext> ctx, uint64_t root);
-	Fd open_root_ino(shared_ptr<BeesContext> ctx, uint64_t root, uint64_t ino);
+	BeesFdCache(shared_ptr<BeesContext> ctx);
+	Fd open_root(uint64_t root);
+	Fd open_root_ino(uint64_t root, uint64_t ino);
 	void clear();
 };
 
