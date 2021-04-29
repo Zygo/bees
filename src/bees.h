@@ -751,8 +751,8 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	condition_variable				m_abort_condvar;
 	bool						m_abort_requested = false;
 
-	BeesThread					m_progress_thread;
-	BeesThread					m_status_thread;
+	shared_ptr<BeesThread>				m_progress_thread;
+	shared_ptr<BeesThread>				m_status_thread;
 
 	void set_root_fd(Fd fd);
 
@@ -763,7 +763,7 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	void rewrite_file_range(const BeesFileRange &bfr);
 
 public:
-	BeesContext(shared_ptr<BeesContext> parent_ctx = nullptr);
+	BeesContext() = default;
 
 	void set_root_path(string path);
 

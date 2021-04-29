@@ -178,22 +178,6 @@ BeesContext::home_fd()
 	return m_home_fd;
 }
 
-BeesContext::BeesContext(shared_ptr<BeesContext> parent) :
-	m_parent_ctx(parent),
-	m_progress_thread("progress_report"),
-	m_status_thread("status_report")
-{
-	if (m_parent_ctx) {
-		m_fd_cache = m_parent_ctx->fd_cache();
-	}
-	m_progress_thread.exec([=]() {
-		show_progress();
-	});
-	m_status_thread.exec([=]() {
-		dump_status();
-	});
-}
-
 bool
 BeesContext::is_root_ro(uint64_t root)
 {
@@ -962,6 +946,15 @@ BeesContext::start()
 	BEESLOGNOTICE("Starting bees main loop...");
 	BEESNOTE("starting BeesContext");
 
+	m_progress_thread = make_shared<BeesThread>("progress_report");
+	m_status_thread = make_shared<BeesThread>("status_report");
+	m_progress_thread->exec([=]() {
+		show_progress();
+	});
+	m_status_thread->exec([=]() {
+		dump_status();
+	});
+
 	// Set up temporary file pool
 	m_tmpfile_pool.generator([=]() -> shared_ptr<BeesTempFile> {
 		return make_shared<BeesTempFile>(shared_from_this());
@@ -1043,7 +1036,7 @@ BeesContext::stop()
 
 	BEESNOTE("waiting for progress thread");
 	BEESLOGDEBUG("Waiting for progress thread");
-	m_progress_thread.join();
+	m_progress_thread->join();
 
 	// XXX: nobody can see this BEESNOTE because we are killing the
 	// thread that publishes it
@@ -1053,7 +1046,7 @@ BeesContext::stop()
 	m_stop_status = true;
 	m_stop_condvar.notify_all();
 	lock.unlock();
-	m_status_thread.join();
+	m_status_thread->join();
 
 	BEESLOGNOTICE("bees stopped in " << stop_timer << " sec");
 }

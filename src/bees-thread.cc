@@ -70,11 +70,6 @@ BeesThread::~BeesThread()
 
 	BEESLOGDEBUG("BeesThread destructor " << m_name);
 	if (m_thread_ptr->joinable()) {
-		BEESLOGDEBUG("Cancelling thread " << m_name);
-		int rv = pthread_cancel(m_thread_ptr->native_handle());
-		if (rv) {
-			BEESLOGDEBUG("pthread_cancel returned " << strerror(-rv));
-		}
 		BEESLOGDEBUG("Waiting for thread " << m_name);
 		Timer thread_time;
 		m_thread_ptr->join();
