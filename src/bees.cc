@@ -426,7 +426,7 @@ BeesStringFile::write(string contents)
 		write_or_die(ofd, contents);
 #if 0
 		// This triggers too many btrfs bugs.  I wish I was kidding.
-		// Forget snapshots, balance, compression, and dedup:
+		// Forget snapshots, balance, compression, and dedupe:
 		// the system call you have to fear on btrfs is fsync().
 		// Also note that when bees renames a temporary over an
 		// existing file, it flushes the temporary, so we get

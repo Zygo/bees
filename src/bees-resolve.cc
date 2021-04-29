@@ -438,7 +438,7 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
 			BEESCOUNT(replacedst_dedup_hit);
 			m_found_dup = true;
 			overlap_bfr = brp.second;
-			// FIXME:  find best range first, then dedup that
+			// FIXME:  find best range first, then dedupe that
 			return true; // i.e. break
 		} else {
 			BEESCOUNT(replacedst_dedup_miss);

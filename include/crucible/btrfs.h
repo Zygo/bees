@@ -162,7 +162,7 @@ enum btrfs_compression_type {
 		__u64 bytes_deduped;    /* out - total # of bytes we were able
 					 * to dedupe from this file */
 		/* status of this dedupe operation:
-		 * 0 if dedup succeeds
+		 * 0 if dedupe succeeds
 		 * < 0 for error
 		 * == BTRFS_SAME_DATA_DIFFERS if data differs
 		 */

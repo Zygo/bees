@@ -820,7 +820,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	for (auto file_path : ipa.m_paths) {
 		BEESTRACE("Looking up root " << root << " ino " << ino << " in dir " << name_fd(root_fd) << " path " << file_path);
 		BEESCOUNT(open_file);
-		// Just open file RO.  root can do the dedup ioctl without
+		// Just open file RO.  root can do the dedupe ioctl without
 		// opening in write mode, and if we do open in write mode,
 		// we can't exec the file while we have it open.
 		const char *fp_cstr = file_path.c_str();
@@ -864,19 +864,19 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 			break;
 		}
 
-		// The kernel rejects dedup requests with
+		// The kernel rejects dedupe requests with
 		// src and dst that have different datasum flags
 		// (datasum is a flag in the inode).
 		//
 		// We can detect the common case where a file is
 		// marked with nodatacow (which implies nodatasum).
-		// nodatacow files are arguably out of scope for dedup,
-		// since dedup would just make them datacow again.
+		// nodatacow files are arguably out of scope for dedupe,
+		// since dedupe would just make them datacow again.
 		// To handle these we pretend we couldn't open them.
 		//
 		// A less common case is nodatasum + datacow files.
-		// Those are availble for dedup but we have to solve
-		// some other problems before we can dedup them.  They
+		// Those are availble for dedupe but we have to solve
+		// some other problems before we can dedupe them.  They
 		// require a separate hash table namespace from datasum
 		// + datacow files, and we have to create nodatasum
 		// temporary files when we rewrite extents.
@@ -992,7 +992,7 @@ BeesCrawl::fetch_extents()
 	// Check for btrfs send workaround: don't scan RO roots at all, pretend
 	// they are just empty.  We can't free any space there, and we
 	// don't have the necessary analysis logic to be able to use
-	// them as dedup src extents (yet).
+	// them as dedupe src extents (yet).
 	//
 	// This will keep the max_transid up to date so if the root
 	// is ever switched back to read-write, it won't trigger big

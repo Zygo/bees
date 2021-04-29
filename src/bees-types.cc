@@ -960,7 +960,7 @@ BeesHash
 BeesBlockData::hash() const
 {
 	if (!m_hash_done) {
-		// We can only dedup unaligned EOF blocks against other unaligned EOF blocks,
+		// We can only dedupe unaligned EOF blocks against other unaligned EOF blocks,
 		// so we do NOT round up to a full sum block size.
 		const Blob &blob = data();
 		m_hash = BeesHash(blob.data(), blob.size());

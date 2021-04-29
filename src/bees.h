@@ -29,7 +29,7 @@ using namespace std;
 // Block size for clone alignment (FIXME: should read this from /sys/fs/btrfs/<FS-UUID>/clone_alignment)
 const off_t BLOCK_SIZE_CLONE = 4096;
 
-// Block size for dedup checksums (arbitrary, but must be a multiple of clone alignment)
+// Block size for dedupe checksums (arbitrary, but must be a multiple of clone alignment)
 const off_t BLOCK_SIZE_SUMS = 4096;
 
 // Block size for memory allocations and file mappings  (FIXME: should be CPU page size)
@@ -805,10 +805,10 @@ class BeesResolver {
 	set<BeesFileRange>			m_ranges;
 	unsigned				m_bior_count;
 
-	// We found matching data, so we can dedup
+	// We found matching data, so we can dedupe
 	bool					m_found_data = false;
 
-	// We found matching data, so we *did* dedup
+	// We found matching data, so we *did* dedupe
 	bool					m_found_dup = false;
 
 	// We found matching hash, so the hash table is still correct

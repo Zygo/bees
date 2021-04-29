@@ -328,7 +328,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				// Apparently they can both extend past EOF
 				BeesFileRange copy_bfr(bfr.fd(), e.begin(), e.begin() + extent_size);
 				BeesRangePair brp(prealloc_bfr, copy_bfr);
-				// Raw dedup here - nothing else to do with this extent, nothing to merge with
+				// Raw dedupe here - nothing else to do with this extent, nothing to merge with
 				if (m_ctx->dedup(brp)) {
 					BEESCOUNT(dedup_prealloc_hit);
 					BEESCOUNTADD(dedup_prealloc_bytes, e.size());
@@ -338,7 +338,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				}
 			}
 		).run();
-		return bfr; // if dedup success, which we now blindly assume
+		return bfr; // if dedupe success, which we now blindly assume
 	}
 
 	// OK we need to read extent now
@@ -596,7 +596,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	// If the extent contains obscured blocks, and we can find no
 	// other refs to the extent that reveal those blocks, nuke the incoming extent.
 	// Don't rewrite extents that are bigger than the maximum FILE_EXTENT_SAME size
-	// because we can't make extents that large with dedup.
+	// because we can't make extents that large with dedupe.
 	// Don't rewrite small extents because it is a waste of time without being
 	// able to combine them into bigger extents.
 	if (!rewrite_extent && (e.flags() & Extent::OBSCURED) && (e.physical_len() > BLOCK_SIZE_MAX_COMPRESSED_EXTENT) && (e.physical_len() < BLOCK_SIZE_MAX_EXTENT_SAME)) {

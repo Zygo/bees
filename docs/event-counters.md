@@ -140,7 +140,7 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
 dedup
 -----
 
-The `dedup` event group consists of operations that deduplicate data.
+The `dedup` (sic) event group consists of operations that deduplicate data.
 
  * `dedup_bytes`: Total bytes in extent references deduplicated.
  * `dedup_copy`: Total bytes copied to eliminate unique data in extents containing a mix of unique and duplicate data.

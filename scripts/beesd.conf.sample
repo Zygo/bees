@@ -23,7 +23,7 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # sHash table entries are 16 bytes each
 # (64-bit hash, 52-bit block number, and some metadata bits)
 # Each entry represents a minimum of 4K on disk.
-# unique data size    hash table size    average dedup block size
+# unique data size    hash table size    average dedupe block size
 #     1TB                 4GB                  4K
 #     1TB                 1GB                 16K
 #     1TB               256MB                 64K
