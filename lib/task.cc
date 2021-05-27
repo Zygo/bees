@@ -192,8 +192,10 @@ namespace crucible {
 		lock.unlock();
 
 		char buf[24] = { 0 };
+#ifdef _GNU_SOURCE
 		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
 		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
+#endif
 
 		weak_ptr<TaskState> this_task_wp = shared_from_this();
 		swap(this_task_wp, tl_current_task_wp);
