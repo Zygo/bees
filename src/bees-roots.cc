@@ -546,12 +546,15 @@ BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_crawl_thread("crawl_transid"),
 	m_writeback_thread("crawl_writeback")
 {
-
 	m_root_ro_cache.func([&](uint64_t root) -> bool {
 		return is_root_ro_nocache(root);
 	});
 	m_root_ro_cache.max_size(BEES_ROOT_FD_CACHE_SIZE);
+}
 
+void
+BeesRoots::start()
+{
 	m_crawl_thread.exec([&]() {
 		// Measure current transid before creating any crawlers
 		catch_all([&]() {

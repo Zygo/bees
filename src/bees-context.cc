@@ -987,7 +987,7 @@ BeesContext::start()
 	hash_table();
 
 	// Kick off the crawlers
-	roots();
+	roots()->start();
 }
 
 void
