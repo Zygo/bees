@@ -135,7 +135,7 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 
 // macros ----------------------------------------
 
-#define BEESLOG(lv,x)   do { if (lv < bees_log_level) { Chatter c(lv, BeesNote::get_name()); c << x; } } while (0)
+#define BEESLOG(lv,x)   do { if (lv < bees_log_level) { Chatter __chatter(lv, BeesNote::get_name()); __chatter << x; } } while (0)
 #define BEESLOGTRACE(x) do { BEESLOG(LOG_DEBUG, x); BeesTracer::trace_now(); } while (0)
 
 #define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x);   })
