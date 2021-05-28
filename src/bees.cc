@@ -734,6 +734,7 @@ bees_main(int argc, char *argv[])
 
 	// Create a context so we can apply configuration to it
 	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
+	BEESLOGDEBUG("context constructed");
 
 	string cwd(readlink_or_die("/proc/self/cwd"));
 
@@ -788,6 +789,8 @@ bees_main(int argc, char *argv[])
 		if (-1 == c) {
 			break;
 		}
+
+		BEESLOGDEBUG("Parsing option '" << static_cast<char>(c) << "'");
 
 		switch (c) {
 

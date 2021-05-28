@@ -233,6 +233,7 @@ size_t
 BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 {
 	BEESNOTE("Crawling batch " << this_crawl->get_state_begin());
+	BEESTRACE("Crawling batch " << this_crawl->get_state_begin());
 	auto ctx_copy = m_ctx;
 	size_t batch_count = 0;
 	auto subvol = this_crawl->get_state_begin().m_root;
@@ -709,6 +710,7 @@ BeesRoots::open_root(uint64_t rootid)
 bool
 BeesRoots::is_root_ro_nocache(uint64_t root)
 {
+	BEESTRACE("checking subvol flags on root " << root);
 	Fd root_fd = open_root(root);
 	BEESTRACE("checking subvol flags on root " << root << " path " << name_fd(root_fd));
 
