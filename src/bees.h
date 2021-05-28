@@ -384,7 +384,7 @@ class BeesStringFile {
 	size_t	m_limit;
 
 public:
-	BeesStringFile(Fd dir_fd, string name, size_t limit = 1024 * 1024);
+	BeesStringFile(Fd dir_fd, string name, size_t limit = 16 * 1024 * 1024);
 	string read();
 	void write(string contents);
 	void name(const string &new_name);
