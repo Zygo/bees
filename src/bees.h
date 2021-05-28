@@ -93,7 +93,7 @@ const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
 const double BEES_TOO_LONG = 5.0;
 
 // Avoid any extent where LOGICAL_INO takes this much kernel CPU time
-const double BEES_TOXIC_SYS_DURATION = 0.1;
+const double BEES_TOXIC_SYS_DURATION = 5.0;
 
 // Maximum number of refs to a single extent before we have other problems
 // If we have more than 10K refs to an extent, adding another will save 0.01% space
