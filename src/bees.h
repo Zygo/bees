@@ -119,6 +119,9 @@ const bool BEES_SERIALIZE_RESOLVE = false;
 // Workaround for tree mod log bugs
 const bool BEES_SERIALIZE_BALANCE = false;
 
+// Workaround for silly dedupe / ineffective readahead behavior
+const size_t BEES_READAHEAD_SIZE = 1024 * 1024;
+
 // Flags
 const int FLAGS_OPEN_COMMON   = O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC | O_NOATIME | O_LARGEFILE | O_NOCTTY;
 const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;
@@ -880,6 +883,7 @@ extern const char *BEES_USAGE;
 extern const char *BEES_VERSION;
 string pretty(double d);
 void bees_sync(int fd);
+void bees_readahead(int fd, off_t offset, size_t size);
 string format_time(time_t t);
 
 #endif

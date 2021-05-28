@@ -371,6 +371,31 @@ bees_sync(int fd)
 	BEESCOUNTADD(sync_ms, sync_timer.age() * 1000);
 }
 
+void
+bees_readahead(int const fd, off_t offset, size_t size)
+{
+	Timer readahead_timer;
+	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	// This might not do anything?
+	DIE_IF_NON_ZERO(readahead(fd, offset, size));
+	// Make sure this data is in page cache
+	// Note spelling: readahead vs read ahead
+	BEESNOTE("read ahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	while (size) {
+		static uint8_t dummy[BEES_READAHEAD_SIZE];
+		size_t this_read_size = min(size, sizeof(dummy));
+		// Ignore errors and short reads.
+		// It turns out our size parameter isn't all that accurate.
+		pread(fd, dummy, this_read_size, offset);
+		BEESCOUNT(readahead_count);
+		BEESCOUNTADD(readahead_bytes, this_read_size);
+		offset += this_read_size;
+		size -= this_read_size;
+	}
+	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
+}
+
 BeesStringFile::BeesStringFile(Fd dir_fd, string name, size_t limit) :
 	m_dir_fd(dir_fd),
 	m_name(name),
