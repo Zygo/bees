@@ -44,8 +44,10 @@ void
 BeesFdCache::clear()
 {
 	BEESNOTE("Clearing root FD cache to enable subvol delete");
+	BEESLOGDEBUG("Clearing root FD cache to enable subvol delete");
 	m_root_cache.clear();
 	BEESCOUNT(root_clear);
+	BEESLOGDEBUG("Clearing open FD cache to enable file delete");
 	BEESNOTE("Clearing open FD cache to enable file delete");
 	m_file_cache.clear();
 	BEESCOUNT(open_clear);
