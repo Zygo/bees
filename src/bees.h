@@ -50,7 +50,7 @@ const off_t BLOCK_SIZE_MAX_EXTENT = 128 * 1024 * 1024;
 const off_t BLOCK_MASK_CLONE = BLOCK_SIZE_CLONE - 1;
 const off_t BLOCK_MASK_SUMS = BLOCK_SIZE_SUMS - 1;
 
-// Maximum temporary file size
+// Maximum temporary file size (maximum extent size for temporary copy)
 const off_t BLOCK_SIZE_MAX_TEMP_FILE = 1024 * 1024 * 1024;
 
 // Bucket size for hash table (size of one hash bucket)
@@ -330,7 +330,6 @@ public:
 
 	// Blocks with no physical address (not yet allocated, hole, or "other").
 	// PREALLOC blocks have a physical address so they're not magic enough to be handled here.
-	// Compressed blocks have a physical address but it's two-dimensional.
 	enum MagicValue {
 		ZERO,		// BeesAddress uninitialized
 		DELALLOC,	// delayed allocation

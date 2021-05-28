@@ -1004,10 +1004,7 @@ BeesCrawl::fetch_extents()
 	sk.min_type = sk.max_type = BTRFS_EXTENT_DATA_KEY;
 	sk.min_offset = old_state.m_offset;
 	sk.min_transid = old_state.m_min_transid;
-	// Don't set max_transid here.	We want to see old extents with
-	// new references, and max_transid filtering in the kernel locks
-	// the filesystem while slowing us down.
-	// sk.max_transid = old_state.m_max_transid;
+	// Don't set max_transid to m_max_transid here.	 See below.
 	sk.max_transid = numeric_limits<uint64_t>::max();
 	sk.nr_items = BEES_MAX_CRAWL_ITEMS;
 
@@ -1077,7 +1074,6 @@ BeesCrawl::fetch_extents()
 		if (gen < get_state_end().m_min_transid) {
 			BEESCOUNT(crawl_gen_low);
 			++count_low;
-			// We want (need?) to scan these anyway?
 			// The header generation refers to the transid
 			// of the metadata page holding the current ref.
 			// This includes anything else in that page that
@@ -1085,17 +1081,22 @@ BeesCrawl::fetch_extents()
 			// old it is.
 			// The file_extent_generation refers to the
 			// transid of the extent item's page, which is
-			// a different approximation of what we want.
-			// Combine both of these filters to minimize
-			// the number of times we unnecessarily re-read
-			// an extent.
+			// what we really want when we are slicing up
+			// the extent data by transid.
 			continue;
 		}
 		if (gen > get_state_end().m_max_transid) {
 			BEESCOUNT(crawl_gen_high);
 			++count_high;
-			// We have to filter these here because we can't
-			// do it in the kernel.
+			// We want to see old extents with references in
+			// new pages, which means we have to get extent
+			// refs from every page older than min_transid,
+			// not every page between min_transid and
+			// max_transid.  This means that we will get
+			// refs to new extent data that we don't want to
+			// process yet, because we'll process it again
+			// on the next crawl cycle.  We filter out refs
+			// to new extents here.
 			continue;
 		}
 

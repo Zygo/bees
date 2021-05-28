@@ -229,6 +229,8 @@ BeesResolver::chase_extent_ref(const BtrfsInodeOffsetRoot &bior, BeesBlockData &
 	// Search near the resolved address for a matching data block.
 	// ...even if it's not compressed, we should do this sanity
 	// check before considering the block as a duplicate candidate.
+	// FIXME:  this is mostly obsolete now and we shouldn't do it here.
+	// Don't bother fixing it because it will all go away with (extent, offset) reads.
 	auto new_bbd = adjust_offset(haystack_bbd, needle_bbd);
 	if (new_bbd.empty()) {
 		// matching offset search failed

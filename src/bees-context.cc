@@ -891,9 +891,10 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 
 	auto rt_age = resolve_timer.age();
 
-	// Avoid performance bug
 	BeesResolveAddrResult rv;
 	rv.m_biors = log_ino.m_iors;
+
+	// Avoid performance bug
 	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION) {
 		rv.m_is_toxic = false;
 	} else {
