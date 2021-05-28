@@ -903,6 +903,18 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 		rv.m_is_toxic = true;
 	}
 
+	// Count how many times this happens so we can figure out how
+	// important this case is
+	size_t rv_count = rv.m_biors.size();
+	static size_t most_refs_ever = 2730;
+	if (rv_count > most_refs_ever) {
+		BEESLOGINFO("addr " << addr << " refs " << rv_count << " beats previous record " << most_refs_ever);
+		most_refs_ever = rv_count;
+	}
+	if (rv_count > 2730) {
+		BEESCOUNT(resolve_large);
+	}
+
 	return rv;
 }
 
