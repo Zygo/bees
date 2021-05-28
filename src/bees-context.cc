@@ -1125,8 +1125,7 @@ BeesContext::fd_cache()
 	if (!m_fd_cache) {
 		m_fd_cache = make_shared<BeesFdCache>(shared_from_this());
 	}
-	auto rv = m_fd_cache;
-	return rv;
+	return m_fd_cache;
 }
 
 shared_ptr<BeesRoots>
@@ -1139,8 +1138,7 @@ BeesContext::roots()
 	if (!m_roots) {
 		m_roots = make_shared<BeesRoots>(shared_from_this());
 	}
-	auto rv = m_roots;
-	return rv;
+	return m_roots;
 }
 
 shared_ptr<BeesHashTable>
@@ -1153,8 +1151,7 @@ BeesContext::hash_table()
 	if (!m_hash_table) {
 		m_hash_table = make_shared<BeesHashTable>(shared_from_this(), "beeshash.dat");
 	}
-	auto rv = m_hash_table;
-	return rv;
+	return m_hash_table;
 }
 
 void
