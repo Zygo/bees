@@ -257,7 +257,7 @@ BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 		auto this_hold = this_crawl->hold_state(this_range);
 		auto shared_this_copy = shared_from_this();
 		BEESNOTE("Starting task " << this_range);
-		Task(task_title, [ctx_copy, this_hold, this_range, shared_this_copy]() {
+		Task(task_title, SCHED_BATCH, [ctx_copy, this_hold, this_range, shared_this_copy]() {
 			BEESNOTE("scan_forward " << this_range);
 			ctx_copy->scan_forward(this_range);
 			shared_this_copy->crawl_state_set_dirty();
@@ -382,7 +382,7 @@ BeesRoots::crawl_thread()
 
 	// Create the Task that does the crawling
 	auto shared_this = shared_from_this();
-	m_crawl_task = Task("crawl_master", [shared_this]() {
+	m_crawl_task = Task("crawl_master", SCHED_IDLE, [shared_this]() {
 		auto tqs = TaskMaster::get_queue_count();
 		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
 		bool run_again = true;

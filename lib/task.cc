@@ -47,6 +47,7 @@ namespace crucible {
 	};
 
 	class TaskState : public enable_shared_from_this<TaskState> {
+		const int                               m_sched_policy;
 		mutex					m_mutex;
 		const function<void()> 			m_exec_fn;
 		const string				m_title;
@@ -93,7 +94,7 @@ namespace crucible {
 
 	public:
 		~TaskState();
-		TaskState(string title, function<void()> exec_fn);
+		TaskState(string title, int policy, function<void()> exec_fn);
 
 		/// Run the task at most one more time.  If task has
 		/// already started running, a new instance is scheduled.
@@ -206,7 +207,7 @@ namespace crucible {
 			} else {
 				// If there are multiple tasks, create a new task to wrap our post-exec queue,
 				// then push it to the front of the global queue using normal locking methods.
-				TaskStatePtr rescue_task(make_shared<TaskState>("rescue_task", [](){}));
+				TaskStatePtr rescue_task(make_shared<TaskState>("rescue_task", SCHED_IDLE, [](){})); //TODO(kakra) Check prio
 				swap(rescue_task->m_post_exec_queue, queue);
 				TaskQueue tq_one { rescue_task };
 				TaskMasterState::push_front(tq_one);
@@ -220,7 +221,8 @@ namespace crucible {
 		--s_instance_count;
 	}
 
-	TaskState::TaskState(string title, function<void()> exec_fn) :
+	TaskState::TaskState(string title, int policy, function<void()> exec_fn) :
+		m_sched_policy(policy),
 		m_exec_fn(exec_fn),
 		m_title(title),
 		m_id(++s_next_id)
@@ -302,10 +304,17 @@ namespace crucible {
 		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
 		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
 
+		int policy = SCHED_OTHER;
+		sched_param param = { .sched_priority = 0 };
+		DIE_IF_MINUS_ERRNO(pthread_getschedparam(pthread_self(), &policy, &param));
+
 		catch_all([&]() {
+			sched_param param = { .sched_priority = 0 };
+			pthread_setschedparam(pthread_self(), m_sched_policy, &param);
 			m_exec_fn();
 		});
 
+		pthread_setschedparam(pthread_self(), policy, &param);
 		pthread_setname_np(pthread_self(), buf);
 
 		lock.lock();
@@ -627,8 +636,8 @@ namespace crucible {
 	{
 	}
 
-	Task::Task(string title, function<void()> exec_fn) :
-		m_task_state(make_shared<TaskState>(title, exec_fn))
+	Task::Task(string title, int policy, function<void()> exec_fn) :
+		m_task_state(make_shared<TaskState>(title, policy, exec_fn))
 	{
 	}
 
@@ -867,7 +876,7 @@ namespace crucible {
 	}
 
 	ExclusionState::ExclusionState(const string &title) :
-		m_task(title, [](){})
+		m_task(title, SCHED_IDLE, [](){}) //TODO(kakra) Check prio
 	{
 	}
 

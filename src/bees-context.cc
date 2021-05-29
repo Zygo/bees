@@ -327,7 +327,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
 		Task(
-			"dedup_prealloc",
+			"dedup_prealloc", SCHED_IDLE,
 			[m_ctx, bfr, e]() {
 				BEESLOGINFO("prealloc extent " << e);
 				// Must not extend past EOF
