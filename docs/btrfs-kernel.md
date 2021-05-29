@@ -7,9 +7,9 @@ First, a warning that is not specific to bees:
 severe regression that can lead to fatal metadata corruption.**
 This issue is fixed in kernel 5.4.14 and later.
 
-**Recommended kernel versions for bees are 4.19, 5.4, 5.7, 5.8, 5.9,
-5.10, or 5.11, with recent LTS and -stable updates.**  The latest released
-kernel as of this writing is 5.11.11.
+**Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, or 5.12,
+with recent LTS and -stable updates.**  The latest released kernel as
+of this writing is 5.12.3.
 
 4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with
 some issues.  Older kernels will be slower (a little slower or a lot
@@ -59,6 +59,8 @@ These bugs are particularly popular among bees users:
 | 5.7 | 5.10 | kernel crash if balance receives fatal signal e.g. Ctrl-C | 5.4.93, 5.10.11, 5.11 and later | 18d3bff411c8 btrfs: don't get an EINTR during drop_snapshot for reloc
 | 5.10 | 5.10 | 20x write performance regression | 5.10.8, 5.11 and later | e076ab2a2ca7 btrfs: shrink delalloc pages instead of full inodes
 | 5.4 | 5.11 | spurious tree checker failures on extent ref hash | 5.11.5, 5.12 and later | 1119a72e223f btrfs: tree-checker: do not error out if extent ref hash doesn't match
+| - | 5.11 | tree mod log issue #5 | 4.4.263, 4.9.263, 4.14.227, 4.19.183, 5.4.108, 5.10.26, 5.11.9, 5.12 and later | dbcc7d57bffc btrfs: fix race when cloning extent buffer during rewind of an old root
+| - | 5.12 | tree mod log issue #6 | 4.14.233, 4.19.191, 5.4.118, 5.10.36, 5.11.20, 5.12.3, 5.13 and later | f9690f426b21 btrfs: fix race when picking most recent mod log operation for an old root
 | 4.15 | - | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | - | workaround:  comment out the `WARN_ON`
 
 "Last bad kernel" refers to that version's last stable update from
@@ -90,7 +92,10 @@ Workarounds for known kernel bugs
   running both the `LOGICAL_INO` ioctl and btrfs balance at the same time,
   which avoids kernel crashes on old kernel versions.
 
-  This workaround is not necessary for kernels 5.4.19, 5.5.3, 5.6 and later.
+  The numbers for "tree mod log issue #" in the above table are arbitrary.
+  There are a lot of them, and they all behave fairly similarly.
+
+  This workaround is less necessary for kernels 5.4.19 and later.
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
   if the number of references to a single shared extent grows too
@@ -107,7 +112,7 @@ Workarounds for known kernel bugs
 
   This workaround is less necessary for kernels 5.4.96, 5.7 and later,
   though it can still take 2 ms of CPU to resolve each extent ref on a
-  fast machine.
+  fast machine on a large, heavily fragmented file.
 
 * **dedupe breaks `btrfs send` in old kernels**.  The bees option
   `--workaround-btrfs-send` prevents any modification of read-only subvols
@@ -118,12 +123,12 @@ Workarounds for known kernel bugs
   5.3.17, 5.4.4, 5.5 and later; however, some conflict between send
   and dedupe still remains, so the workaround is still useful.
 
-  `btrfs receive` is not affected by this issue.
+  `btrfs receive` is not and has never been affected by this issue.
 
 Unfixed kernel bugs
 -------------------
 
-As of 5.11.11:
+As of 5.12.3:
 
 * **The kernel does not permit `btrfs send` and dedupe to run at the
   same time**.  Recent kernels no longer crash, but now refuse one
