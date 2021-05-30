@@ -54,9 +54,8 @@ namespace crucible {
 		/// Tasks to be executed after the current task is executed
 		list<TaskStatePtr>			m_post_exec_queue;
 
-		/// Set when task is waiting to execute.
-		/// Cleared when exec() begins.
-		bool					m_is_waiting = false;
+		/// Incremented by run() and append().  Decremented by exec().
+		size_t					m_run_count = 0;
 
 		/// Set when task starts execution by exec().
 		/// Cleared when exec() ends.
@@ -95,15 +94,16 @@ namespace crucible {
 		~TaskState();
 		TaskState(string title, function<void()> exec_fn);
 
-		/// Run the task at least once.  If task is already running, appends
-		/// a self-reference to its after queue.  If task is not running
-		/// and task is not waiting, adds task to a master queue and marks
-		/// the task waiting.
+		/// Run the task at most one more time.  If task has
+		/// already started running, a new instance is scheduled.
+		/// If an instance is already scheduled by run() or
+		/// append(), does nothing.  Otherwise, schedules a new
+		/// instance at the end of TaskMaster's global queue.
 		void run();
 
 		/// Execute task immediately in current thread if it is not already
-		/// executing in another thread.  If m_run_again is set while m_is_running
-		/// is true, the thread that set m_is_running will requeue the task.
+		/// executing in another thread; otherwise, append the current task
+		/// to itself to be executed immediately in the other thread.
 		void exec();
 
 		/// Return title of task.
@@ -112,9 +112,8 @@ namespace crucible {
 		/// Return ID of task.
 		TaskId id() const;
 
-		/// Queue task to execute after current task finishes executing.
-		/// If current task is neither running nor waiting, this
-		/// places the argument task on a worker queue immediately.
+		/// Queue task to execute after current task finishes executing
+		/// or is destroyed.
 		void append(const TaskStatePtr &task);
 
 		/// How masy Tasks are there?  Good for catching leaks
@@ -204,7 +203,6 @@ namespace crucible {
 			// then push it to the front of the global queue using normal locking methods.
 			TaskStatePtr rescue_task(make_shared<TaskState>("rescue_task", [](){}));
 			swap(rescue_task->m_post_exec_queue, queue);
-			rescue_task->m_is_waiting;
 			TaskQueue tq_one { rescue_task };
 			TaskMasterState::push_front(tq_one);
 		}
@@ -259,18 +257,19 @@ namespace crucible {
 	void
 	TaskState::append_nolock(const TaskStatePtr &task)
 	{
-		task->m_is_waiting = true;
+		THROW_CHECK0(invalid_argument, task);
 		m_post_exec_queue.push_back(task);
 	}
 
 	void
 	TaskState::append(const TaskStatePtr &task)
 	{
-		if (!task) {
-			return;
-		}
+		THROW_CHECK0(invalid_argument, task);
 		PairLock lock(m_mutex, task->m_mutex);
-		append_nolock(task);
+		if (!task->m_run_count) {
+			++task->m_run_count;
+			append_nolock(task);
+		}
 	}
 
 	void
@@ -280,11 +279,11 @@ namespace crucible {
 		THROW_CHECK0(invalid_argument, !m_title.empty());
 
 		unique_lock<mutex> lock(m_mutex);
-		m_is_waiting = false;
 		if (m_is_running) {
 			append_nolock(shared_from_this());
 			return;
 		} else {
+			--m_run_count;
 			m_is_running = true;
 		}
 		lock.unlock();
@@ -327,10 +326,11 @@ namespace crucible {
 	TaskState::run()
 	{
 		unique_lock<mutex> lock(m_mutex);
-		if (!m_is_waiting) {
-			TaskMasterState::push_back(shared_from_this());
-			m_is_waiting = true;
+		if (m_run_count) {
+			return;
 		}
+		++m_run_count;
+		TaskMasterState::push_back(shared_from_this());
 	}
 
 	TaskMasterState::TaskMasterState(size_t thread_max) :
@@ -636,9 +636,7 @@ namespace crucible {
 	Task::append(const Task &that) const
 	{
 		THROW_CHECK0(runtime_error, m_task_state);
-		if (!that) {
-			return;
-		}
+		THROW_CHECK0(runtime_error, that);
 		m_task_state->append(that.m_task_state);
 	}
 

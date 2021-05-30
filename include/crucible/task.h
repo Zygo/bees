@@ -27,17 +27,20 @@ namespace crucible {
 		/// Create Task object containing closure and description.
 		Task(string title, function<void()> exec_fn);
 
-		/// Schedule Task for at least one future execution.
+		/// Schedule Task for at most one future execution.
 		/// May run Task in current thread or in other thread.
 		/// May run Task before or after returning.
+		/// Schedules Task at the end of the global execution queue.
 		///
 		/// Only one instance of a Task may execute at a time.
 		/// If a Task is already scheduled, run() does nothing.
-		/// If a Task is already running, run() reschedules the
-		/// task after the currently running instance returns.
+		/// If a Task is already running when a new instance reaches
+		/// the front of the queue, the new instance will execute
+		/// after the current instance exits.
 		void run() const;
 
-		/// Schedule Task to run after this task has run at least once.
+		/// Schedule Task to run after this Task has run or
+		/// been destroyed.
 		void append(const Task &task) const;
 
 		/// Describe Task as text.
