@@ -65,6 +65,9 @@ namespace crucible {
 		/// Sequential identifier for next task
 		static atomic<TaskId>			s_next_id;
 
+		/// Sequential identifier for next task
+		static atomic<size_t>			s_instance_count;
+
 		/// Identifier for this task
 		TaskId					m_id;
 
@@ -89,6 +92,7 @@ namespace crucible {
 		TaskState(const TaskState &) = delete;
 
 	public:
+		~TaskState();
 		TaskState(string title, function<void()> exec_fn);
 
 		/// Run the task at least once.  If task is already running, appends
@@ -112,9 +116,13 @@ namespace crucible {
 		/// If current task is neither running nor waiting, this
 		/// places the argument task on a worker queue immediately.
 		void append(const TaskStatePtr &task);
+
+		/// How masy Tasks are there?  Good for catching leaks
+		static size_t instance_count();
 	};
 
 	atomic<TaskId> TaskState::s_next_id;
+	atomic<size_t> TaskState::s_instance_count;
 
 	class TaskMasterState : public enable_shared_from_this<TaskMasterState> {
 		mutex 					m_mutex;
@@ -202,12 +210,30 @@ namespace crucible {
 		}
 	}
 
+	TaskState::~TaskState()
+	{
+		--s_instance_count;
+	}
+
 	TaskState::TaskState(string title, function<void()> exec_fn) :
 		m_exec_fn(exec_fn),
 		m_title(title),
 		m_id(++s_next_id)
 	{
 		THROW_CHECK0(invalid_argument, !m_title.empty());
+		++s_instance_count;
+	}
+
+	size_t
+	TaskState::instance_count()
+	{
+		return s_instance_count;
+	}
+
+	size_t
+	Task::instance_count()
+	{
+		return TaskState::instance_count();
 	}
 
 	void

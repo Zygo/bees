@@ -47,6 +47,10 @@ namespace crucible {
 		/// Usually used to reschedule the currently executing Task.
 		static Task current_task();
 
+		/// Returns number of currently existing Task objects.
+		/// Good for spotting leaks.
+		static size_t instance_count();
+
 		/// Ordering operator for containers
 		bool operator<(const Task &that) const;
 
