@@ -55,7 +55,7 @@ $(PROGRAMS): ../bin/%: %.o
 
 $(PROGRAMS): ../lib/libcrucible.a
 
-$(BEES): $(BEES_OBJS) bees-version.o bees-usage.o
+$(BEES): $(BEES_OBJS) bees-version.o bees-usage.o ../lib/libcrucible.a
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
