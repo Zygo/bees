@@ -3,6 +3,8 @@
 #include "crucible/task.h"
 #include "crucible/time.h"
 
+#include <atomic>
+#include <chrono>
 #include <cassert>
 #include <condition_variable>
 #include <mutex>
@@ -70,13 +72,14 @@ test_finish()
 	TaskMaster::print_queue(oss);
 	TaskMaster::print_workers(oss);
 	TaskMaster::set_thread_count(0);
-	// cerr << "finish done" << endl;
+	cerr << "finish done...";
 }
 
 void
 test_unfinish()
 {
 	TaskMaster::set_thread_count();
+	cerr << "unfinish done...";
 }
 
 
@@ -150,61 +153,78 @@ void
 test_exclusion(size_t count)
 {
 	mutex only_one;
-	Exclusion excl;
+	auto excl = make_shared<Exclusion>("test_excl");
 
 	mutex mtx;
 	condition_variable cv;
 
-	unique_lock<mutex> lock(mtx);
+	size_t tasks_running(0);
+	atomic<size_t> lock_success_count(0);
+	atomic<size_t> lock_failure_count(0);
 
-	auto b = make_shared<Barrier>();
+	vector<size_t> pings;
+	pings.resize(count);
 
 	// Run several tasks in parallel
 	for (size_t c = 0; c < count; ++c) {
-		auto bl = b->lock();
 		ostringstream oss;
 		oss << "task #" << c;
 		Task t(
 			oss.str(),
-			[c, &only_one, &excl, bl]() mutable {
+			[c, &only_one, excl, &lock_success_count, &lock_failure_count, &pings, &tasks_running, &cv, &mtx]() mutable {
 				// cerr << "Task #" << c << endl;
 				(void)c;
-				auto lock = excl.try_lock();
+				auto lock = excl->try_lock();
 				if (!lock) {
-					excl.insert_task(Task::current_task());
+					excl->insert_task(Task::current_task());
+					++lock_failure_count;
 					return;
 				}
+				++lock_success_count;
 				bool locked = only_one.try_lock();
 				assert(locked);
 				nanosleep(0.0001);
 				only_one.unlock();
-				bl.release();
+				unique_lock<mutex> mtx_lock(mtx);
+				--tasks_running;
+				++pings[c];
+				cv.notify_all();
 			}
 		);
+		unique_lock<mutex> mtx_lock(mtx);
+		++tasks_running;
 		t.run();
 	}
 
-	bool done_flag = false;
+	// excl.reset();
 
-	Task completed(
-		"Waiting for Barrier",
-		[&mtx, &cv, &done_flag]() {
-			unique_lock<mutex> lock(mtx);
-			// cerr << "Running cv notify" << endl;
-			done_flag = true;
-			cv.notify_all();
+	unique_lock<mutex> lock(mtx);
+	while (tasks_running) {
+		auto cv_rv = cv.wait_for(lock, chrono::duration<double>(1));
+		if (cv_rv == cv_status::timeout) {
+			// TaskMaster::print_tasks(cerr);
+			for (auto i : pings) {
+				cerr << i << " ";
+			}
+			cerr << endl << "tasks_running = " << tasks_running << endl;
+			cerr << "lock_success_count " << lock_success_count << endl;
+			cerr << "lock_failure_count " << lock_failure_count << endl;
 		}
-	);
-	b->insert_task(completed);
+	}
+	cerr << "lock_success_count " << lock_success_count << endl;
+	cerr << "lock_failure_count " << lock_failure_count << endl;
 
-	b.reset();
-
-	while (true) {
-		if (done_flag) {
-			break;
+	bool oops = false;
+	for (size_t c = 0; c < pings.size(); ++c) {
+		if (pings[c] != 1) {
+			cerr << "pings[" << c << "] = " << pings[c] << endl;
+			oops = true;
 		}
-
-		cv.wait(lock);
+	}
+	if (oops) {
+		assert(!"Pings not OK");
+	} else {
+		cerr << "Pings OK" << endl;
 	}
 }
 

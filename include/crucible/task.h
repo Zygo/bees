@@ -27,16 +27,7 @@ namespace crucible {
 		/// Create Task object containing closure and description.
 		Task(string title, function<void()> exec_fn);
 
-		/// Insert at tail of queue (default).
-		void queue_at_tail() const;
-
-		/// Insert at head of queue instead of tail.
-		/// May insert onto current thread/CPU core's queue.
-		void queue_at_head() const;
-
-		// Add other insertion points here (same CPU, time delay, etc).
-
-		/// Schedule Task at designated queue position.
+		/// Schedule Task for at least one future execution.
 		/// May run Task in current thread or in other thread.
 		/// May run Task before or after returning.
 		///
@@ -45,6 +36,9 @@ namespace crucible {
 		/// If a Task is already running, run() reschedules the
 		/// task after the currently running instance returns.
 		void run() const;
+
+		/// Schedule Task to run after this task has run at least once.
+		void append(const Task &task) const;
 
 		/// Describe Task as text.
 		string title() const;
@@ -159,7 +153,7 @@ namespace crucible {
 
 		Exclusion(shared_ptr<ExclusionState> pes);
 	public:
-		Exclusion();
+		Exclusion(const string &title);
 
 		// Attempt to obtain a Lock.  If successful, current Task
 		// owns the Lock until the ExclusionLock is released
@@ -172,9 +166,8 @@ namespace crucible {
 		ExclusionLock try_lock();
 
 		// Execute Task when Exclusion is unlocked (possibly
-		// immediately).  First Task is scheduled at head,
-		// all others are scheduled at tail.
-		void insert_task(Task t);
+		// immediately).
+		void insert_task(Task t = Task::current_task());
 	};
 
 
