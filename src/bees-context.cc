@@ -1069,9 +1069,13 @@ BeesContext::stop()
 	BEESLOGDEBUG("Waiting for progress thread");
 	m_progress_thread->join();
 
-	// XXX: nobody can see this BEESNOTE because we are killing the
-	// thread that publishes it
-	BEESNOTE("waiting for status thread");
+	// Write status once with this message...
+	BEESNOTE("stopping status thread at " << stop_timer << " sec");
+	lock.lock();
+	m_stop_condvar.notify_all();
+	lock.unlock();
+
+	// then wake the thread up one more time to exit the while loop
 	BEESLOGDEBUG("Waiting for status thread");
 	lock.lock();
 	m_stop_status = true;
