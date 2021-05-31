@@ -41,9 +41,7 @@ namespace crucible {
 		if (e.m_flags & Extent::OBSCURED) {
 			os << "Extent::OBSCURED|";
 		}
-		if (e.m_flags & ~(Extent::HOLE | Extent::PREALLOC | Extent::OBSCURED)) {
-			os << fiemap_extent_flags_ntoa(e.m_flags & ~(Extent::HOLE | Extent::PREALLOC | Extent::OBSCURED));
-		}
+		os << fiemap_extent_flags_ntoa(e.m_flags & ~(Extent::HOLE | Extent::PREALLOC | Extent::OBSCURED));
 		if (e.m_physical_len) {
 			os << ", physical_len = " << to_hex(e.m_physical_len);
 		}
@@ -601,7 +599,7 @@ namespace crucible {
 					e.m_flags |= FIEMAP_EXTENT_LAST;
 				}
 				// FIXME:  no FIEMAP_EXTENT_SHARED
-				// WONTFIX:  non-trivial to replicate LOGIAL_INO
+				// WONTFIX:  non-trivial to replicate LOGICAL_INO
 				rv.push_back(e);
 			}
 		}
