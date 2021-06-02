@@ -58,16 +58,16 @@ namespace crucible {
 
 		virtual Vec get_extent_map(off_t pos);
 
-		static const unsigned sc_extent_fetch_max = 16;
-		static const unsigned sc_extent_fetch_min = 4;
-		static const off_t sc_step_size = 0x1000 * (sc_extent_fetch_max / 2);
-
 	private:
 		Vec	m_extents;
 		Itr	m_current;
 
 		Itr find_in_cache(off_t pos);
 		void run_fiemap(off_t pos);
+
+#ifdef EXTENTWALKER_DEBUG
+		ostringstream m_log;
+#endif
 
 	public:
 		ExtentWalker(Fd fd = Fd());
