@@ -20,6 +20,7 @@ BEES_OBJS = \
 	bees-resolve.o \
 	bees-roots.o \
 	bees-thread.o \
+	bees-trace.o \
 	bees-types.o \
 
 ALL_OBJS = $(BEES_OBJS) $(PROGRAM_OBJS)
