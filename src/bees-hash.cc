@@ -730,13 +730,13 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 
 	m_extent_metadata.resize(m_extents);
 
-	m_writeback_thread.exec([&]() {
+	m_writeback_thread.exec(SCHED_IDLE, [&]() {
 		writeback_loop();
-        });
+	});
 
-	m_prefetch_thread.exec([&]() {
+	m_prefetch_thread.exec(SCHED_IDLE, [&]() {
 		prefetch_loop();
-        });
+	});
 
 	// Blacklist might fail if the hash table is not stored on a btrfs
 	catch_all([&]() {

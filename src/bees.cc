@@ -116,6 +116,7 @@ BeesNote::BeesNote(function<void(ostream &os)> f) :
 	m_func(f)
 {
 	m_name = get_name();
+	m_policy = get_policy();
 	m_prev = tl_next;
 	tl_next = this;
 	unique_lock<mutex> lock(s_mutex);
@@ -164,6 +165,16 @@ BeesNote::get_name()
 	return buf;
 }
 
+int
+BeesNote::get_policy()
+{
+	int policy = SCHED_OTHER;
+	sched_param param = { .sched_priority = 0 };
+	pthread_getschedparam(pthread_self(), &policy, &param);
+
+	return policy;
+}
+
 BeesNote::ThreadStatusMap
 BeesNote::get_status()
 {
@@ -176,6 +187,14 @@ BeesNote::get_status()
 		}
 		if (t.second->m_timer.age() > BEES_TOO_LONG) {
 			oss << "[" << t.second->m_timer << "s] ";
+		}
+		switch (t.second->m_policy) {
+			case SCHED_BATCH:
+				oss << "[BT] ";
+				break;
+			case SCHED_IDLE:
+				oss << "[ID] ";
+				break;
 		}
 		t.second->m_func(oss);
 		rv[t.first] = oss.str();

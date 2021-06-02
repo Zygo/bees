@@ -25,7 +25,7 @@ namespace crucible {
 		Task() = default;
 
 		/// Create Task object containing closure and description.
-		Task(string title, function<void()> exec_fn);
+		Task(string title, int policy, function<void()> exec_fn);
 
 		/// Insert at tail of queue (default).
 		void queue_at_tail() const;

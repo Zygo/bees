@@ -208,6 +208,7 @@ public:
 class BeesNote {
 	function<void(ostream &)>	m_func;
 	BeesNote			*m_prev;
+	int					m_policy;
 	Timer				m_timer;
 	string				m_name;
 
@@ -227,6 +228,7 @@ public:
 
 	static void set_name(const string &name);
 	static string get_name();
+	static int get_policy();
 };
 
 // C++ threads dumbed down even further
@@ -238,8 +240,8 @@ class BeesThread {
 public:
 	~BeesThread();
 	BeesThread(string name);
-	BeesThread(string name, function<void()> args);
-	void exec(function<void()> args);
+	BeesThread(string name, int policy, function<void()> args);
+	void exec(int policy, function<void()> args);
 	void join();
 	void set_name(const string &name);
 };

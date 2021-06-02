@@ -21,6 +21,7 @@ namespace crucible {
 	class TaskStateLock;
 
 	class TaskState : public enable_shared_from_this<TaskState> {
+		const int                               m_sched_policy;
 		const function<void()> 			m_exec_fn;
 		const string				m_title;
 		TaskId					m_id;
@@ -47,7 +48,7 @@ namespace crucible {
 	friend class TaskStateLock;
 
 	public:
-		TaskState(string title, function<void()> exec_fn);
+		TaskState(string title, int policy, function<void()> exec_fn);
 
 		/// Queue task for execution according to previously stored queue policy.
 		void run();
@@ -166,7 +167,8 @@ namespace crucible {
 		m_state.m_is_queued = is_queued_now;
 	}
 
-	TaskState::TaskState(string title, function<void()> exec_fn) :
+	TaskState::TaskState(string title, int policy, function<void()> exec_fn) :
+		m_sched_policy(policy),
 		m_exec_fn(exec_fn),
 		m_title(title),
 		m_id(++s_next_id),
@@ -195,14 +197,21 @@ namespace crucible {
 		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
 		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
 
+		sched_param param = { .sched_priority = 0 };
+		int policy = SCHED_OTHER;
+		DIE_IF_MINUS_ERRNO(pthread_getschedparam(pthread_self(), &policy, &param));
+
 		weak_ptr<TaskState> this_task_wp = shared_from_this();
 		swap(this_task_wp, tl_current_task_wp);
 
 		catch_all([&]() {
+			sched_param param = { .sched_priority = 0 };
+			pthread_setschedparam(pthread_self(), m_sched_policy, &param);
 			m_exec_fn();
 		});
 
 		swap(this_task_wp, tl_current_task_wp);
+		pthread_setschedparam(pthread_self(), policy, &param);
 		pthread_setname_np(pthread_self(), buf);
 
 		lock.lock();
@@ -497,6 +506,8 @@ namespace crucible {
 	void
 	TaskMasterState::loadavg_thread_fn()
 	{
+		sched_param param = { .sched_priority = 0 };
+		pthread_setschedparam(pthread_self(), SCHED_ISO, &param);
 		pthread_setname_np(pthread_self(), "load_tracker");
 		while (!m_cancelled) {
 			adjust_thread_count();
@@ -539,8 +550,8 @@ namespace crucible {
 	{
 	}
 
-	Task::Task(string title, function<void()> exec_fn) :
-		m_task_state(make_shared<TaskState>(title, exec_fn))
+	Task::Task(string title, int policy, function<void()> exec_fn) :
+		m_task_state(make_shared<TaskState>(title, policy, exec_fn))
 	{
 	}
 

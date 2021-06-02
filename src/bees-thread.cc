@@ -10,28 +10,30 @@ BeesThread::BeesThread(string name) :
 }
 
 void
-BeesThread::exec(function<void()> func)
+BeesThread::exec(int policy, function<void()> func)
 {
 	m_timer.reset();
 	BEESLOGDEBUG("BeesThread exec " << m_name);
 	m_thread_ptr = make_shared<thread>([=]() {
 		BeesNote::set_name(m_name);
-		BEESLOGDEBUG("Starting thread " << m_name);
+		BEESLOGDEBUG("Starting thread " << m_name << " policy " << policy);
 		BEESNOTE("thread function");
 		Timer thread_time;
 		catch_all([&]() {
+			sched_param param = { .sched_priority = 0 };
+			pthread_setschedparam(pthread_self(), policy, &param);
 			func();
 		});
 		BEESLOGDEBUG("Exiting thread " << m_name << ", " << thread_time << " sec");
 	});
 }
 
-BeesThread::BeesThread(string name, function<void()> func) :
+BeesThread::BeesThread(string name, int policy, function<void()> func) :
 	m_name(name)
 {
 	THROW_CHECK1(invalid_argument, name, !name.empty());
 	BEESLOGDEBUG("BeesThread construct " << m_name);
-	exec(func);
+	exec(policy, func);
 }
 
 void
