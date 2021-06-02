@@ -42,11 +42,16 @@ do_cmd_help(char *argv[])
 // tracing ----------------------------------------
 
 thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
+thread_local bool BeesTracer::tl_first = true;
 thread_local bool BeesTracer::tl_silent = false;
 
 BeesTracer::~BeesTracer()
 {
 	if (!tl_silent && current_exception()) {
+		if (tl_first) {
+			BEESLOGNOTICE("--- BEGIN TRACE --- exception ---");
+			tl_first = false;
+		}
 		try {
 			m_func();
 		} catch (exception &e) {
@@ -61,6 +66,7 @@ BeesTracer::~BeesTracer()
 	tl_next_tracer = m_next_tracer;
 	if (!m_next_tracer) {
 		tl_silent = false;
+		tl_first = true;
 	}
 }
 
