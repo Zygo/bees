@@ -8,9 +8,25 @@ thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 thread_local bool BeesTracer::tl_first = true;
 thread_local bool BeesTracer::tl_silent = false;
 
+#if __cplusplus >= 201703
+static
+bool
+exception_check()
+{
+	return uncaught_exceptions();
+}
+#else
+static
+bool
+exception_check()
+{
+	return uncaught_exception();
+}
+#endif
+
 BeesTracer::~BeesTracer()
 {
-	if (!tl_silent && current_exception()) {
+	if (!tl_silent && exception_check()) {
 		if (tl_first) {
 			BEESLOGNOTICE("--- BEGIN TRACE --- exception ---");
 			tl_first = false;
