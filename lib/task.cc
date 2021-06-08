@@ -199,12 +199,17 @@ namespace crucible {
 			tlcc->m_local_queue.splice(tlcc->m_local_queue.begin(), queue);
 		} else {
 			// We are not executing under a TaskConsumer.
-			// Create a new task to wrap our post-exec queue,
-			// then push it to the front of the global queue using normal locking methods.
-			TaskStatePtr rescue_task(make_shared<TaskState>("rescue_task", [](){}));
-			swap(rescue_task->m_post_exec_queue, queue);
-			TaskQueue tq_one { rescue_task };
-			TaskMasterState::push_front(tq_one);
+			// If there is only one task, then just insert it at the front of the queue.
+			if (queue.size() == 1) {
+				TaskMasterState::push_front(queue);
+			} else {
+				// If there are multiple tasks, create a new task to wrap our post-exec queue,
+				// then push it to the front of the global queue using normal locking methods.
+				TaskStatePtr rescue_task(make_shared<TaskState>("rescue_task", [](){}));
+				swap(rescue_task->m_post_exec_queue, queue);
+				TaskQueue tq_one { rescue_task };
+				TaskMasterState::push_front(tq_one);
+			}
 		}
 	}
 
