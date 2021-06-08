@@ -703,6 +703,9 @@ namespace crucible {
 		// Detach thread so destructor doesn't call terminate
 		m_thread->detach();
 
+		// Set thread name so it isn't empty or the name of some other thread
+		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), "task_consumer"));
+
 		// It is now safe to access our own shared_ptr
 		TaskConsumerPtr this_consumer = shared_from_this();
 		swap(this_consumer, tl_current_consumer);
