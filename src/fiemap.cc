@@ -23,6 +23,7 @@ main(int argc, char **argv)
 		cout << "File: " << filename << endl;
 		Fd fd = open_or_die(filename, O_RDONLY);
 		Fiemap fm;
+		fm.fm_flags &= ~(FIEMAP_FLAG_SYNC);
 		fm.m_max_count = 100;
 		if (argc > 2) { fm.fm_start = stoull(argv[2], nullptr, 0); }
 		if (argc > 3) { fm.fm_length = stoull(argv[3], nullptr, 0); }
