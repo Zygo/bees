@@ -892,20 +892,27 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	auto rt_age = resolve_timer.age();
 
 	BeesResolveAddrResult rv;
-	rv.m_biors = log_ino.m_iors;
 
-	// Avoid performance bug
+	// Avoid performance problems - pretend resolve failed if there are too many refs
+	const size_t rv_count = log_ino.m_iors.size();
+	if (rv_count < BEES_MAX_EXTENT_REF_COUNT) {
+		rv.m_biors = log_ino.m_iors;
+	} else {
+		BEESLOGINFO("addr " << addr << " refs " << rv_count << " overflows configured ref limit " << BEES_MAX_EXTENT_REF_COUNT);
+		BEESCOUNT(resolve_overflow);
+	}
+
+	// Avoid crippling performance bug
 	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION) {
 		rv.m_is_toxic = false;
 	} else {
-		BEESLOGNOTICE("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << log_ino.m_iors.size());
+		BEESLOGNOTICE("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << rv_count);
 		BEESCOUNT(resolve_toxic);
 		rv.m_is_toxic = true;
 	}
 
 	// Count how many times this happens so we can figure out how
 	// important this case is
-	size_t rv_count = rv.m_biors.size();
 	static size_t most_refs_ever = 2730;
 	if (rv_count > most_refs_ever) {
 		BEESLOGINFO("addr " << addr << " refs " << rv_count << " beats previous record " << most_refs_ever);
