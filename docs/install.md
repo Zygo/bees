@@ -32,9 +32,13 @@ bees can be installed by following one these instructions:
 Arch package
 ------------
 
-bees is available in Arch Linux AUR. Install with:
+bees is available for Arch Linux in the community repository. Install with:
 
-`$ pacaur -S bees-git`
+`$ pacman -S bees`
+
+or build a live version from git master using AUR:
+
+`$ git clone https://aur.archlinux.org/bees-git.git && cd bees-git && makepkg -si`
 
 Gentoo package
 --------------
