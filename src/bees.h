@@ -95,8 +95,9 @@ const double BEES_TOO_LONG = 5.0;
 // Avoid any extent where LOGICAL_INO takes this much kernel CPU time
 const double BEES_TOXIC_SYS_DURATION = 0.1;
 
-// Maximum number of refs to a single extent
-const size_t BEES_MAX_EXTENT_REF_COUNT = (16 * 1024 * 1024 / 24) - 1;
+// Maximum number of refs to a single extent before we have other problems
+// If we have more than 10K refs to an extent, adding another will save 0.01% space
+const size_t BEES_MAX_EXTENT_REF_COUNT = 9999; // (16 * 1024 * 1024 / 24);
 
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
