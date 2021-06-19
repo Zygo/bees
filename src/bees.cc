@@ -241,7 +241,7 @@ bees_readahead(int const fd, off_t offset, size_t size)
 		size_t this_read_size = min(size, sizeof(dummy));
 		// Ignore errors and short reads.
 		// It turns out our size parameter isn't all that accurate.
-		pread(fd, dummy, this_read_size, offset);
+		(void)!pread(fd, dummy, this_read_size, offset);
 		BEESCOUNT(readahead_count);
 		BEESCOUNTADD(readahead_bytes, this_read_size);
 		offset += this_read_size;
