@@ -132,12 +132,11 @@ BeesContext::show_progress()
 		auto all_age = all_timer.age();
 		stats_timer.lap();
 
-		auto avg_rates = thisStats / stats_age;
-
 		BEESNOTE("logging event counter totals for last " << all_timer);
 		BEESLOGINFO("TOTAL COUNTS (" << all_age << "s):\n\t" << thisStats);
 
 		BEESNOTE("logging event counter rates for last " << all_timer);
+		auto avg_rates = thisStats / all_age;
 		BEESLOGINFO("TOTAL RATES (" << all_age << "s):\n\t" << avg_rates);
 
 		BEESNOTE("logging event counter delta counts for last " << stats_age);
