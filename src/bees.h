@@ -462,6 +462,9 @@ private:
 	RateLimiter		m_flush_rate_limit;
 	BeesStringFile		m_stats_file;
 
+	// Prefetch readahead hint
+	bool			m_prefetch_running = false;
+
 	// Mutex/condvar for the writeback thread
 	mutex			m_dirty_mutex;
 	condition_variable	m_dirty_condvar;
@@ -887,6 +890,7 @@ extern const char *BEES_VERSION;
 string pretty(double d);
 void bees_sync(int fd);
 void bees_readahead(int fd, off_t offset, size_t size);
+void bees_unreadahead(int fd, off_t offset, size_t size);
 string format_time(time_t t);
 
 #endif

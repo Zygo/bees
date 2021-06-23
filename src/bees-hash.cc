@@ -115,8 +115,9 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 	bool wrote_extent = false;
 
 	catch_all([&]() {
-		uint8_t *dirty_extent     = m_extent_ptr[extent_index].p_byte;
-		uint8_t *dirty_extent_end = m_extent_ptr[extent_index + 1].p_byte;
+		uint8_t *const dirty_extent      = m_extent_ptr[extent_index].p_byte;
+		uint8_t *const dirty_extent_end  = m_extent_ptr[extent_index + 1].p_byte;
+		const size_t dirty_extent_offset = dirty_extent - m_byte_ptr;
 		THROW_CHECK1(out_of_range, dirty_extent,     dirty_extent     >= m_byte_ptr);
 		THROW_CHECK1(out_of_range, dirty_extent_end, dirty_extent_end <= m_byte_ptr_end);
 		THROW_CHECK2(out_of_range, dirty_extent_end, dirty_extent, dirty_extent_end - dirty_extent == BLOCK_SIZE_HASHTAB_EXTENT);
@@ -131,8 +132,12 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 		lock.unlock();
 
 		// Write the extent (or not)
-		pwrite_or_die(m_fd, extent_copy, dirty_extent - m_byte_ptr);
+		pwrite_or_die(m_fd, extent_copy, dirty_extent_offset);
 		BEESCOUNT(hash_extent_out);
+
+		// Nope, this causes a _dramatic_ loss of performance.
+		// const size_t dirty_extent_size   = dirty_extent_end - dirty_extent;
+		// bees_unreadahead(m_fd, dirty_extent_offset, dirty_extent_size);
 
 		wrote_extent = true;
 	});
@@ -155,6 +160,8 @@ BeesHashTable::flush_dirty_extents(bool slowly)
 				unique_lock<mutex> lock(m_stop_mutex);
 				if (m_stop_requested) {
 					BEESLOGDEBUG("Stop requested in hash table flush_dirty_extents");
+					// This function is called by another thread with !slowly,
+					// so we just get out of the way here.
 					break;
 				}
 				m_stop_condvar.wait_for(lock, sleep_time);
@@ -197,6 +204,11 @@ BeesHashTable::writeback_loop()
 			m_dirty_condvar.wait(lock);
 		}
 	}
+	catch_all([&]() {
+		// trigger writeback on our way out
+		BEESTOOLONG("unreadahead hash table size " << pretty(m_size));
+		bees_unreadahead(m_fd, 0, m_size);
+	});
 	BEESLOGDEBUG("Exited hash table writeback_loop");
 }
 
@@ -225,6 +237,7 @@ BeesHashTable::prefetch_loop()
 		size_t toxic_count = 0;
 		size_t unaligned_eof_count = 0;
 
+		m_prefetch_running = true;
 		for (uint64_t ext = 0; ext < m_extents && !m_stop_requested; ++ext) {
 			BEESNOTE("prefetching hash table extent #" << ext << " of " << m_extents);
 			catch_all([&]() {
@@ -266,6 +279,7 @@ BeesHashTable::prefetch_loop()
 				}
 			});
 		}
+		m_prefetch_running = false;
 
 		BEESNOTE("calculating hash table statistics");
 
@@ -394,18 +408,29 @@ BeesHashTable::fetch_missing_extent_by_index(uint64_t extent_index)
 	BEESTRACE("Fetching hash extent #" << extent_index << " of " << m_extents << " extents");
 	BEESTOOLONG("Fetching hash extent #" << extent_index << " of " << m_extents << " extents");
 
-	uint8_t *dirty_extent     = m_extent_ptr[extent_index].p_byte;
-	uint8_t *dirty_extent_end = m_extent_ptr[extent_index + 1].p_byte;
+	uint8_t *const dirty_extent      = m_extent_ptr[extent_index].p_byte;
+	uint8_t *const dirty_extent_end  = m_extent_ptr[extent_index + 1].p_byte;
+	const size_t dirty_extent_size   = dirty_extent_end - dirty_extent;
+	const size_t dirty_extent_offset = dirty_extent - m_byte_ptr;
 
 	// If the read fails don't retry, just go with whatever data we have
 	m_extent_metadata.at(extent_index).m_missing = false;
 
 	catch_all([&]() {
 		BEESTOOLONG("pread(fd " << m_fd << " '" << name_fd(m_fd)<< "', length " << to_hex(dirty_extent_end - dirty_extent) << ", offset " << to_hex(dirty_extent - m_byte_ptr) << ")");
-		pread_or_die(m_fd, dirty_extent, dirty_extent_end - dirty_extent, dirty_extent - m_byte_ptr);
+		pread_or_die(m_fd, dirty_extent, dirty_extent_size, dirty_extent_offset);
 
 		// Only count extents successfully read
 		BEESCOUNT(hash_extent_in);
+
+		// Won't need that again
+		bees_unreadahead(m_fd, dirty_extent_offset, dirty_extent_size);
+
+		// If we are in prefetch, give the kernel a hint about the next extent
+		if (m_prefetch_running) {
+			// XXX: don't call this if bees_readahead is implemented by pread()
+			bees_readahead(m_fd, dirty_extent_offset + dirty_extent_size, dirty_extent_size);
+		}
 	});
 }
 
@@ -753,10 +778,12 @@ BeesHashTable::~BeesHashTable()
 		// into the same trap (and maybe throw an exception) here.
 		// flush_dirty_extents(false);
 		catch_all([&]() {
+			// drop the memory mapping
+			BEESTOOLONG("unmap handle table size " << pretty(m_size));
 			DIE_IF_NON_ZERO(munmap(m_cell_ptr, m_size));
-			m_cell_ptr = nullptr;
-			m_size = 0;
 		});
+		m_cell_ptr = nullptr;
+		m_size = 0;
 	}
 	BEESLOGDEBUG("BeesHashTable destroyed");
 }

@@ -252,6 +252,16 @@ bees_readahead(int const fd, off_t offset, size_t size)
 	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
 }
 
+void
+bees_unreadahead(int const fd, off_t offset, size_t size)
+{
+	Timer unreadahead_timer;
+	BEESNOTE("unreadahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	BEESTOOLONG("unreadahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	DIE_IF_NON_ZERO(posix_fadvise(fd, offset, size, POSIX_FADV_DONTNEED));
+	BEESCOUNTADD(readahead_unread_ms, unreadahead_timer.age() * 1000);
+}
+
 BeesStringFile::BeesStringFile(Fd dir_fd, string name, size_t limit) :
 	m_dir_fd(dir_fd),
 	m_name(name),
