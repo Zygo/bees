@@ -362,7 +362,7 @@ namespace crucible {
                 }
 		int rv = ::pwrite(fd, buf, size, offset);
 		if (rv != static_cast<int>(size)) {
-			THROW_ERROR(runtime_error, "pwrite: only " << rv << " of " << size << " bytes written at offset " << offset);
+			THROW_ERROR(runtime_error, "pwrite: only " << rv << " of " << size << " bytes written at fd " << name_fd(fd) << " offset " << offset);
 		}
 	}
 
@@ -442,7 +442,7 @@ namespace crucible {
 					THROW_ERRNO("pread: " << size << " bytes");
 				}
 				if (rv != static_cast<int>(size)) {
-					THROW_ERROR(runtime_error, "pread: " << size << " bytes at offset " << offset << " returned " << rv);
+					THROW_ERROR(runtime_error, "pread: " << size << " bytes at fd " << name_fd(fd) << " offset " << offset << " returned " << rv);
 				}
 				break;
 			}
