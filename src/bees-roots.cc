@@ -955,8 +955,8 @@ BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) 
 bool
 BeesCrawl::next_transid()
 {
-	auto roots = m_ctx->roots();
-	auto next_transid = roots->transid_max();
+	const auto roots = m_ctx->roots();
+	const auto next_transid = roots->transid_max();
 	auto crawl_state = get_state_end();
 
 	// If we are already at transid_max then we are still finished
@@ -966,7 +966,7 @@ BeesCrawl::next_transid()
 		m_deferred = true;
 	} else {
 		// Log performance stats from the old crawl
-		auto current_time = time(NULL);
+		const auto current_time = time(NULL);
 
 		// Start new crawl
 		crawl_state.m_min_transid = crawl_state.m_max_transid;
