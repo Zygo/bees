@@ -171,15 +171,23 @@ BeesRoots::crawl_state_erase(const BeesCrawlState &bcs)
 uint64_t
 BeesRoots::transid_min()
 {
-	BEESNOTE("Calculating transid_min");
+	uint64_t rv = numeric_limits<uint64_t>::max();
+	uint64_t last_root = 0;
+	BEESNOTE("Calculating transid_min (" << rv << " so far, last_root " << last_root << ")");
 	unique_lock<mutex> lock(m_mutex);
 	if (m_root_crawl_map.empty()) {
 		return 0;
 	}
-	uint64_t rv = numeric_limits<uint64_t>::max();
 	const uint64_t max_rv = rv;
 	for (auto i : m_root_crawl_map) {
-		rv = min(rv, i.second->get_state_end().m_min_transid);
+		// Do not count subvols that are isolated by btrfs send workaround.
+		// They will not advance until the workaround is removed or they are set read-write.
+		catch_all([&](){
+			if (!is_root_ro(i.first)) {
+				rv = min(rv, i.second->get_state_end().m_min_transid);
+			}
+		});
+		last_root = i.first;
 	}
 	// If we get through this loop without setting rv, we'll create broken crawlers due to integer overflow.
 	THROW_CHECK2(runtime_error, rv, max_rv, max_rv > rv);
@@ -993,20 +1001,6 @@ BeesCrawl::fetch_extents()
 		return next_transid();
 	}
 
-	// Check for btrfs send workaround: don't scan RO roots at all, pretend
-	// they are just empty.  We can't free any space there, and we
-	// don't have the necessary analysis logic to be able to use
-	// them as dedupe src extents (yet).
-	//
-	// This will keep the max_transid up to date so if the root
-	// is ever switched back to read-write, it won't trigger big
-	// expensive in-kernel searches for ancient transids.
-	if (m_ctx->is_root_ro(old_state.m_root)) {
-		BEESLOGDEBUG("WORKAROUND: skipping scan of RO root " << old_state.m_root);
-		BEESCOUNT(root_workaround_btrfs_send);
-		return next_transid();
-	}
-
 	BEESNOTE("crawling " << get_state_end());
 
 	Timer crawl_timer;
@@ -1045,6 +1039,43 @@ BeesCrawl::fetch_extents()
 		BEESCOUNT(crawl_empty);
 		BEESLOGINFO("Crawl finished " << get_state_end());
 		return next_transid();
+	}
+
+	// Check for btrfs send workaround: don't scan RO roots at all, pretend
+	// they are just empty.  We can't free any space there, and we
+	// don't have the necessary analysis logic to be able to use
+	// them as dedupe src extents (yet).
+	bool ro_root = true;
+	catch_all([&](){
+		ro_root = m_ctx->is_root_ro(old_state.m_root);
+	});
+	if (ro_root) {
+		BEESLOGDEBUG("WORKAROUND: skipping scan of RO root " << old_state.m_root);
+		BEESCOUNT(root_workaround_btrfs_send);
+		// We would call next_transid() here, but we want to do a few things differently.
+		// We immediately defer further crawling on this subvol.
+		// We track max_transid if the subvol scan has never started.
+		// We postpone the started timestamp since we haven't started.
+		auto crawl_state = get_state_end();
+		if (crawl_state.m_objectid == 0) {
+			// This will keep the max_transid up to date so if the root
+			// is ever switched back to read-write, it won't trigger big
+			// expensive in-kernel searches for ancient transids.
+			// If the root is made RO while crawling is in progress, we will
+			// have the big expensive in-kernel searches (same as if we have
+			// been not running for a long time).
+			// Don't allow transid_max to ever move backwards.
+			const auto roots = m_ctx->roots();
+			const auto next_transid = roots->transid_max();
+			const auto current_time = time(NULL);
+			crawl_state.m_max_transid = max(next_transid, crawl_state.m_max_transid);
+			// Move the start time forward too, since we have not started crawling yet.
+			crawl_state.m_started = current_time;
+			set_state(crawl_state);
+		}
+		// Mark this root deferred so we won't see it until the next transid cycle
+		m_deferred = true;
+		return false;
 	}
 
 	// BEESLOGINFO("Crawling " << sk.m_result.size() << " results from " << get_state_end());
