@@ -78,13 +78,13 @@ const int BEES_PROGRESS_INTERVAL = BEES_STATS_INTERVAL;
 const int BEES_STATUS_INTERVAL = 1;
 
 // Number of file FDs to cache when not in active use
-const size_t BEES_FILE_FD_CACHE_SIZE = 4096;
+const size_t BEES_FILE_FD_CACHE_SIZE = 32768;
 
 // Number of root FDs to cache when not in active use
-const size_t BEES_ROOT_FD_CACHE_SIZE = 1024;
+const size_t BEES_ROOT_FD_CACHE_SIZE = 4096;
 
 // Number of FDs to open (rlimit)
-const size_t BEES_OPEN_FILE_LIMIT = (BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACHE_SIZE) * 2 + 100;
+const size_t BEES_OPEN_FILE_LIMIT = BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACHE_SIZE + 100;
 
 // Worker thread factor (multiplied by detected number of CPU cores)
 const double BEES_DEFAULT_THREAD_FACTOR = 1.0;
