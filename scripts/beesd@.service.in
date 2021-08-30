@@ -20,5 +20,7 @@ Restart=on-abnormal
 StartupCPUWeight=25
 StartupIOWeight=25
 
+PrivateMounts=true
+
 [Install]
 WantedBy=basic.target

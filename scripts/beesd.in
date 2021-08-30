@@ -111,11 +111,7 @@ mkdir -p "$WORK_DIR" || exit 1
 INFO "MOUNT DIR: $MNT_DIR"
 mkdir -p "$MNT_DIR" || exit 1
 
-umount_w(){ mountpoint -q "$1" && umount -l "$1"; }
-force_umount(){ umount_w "$MNT_DIR"; }
-trap force_umount SIGINT SIGTERM EXIT
-
-mount -osubvolid=5 -o "$MOUNT_OPTIONS" /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
+mount --make-private -osubvolid=5 -o "$MOUNT_OPTIONS" /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
 if [ ! -d "$BEESHOME" ]; then
     INFO "Create subvol $BEESHOME for store bees data"
@@ -144,4 +140,4 @@ fi
 MNT_DIR="$(realpath $MNT_DIR)"
 
 cd "$MNT_DIR"
-"$bees_bin" "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
+exec "$bees_bin" "${ARGUMENTS[@]}" $OPTIONS "$MNT_DIR"
