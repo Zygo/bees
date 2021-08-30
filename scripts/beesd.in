@@ -91,6 +91,7 @@ MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((8192*AL128K))}"
+MOUNT_OPTIONS="${MOUNT_OPTIONS-}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
@@ -114,7 +115,7 @@ umount_w(){ mountpoint -q "$1" && umount -l "$1"; }
 force_umount(){ umount_w "$MNT_DIR"; }
 trap force_umount SIGINT SIGTERM EXIT
 
-mount -osubvolid=5 /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
+mount -osubvolid=5 -o "$MOUNT_OPTIONS" /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
 if [ ! -d "$BEESHOME" ]; then
     INFO "Create subvol $BEESHOME for store bees data"
