@@ -1,5 +1,9 @@
 BEES = ../bin/bees
 PROGRAMS = \
+	../bin/bees \
+	../bin/btrsame \
+	../bin/clone-cat \
+	../bin/clone-split \
 	../bin/fiemap \
 	../bin/fiewalk \
 
@@ -57,6 +61,15 @@ $(PROGRAMS): ../bin/%: %.o
 $(PROGRAMS): ../lib/libcrucible.a
 
 $(BEES): $(BEES_OBJS) bees-version.o bees-usage.o ../lib/libcrucible.a
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
+
+../bin/btrsame: btrsame.o
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
+
+../bin/clone-cat: clone-cat.o
+	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
+
+../bin/clone-split: clone-split.o
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
