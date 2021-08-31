@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -23,6 +24,7 @@ using namespace std;
 
 #define EXTENT_SAME_CLASS BtrfsExtentSame
 static const bool ALWAYS_ALIGN = false;
+static const bool OPEN_RDONLY = true;
 
 static const int EXTENT_ALIGNMENT = 4096;
 
@@ -33,9 +35,6 @@ const off_t max_step_size = 128 * 1024 * 1024;
 
 // Not a good idea to go below 4K
 const off_t min_step_size = 4096;
-
-// Give up fairly early - 1MB
-const off_t max_contiguous_differences = 1 * 1024 * 1024;
 
 struct PhysicalBlockRange {
 	uint64_t m_start, m_end;
@@ -89,7 +88,23 @@ verbose()
 }
 
 static
-bool
+string
+pretty(double d)
+{
+	static const char * units[] = { "", "K", "M", "G", "T", "P", "E" };
+	static const char * *units_stop = units + sizeof(units) / sizeof(units[0]) - 1;
+	const char * *unit = units;
+	while (d >= 1024 && unit < units_stop) {
+		d /= 1024;
+		++unit;
+	}
+	ostringstream oss;
+	oss << (round(d * 1000.0) / 1000.0) << *unit;
+	return oss.str();
+}
+
+static
+void
 bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 {
 	Stat incumbent_stat(incumbent_fd);
@@ -110,15 +125,18 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 	off_t total_deduped = 0;
 	int status_ok = 0, status_err = 0, status_different = 0;
 	off_t step_size = max_step_size;
-	uint64_t contiguous_differences = 0;
 	uint64_t total_differences = 0;
 	uint64_t total_shared = 0;
 	uint64_t total_holes = 0;
 
 	bool fatal_error = false;
 
-	off_t p, len;
+	vector<uint8_t> silly_buffer(max_step_size);
+
+	off_t p;
+	off_t len = 0;
 	ostringstream oss;
+	Timer elapsed;
 	Timer timer;
 	for (p = 0; p < common_size && !fatal_error; ) {
 		off_t this_step_size = step_size;
@@ -130,14 +148,15 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 		}
 		oss.str("");
 		oss << "\r"
-			<< "total " << common_size
-			<< (total_deduped ? " **DUP** " : " dup ") << total_deduped
-			<< " diff " << total_differences
-			<< " shared " << total_shared
-			<< " holes " << total_holes
-			<< " off " << p
-			<< " len " << len
-			<< ' ';
+			<< "total " << pretty(common_size)
+			<< (total_deduped ? " **DUP** " : " dup ") << pretty(total_deduped)
+			<< " diff " << pretty(total_differences)
+			<< " shared " << pretty(total_shared)
+			<< " holes " << pretty(total_holes)
+			<< " off " << pretty(p)
+			<< " len " << pretty(len)
+			<< " elapsed " << elapsed
+			<< "   \b\b\b";
 
 		PhysicalBlockRange incumbent_pbr(incumbent_fd, p, len);
 		PhysicalBlockRange candidate_pbr(candidate_fd, p, len);
@@ -146,42 +165,37 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 			off_t shared_len = min(incumbent_pbr.m_end - incumbent_pbr.m_start, candidate_pbr.m_end - candidate_pbr.m_start);
 			this_step_size = max(min_step_size, min(shared_len, common_size - p));
 			total_shared += this_step_size;
-			contiguous_differences = 0;
 			len = shared_len;
 			// At this point, if we see anything shared, it's because we already deduped the whole thing
 			// unless it's a hole.  We do have those.
-			if (incumbent_pbr.m_start) {
-				// break;
-			} else {
+			if (!incumbent_pbr.m_start) {
 				total_holes += shared_len;
 			}
 		} else {
 
-			// These might be triggering a locking bug
-			// ...actually we found the locking bug and it's somewhere else
-			// ...though there may be a memory leak bug so let's try turning this back off again
-			// ...nope, seems to be a kernel bug triggered by git
-			// ...but we still run out of RAM, hard, on some machines running this code.  But not all.
-			// ...let's avoid the scary syscalls until we prove they work, OK?
-			// ...ok let's go looking for scary syscall behavior now
-			// ...no hangs but they don't seem to be helping, or are helping negatively
-			// ...long stalls here, see if they go away
-			// OK we were totally doing the wrong thing here.  "common_size - p", indeed.
-			// DIE_IF_MINUS_ONE(posix_fadvise(incumbent_fd, p, common_size - p, POSIX_FADV_WILLNEED));
-			// DIE_IF_MINUS_ONE(posix_fadvise(candidate_fd, p, common_size - p, POSIX_FADV_WILLNEED));
 			DIE_IF_MINUS_ONE(readahead(incumbent_fd, p, len));
 			DIE_IF_MINUS_ONE(readahead(candidate_fd, p, len));
+			// The above kernel calls request readahead, same as posix_fadvise ... MADV_WILLNEED
+			// but in btrfs the readahead iops are scheduled at idle priority.
+			// This is not what we want, so here we can use read to force non-idle priority
+			// (or just use a scheduler that doesn't support io priority).
+			// DIE_IF_MINUS_ONE(pread(incumbent_fd, silly_buffer.data(), len, p));
+			// DIE_IF_MINUS_ONE(pread(candidate_fd, silly_buffer.data(), len, p));
 
 			EXTENT_SAME_CLASS bes(incumbent_fd, p, len);
 			bes.add(candidate_fd, p);
 			bes.do_ioctl();
+
+			// Don't need it any more, might either speed up page reclaim, or
+			// make us block waiting for writeback.
+			DIE_IF_MINUS_ONE(posix_fadvise(incumbent_fd, p, len, POSIX_FADV_DONTNEED));
+			DIE_IF_MINUS_ONE(posix_fadvise(candidate_fd, p, len, POSIX_FADV_DONTNEED));
 
 			int status = bes.m_info[0].status;
 
 			if (status == 0) {
 				++status_ok;
 				total_deduped += bes.m_info[0].bytes_deduped;
-				contiguous_differences = 0;
 				if (step_size * 2 <= max_step_size) {
 					step_size *= 2;
 				}
@@ -191,9 +205,8 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 					++status_err;
 					switch (-status) {
 						case EXDEV:
-							oss << " (fatal error)" << endl;
-							THROW_ERRNO(-status);
-							break;
+							oss << " (fatal error, paths are not on the same mount point?)" << endl;
+							return;
 					}
 				} else if (status == BTRFS_SAME_DATA_DIFFERS) {
 					++status_different;
@@ -205,12 +218,6 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 					continue;
 				} else {
 					total_differences += step_size;
-					contiguous_differences += step_size;
-					if (total_deduped == 0 && contiguous_differences > max_contiguous_differences) {
-						oss << " (giving up, contiguous_differences = " << contiguous_differences
-						    << ", max_contiguous_differences = " << max_contiguous_differences << ")" << endl;
-						break;
-					}
 				}
 			}
 		}
@@ -218,17 +225,16 @@ bees_same_file(Fd incumbent_fd, Fd candidate_fd)
 		p += len;
 	}
 	cerr << oss.str() << "\r"
-		<< "total " << common_size
-		<< (total_deduped ? " **DUP** " : " dup ") << total_deduped
-		<< " diff " << total_differences
-		<< " shared " << total_shared
-		<< " holes " << total_holes
-		<< " off " << p
-		<< " len " << len
+		<< "total " << pretty(common_size)
+		<< (total_deduped ? " **DUP** " : " dup ") << pretty(total_deduped)
+		<< " diff " << pretty(total_differences)
+		<< " shared " << pretty(total_shared)
+		<< " holes " << pretty(total_holes)
+		<< " off " << pretty(p)
+		<< " len " << pretty(len)
+		<< " elapsed " << elapsed
 		<< "     "
 		<< endl;
-
-	return status_ok > 0 && status_err == 0 && status_different == 0;
 }
 
 int
@@ -248,56 +254,10 @@ main(int argc, char **argv)
 	if (verbose()) {
 		cerr << "B: " << argv[2] << endl;
 	}
-	Fd candidate_fd = open_or_die(argv[2], O_RDWR);
+	Fd candidate_fd = open_or_die(argv[2], OPEN_RDONLY ? O_RDONLY : O_RDWR);
 
-	int rv;
-	if (bees_same_file(incumbent_fd, candidate_fd)) {
-		rv = EXIT_SUCCESS;
-	} else {
-		// any run that doesn't end with terminate() is success
-		// rv = EXIT_FAILURE;
-		rv = EXIT_SUCCESS;
-	}
+	bees_same_file(incumbent_fd, candidate_fd);
 
-// Let's try not doing this to see if our memory leaks go away
-// OK we have memory leak fixes, bring on the extra testing
-// OK it's slow and unnecessary in this context
-#if 0
-	catch_all([&]() {
-		PhysicalBlockRange pbr(incumbent_fd, 0);
-		cerr << "pbr = " << to_hex(pbr.m_start) << ".." << to_hex(pbr.m_end) << endl;
-		set<uint64_t> inodes_seen;
-		set<string> paths_seen;
-		if (pbr.m_start) {
-			BtrfsIoctlLogicalInoArgs lia(pbr.m_start);
-			lia.do_ioctl(incumbent_fd);
-			// cerr << &lia;
-                	// [0] = BtrfsInodeOffsetRoot {  .m_inum = 10544359, .m_offset = 0x0, .m_root = 257},
-			for (auto i : lia.m_iors) {
-				auto seen_inode = inodes_seen.insert(i.m_inum);
-				if (!seen_inode.second) {
-					continue;
-				}
-				cerr << "Root " << i.m_root << " Inode " << i.m_inum << " Offset " << to_hex(i.m_offset) << "\n";
-				catch_all([&]() {
-					// cerr << "Inode " << i.m_inum << ":\n";
-					BtrfsIoctlInoPathArgs ipa(i.m_inum);
-					ipa.do_ioctl(incumbent_fd);
-					for (auto p : ipa.m_paths) {
-						auto seen_path = paths_seen.insert(p);
-						if (seen_path.second) {
-							cerr << "\tPath " << p << "\n";
-						}
-					}
-					// Not useful without the rest of the root tree
-					// BtrfsIoctlInoLookupArgs ila(BTRFS_FIRST_FREE_OBJECTID);
-					// ila.do_ioctl(incumbent_fd);
-					// cerr << "ila = '" << ila.name << "'\n";
-				});
-			}
-		}
-	});
-#endif
-
-	return rv;
+	// any run that doesn't end with terminate() is success,
+	return EXIT_SUCCESS;
 }
