@@ -91,7 +91,7 @@ MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((8192*AL128K))}"
-MOUNT_OPTIONS="${MOUNT_OPTIONS-}"
+MOUNT_OPTIONS="${MOUNT_OPTIONS:-}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
