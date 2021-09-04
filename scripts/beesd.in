@@ -91,7 +91,6 @@ MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
 BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((8192*AL128K))}"
-MOUNT_OPTIONS="${MOUNT_OPTIONS:-noatime,nodev,noexec,nosuid}"
 
 INFO "Check: Disk exists"
 if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
@@ -111,7 +110,7 @@ mkdir -p "$WORK_DIR" || exit 1
 INFO "MOUNT DIR: $MNT_DIR"
 mkdir -p "$MNT_DIR" || exit 1
 
-mount --make-private -osubvolid=5 -o "$MOUNT_OPTIONS" /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
+mount --make-private -osubvolid=5 /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
 if [ ! -d "$BEESHOME" ]; then
     INFO "Create subvol $BEESHOME for store bees data"
