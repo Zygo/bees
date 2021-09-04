@@ -20,7 +20,39 @@ Restart=on-abnormal
 StartupCPUWeight=25
 StartupIOWeight=25
 
-PrivateMounts=true
+# Hide other users' process in /proc/
+ProtectProc=invisible
+
+# Mount / as read-only
+ProtectSystem=strict
+
+# Forbidden access to /home, /root and /run/user
+ProtectHome=true
+
+# Mount tmpfs on /tmp/ and /var/tmp/.
+# Cannot mount at /run/ or /var/run/ for they are used by systemd.
+PrivateTmp=true
+
+# Disable network access
+PrivateNetwork=true
+
+# Use private IPC namespace, user namespace, utc namespace
+PrivateIPC=true
+ProtectHostname=true
+
+# Disable write access to kernel variables throug /proc
+ProtectKernelTunables=true
+
+# Disable access to control groups
+ProtectControlGroups=true
+
+# Set capabilities of the new program
+# The first three are required for accessing any file on the mounted filesystem.
+# The last one is required for mounting the filesystem.
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_SYS_ADMIN
+
+# With NoNewPrivileges, running sudo cannot gain any new privilege
+NoNewPrivileges=true
 
 [Install]
 WantedBy=basic.target
