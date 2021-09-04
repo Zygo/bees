@@ -18,9 +18,6 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ## Options to apply, see `beesd --help` for details
 # OPTIONS="--strip-paths --no-timestamps"
 
-## Mount options
-# MOUNT_OPTIONS=""
-
 ## Bees DB size
 # Hash Table Sizing
 # sHash table entries are 16 bytes each
