@@ -36,7 +36,7 @@ PrivateTmp=true
 # Disable network access
 PrivateNetwork=true
 
-# Use private IPC namespace, user namespace, utc namespace
+# Use private IPC namespace, utc namespace
 PrivateIPC=true
 ProtectHostname=true
 
