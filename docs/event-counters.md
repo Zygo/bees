@@ -333,6 +333,7 @@ The `scan` event group consists of operations related to scanning incoming data.
  * `scan_eof`: Scan past EOF was attempted.
  * `scan_erase_redundant`: Blocks in the hash table were removed because they were removed from the filesystem by dedupe.
  * `scan_extent`: An extent was scanned (`scan_one_extent`).
+ * `scan_extent_tiny`: An extent below 128K that was not the beginning or end of a file was scanned.  No action is currently taken for these--they are merely counted.
  * `scan_forward`: A logical byte range was scanned (`scan_forward`).
  * `scan_found`: An entry was found in the hash table matching a scanned block from the filesystem.
  * `scan_hash_hit`: A block was found on the filesystem corresponding to a block found in the hash table.
