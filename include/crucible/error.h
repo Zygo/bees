@@ -126,6 +126,13 @@ namespace crucible {
 	} \
 } while(0)
 
+#define THROW_CHECK4(type, value1, value2, value3, value4, expr) do { \
+	if (!(expr)) { \
+		THROW_ERROR(type, #value1 << " = " << (value1) << ", " #value2 << " = " << (value2) << ", " #value3 << " = " << (value3) << ", " #value4 << " = " << (value4) \
+			<< " failed constraint check (" << #expr << ")"); \
+	} \
+} while(0)
+
 #define THROW_CHECK_BIN_OP(type, value1, op, value2) do { \
 	if (!((value1) op (value2))) { \
 		THROW_ERROR(type, "failed constraint check " << #value1 << " (" << (value1) << ") " << #op << " " << #value2 << " (" << (value2) << ")"); \
