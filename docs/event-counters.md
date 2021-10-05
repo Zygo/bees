@@ -258,6 +258,14 @@ The `pairforward` event group consists of events related to extending matching b
  * `pairforward_try`: Started extending a pair of matching block ranges forward.
  * `pairforward_zero`: A pair of matching block ranges could not be extended backward by one block because the src block contained all zeros and was not compressed.
 
+readahead
+---------
+
+The `readahead` event group consists of events related to calls to `posix_fadvise`.
+
+ * `readahead_ms`: Total time spent running `posix_fadvise(..., POSIX_FADV_WILLNEED)` aka `readahead()`.
+ * `readahead_unread_ms`: Total time spent running `posix_fadvise(..., POSIX_FADV_DONTNEED)`.
+
 replacedst
 ----------
 
