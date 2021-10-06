@@ -28,13 +28,13 @@ main(int argc, char **argv)
 		if (argc > 2) { fm.fm_start = stoull(argv[2], nullptr, 0); }
 		if (argc > 3) { fm.fm_length = stoull(argv[3], nullptr, 0); }
 		if (argc > 4) { fm.fm_flags = stoull(argv[4], nullptr, 0); }
-		fm.fm_length = min(fm.fm_length, FIEMAP_MAX_OFFSET - fm.fm_start);
+		fm.fm_length = min(fm.fm_length, Fiemap::s_fiemap_max_offset - fm.fm_start);
 		uint64_t stop_at = fm.fm_start + fm.fm_length;
 		uint64_t last_byte = fm.fm_start;
 		do {
 			fm.do_ioctl(fd);
 			// cerr << fm;
-			uint64_t last_logical = FIEMAP_MAX_OFFSET;
+			uint64_t last_logical = Fiemap::s_fiemap_max_offset;
 			for (auto &extent : fm.m_extents) {
 				if (extent.fe_logical > last_byte) {
 					cout << "Log " << to_hex(last_byte) << ".." << to_hex(extent.fe_logical) << " Hole" << endl;

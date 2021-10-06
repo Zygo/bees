@@ -143,8 +143,12 @@ namespace crucible {
 
 	struct Fiemap : public fiemap {
 
+		// because fiemap.h insists on giving FIEMAP_MAX_OFFSET
+		// a different type from the struct fiemap members
+		static const uint64_t s_fiemap_max_offset = FIEMAP_MAX_OFFSET;
+
 		// Get entire file
-		Fiemap(uint64_t start = 0, uint64_t length = FIEMAP_MAX_OFFSET);
+		Fiemap(uint64_t start = 0, uint64_t length = s_fiemap_max_offset);
 
 		void do_ioctl(int fd);
 
