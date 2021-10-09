@@ -7,6 +7,7 @@ PROGRAMS = \
 	path \
 	process \
 	progress \
+	seeker \
 	task \
 
 all: test
