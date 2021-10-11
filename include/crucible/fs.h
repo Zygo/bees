@@ -186,8 +186,8 @@ namespace crucible {
 
 	struct BtrfsIoctlSearchKey : public btrfs_ioctl_search_key {
 		BtrfsIoctlSearchKey(size_t buf_size = 4096);
-		virtual bool do_ioctl_nothrow(int fd);
-		virtual void do_ioctl(int fd);
+		bool do_ioctl_nothrow(int fd);
+		void do_ioctl(int fd);
 
 		// Copy objectid/type/offset so we move forward
 		void next_min(const BtrfsIoctlSearchHeader& ref);
