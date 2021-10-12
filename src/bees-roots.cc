@@ -632,7 +632,6 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 
 	BEESTRACE("sk " << sk);
 	while (sk.min_objectid <= rootid) {
-		sk.nr_items = 1;
 		sk.do_ioctl(m_ctx->root_fd());
 
 		if (sk.m_result.empty()) {
@@ -769,7 +768,6 @@ BeesRoots::next_root(uint64_t root)
 	sk.min_objectid = root + 1;
 
 	while (true) {
-		sk.nr_items = 1;
 		sk.do_ioctl(m_ctx->root_fd());
 
 		if (sk.m_result.empty()) {
