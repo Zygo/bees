@@ -465,20 +465,6 @@ namespace crucible {
 
 	template<>
 	void
-	pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t> &text, off_t offset)
-	{
-		return pread_or_die(fd, text.data(), text.size(), offset);
-	}
-
-	template<>
-	void
-	pwrite_or_die<vector<uint8_t>>(int fd, const vector<uint8_t> &text, off_t offset)
-	{
-		return pwrite_or_die(fd, text.data(), text.size(), offset);
-	}
-
-	template<>
-	void
 	pwrite_or_die<ByteVector>(int fd, const ByteVector &text, off_t offset)
 	{
 		return pwrite_or_die(fd, text.data(), text.size(), offset);

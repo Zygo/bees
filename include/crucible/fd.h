@@ -130,8 +130,8 @@ namespace crucible {
 	template<> void pread_or_die<ByteVector>(int fd, ByteVector& str, off_t offset);
 	template<> void pwrite_or_die<ByteVector>(int fd, const ByteVector& str, off_t offset);
 	// Deprecated
-	template<> void pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t>& str, off_t offset);
-	template<> void pwrite_or_die<vector<uint8_t>>(int fd, const vector<uint8_t>& str, off_t offset);
+	template<> void pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t>& str, off_t offset) = delete;
+	template<> void pwrite_or_die<vector<uint8_t>>(int fd, const vector<uint8_t>& str, off_t offset) = delete;
 	template<> void pread_or_die<vector<char>>(int fd, vector<char>& str, off_t offset) = delete;
 	template<> void pwrite_or_die<vector<char>>(int fd, const vector<char>& str, off_t offset) = delete;
 
