@@ -123,7 +123,7 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 		THROW_CHECK2(out_of_range, dirty_extent_end, dirty_extent, dirty_extent_end - dirty_extent == BLOCK_SIZE_HASHTAB_EXTENT);
 		BEESTOOLONG("pwrite(fd " << m_fd << " '" << name_fd(m_fd)<< "', length " << to_hex(dirty_extent_end - dirty_extent) << ", offset " << to_hex(dirty_extent - m_byte_ptr) << ")");
 		// Copy the extent because we might be stuck writing for a while
-		vector<uint8_t> extent_copy(dirty_extent, dirty_extent_end);
+		ByteVector extent_copy(dirty_extent, dirty_extent_end);
 
 		// Mark extent non-dirty while we still hold the lock
 		m_extent_metadata.at(extent_index).m_dirty = false;

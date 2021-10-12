@@ -633,7 +633,7 @@ private:
 ostream & operator<<(ostream &os, const BeesHash &bh);
 
 class BeesBlockData {
-	using Blob = vector<uint8_t>;
+	using Blob = ByteVector;
 
 	mutable Fd		m_fd;
 	off_t			m_offset;
