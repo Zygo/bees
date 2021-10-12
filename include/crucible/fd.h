@@ -1,6 +1,7 @@
 #ifndef CRUCIBLE_FD_H
 #define CRUCIBLE_FD_H
 
+#include "crucible/bytevector.h"
 #include "crucible/namedptr.h"
 
 #include <cstring>
@@ -125,11 +126,14 @@ namespace crucible {
 	// Specialization for strings which reads/writes the string content, not the struct string
 	template<> void write_or_die<string>(int fd, const string& str);
 	template<> void pread_or_die<string>(int fd, string& str, off_t offset);
-	template<> void pread_or_die<vector<char>>(int fd, vector<char>& str, off_t offset);
-	template<> void pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t>& str, off_t offset);
 	template<> void pwrite_or_die<string>(int fd, const string& str, off_t offset);
-	template<> void pwrite_or_die<vector<char>>(int fd, const vector<char>& str, off_t offset);
+	template<> void pread_or_die<ByteVector>(int fd, ByteVector& str, off_t offset);
+	template<> void pwrite_or_die<ByteVector>(int fd, const ByteVector& str, off_t offset);
+	// Deprecated
+	template<> void pread_or_die<vector<uint8_t>>(int fd, vector<uint8_t>& str, off_t offset);
 	template<> void pwrite_or_die<vector<uint8_t>>(int fd, const vector<uint8_t>& str, off_t offset);
+	template<> void pread_or_die<vector<char>>(int fd, vector<char>& str, off_t offset) = delete;
+	template<> void pwrite_or_die<vector<char>>(int fd, const vector<char>& str, off_t offset) = delete;
 
 	// A different approach to reading a simple string
 	string read_string(int fd, size_t size);
