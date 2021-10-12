@@ -139,9 +139,9 @@ namespace crucible {
 	BtrfsExtentSame::do_ioctl()
 	{
 		dest_count = m_info.size();
-		vector<uint8_t> ioctl_arg = vector_copy_struct<btrfs_ioctl_same_args>(this);
-		ioctl_arg.resize(sizeof(btrfs_ioctl_same_args) + dest_count * sizeof(btrfs_ioctl_same_extent_info), 0);
-		btrfs_ioctl_same_args *ioctl_ptr = reinterpret_cast<btrfs_ioctl_same_args *>(ioctl_arg.data());
+		const size_t buf_size = sizeof(btrfs_ioctl_same_args) + dest_count * sizeof(btrfs_ioctl_same_extent_info);
+		ByteVector ioctl_arg(static_cast<btrfs_ioctl_same_args&>(*this), buf_size);
+		btrfs_ioctl_same_args *const ioctl_ptr = ioctl_arg.get<btrfs_ioctl_same_args>();
 		size_t count = 0;
 		for (auto i = m_info.cbegin(); i != m_info.cend(); ++i) {
 			ioctl_ptr->info[count] = static_cast<const btrfs_ioctl_same_extent_info &>(m_info[count]);
@@ -195,9 +195,9 @@ namespace crucible {
 	BtrfsDataContainer::prepare(size_t container_size)
 	{
 		if (m_data.size() < container_size) {
-			m_data.resize(container_size);
+			m_data = ByteVector(container_size);
 		}
-		btrfs_data_container *p = reinterpret_cast<btrfs_data_container *>(m_data.data());
+		const auto p = m_data.get<btrfs_data_container>();
 		const size_t min_size = offsetof(btrfs_data_container, val);
 		if (container_size < min_size) {
 			THROW_ERROR(out_of_range, "container size " << container_size << " smaller than minimum " << min_size);
@@ -328,7 +328,7 @@ namespace crucible {
 	bool
 	BtrfsIoctlLogicalInoArgs::do_ioctl_nothrow(int fd)
 	{
-		btrfs_ioctl_logical_ino_args *p = static_cast<btrfs_ioctl_logical_ino_args *>(this);
+		btrfs_ioctl_logical_ino_args *const p = static_cast<btrfs_ioctl_logical_ino_args *>(this);
 		inodes = reinterpret_cast<uint64_t>(m_container.prepare(m_container_size));
 		size = m_container.get_size();
 
@@ -676,11 +676,9 @@ namespace crucible {
 		THROW_CHECK1(out_of_range, m_min_count, m_min_count <= m_max_count);
 
 		auto extent_count = m_min_count;
-		vector<uint8_t> ioctl_arg = vector_copy_struct<fiemap>(this);
+		ByteVector ioctl_arg(static_cast<const fiemap&>(*this), sizeof(fiemap) + extent_count * sizeof(fiemap_extent));
 
-		ioctl_arg.resize(sizeof(fiemap) + extent_count * sizeof(fiemap_extent), 0);
-
-		fiemap *ioctl_ptr = reinterpret_cast<fiemap *>(ioctl_arg.data());
+		fiemap *const ioctl_ptr = ioctl_arg.get<fiemap>();
 
 		auto start = fm_start;
 		auto end = fm_start + fm_length;
@@ -736,7 +734,7 @@ namespace crucible {
 		max_offset = numeric_limits<decltype(max_offset)>::max();
 		max_transid = numeric_limits<decltype(max_transid)>::max();
 		max_type = numeric_limits<decltype(max_type)>::max();
-		nr_items = numeric_limits<decltype(nr_items)>::max();
+		nr_items = 1;
 	}
 
 	BtrfsIoctlSearchHeader::BtrfsIoctlSearchHeader()
@@ -745,49 +743,68 @@ namespace crucible {
 	}
 
 	size_t
-	BtrfsIoctlSearchHeader::set_data(const vector<uint8_t> &v, size_t offset)
+	BtrfsIoctlSearchHeader::set_data(const ByteVector &v, size_t offset)
 	{
 		THROW_CHECK2(invalid_argument, offset, v.size(), offset + sizeof(btrfs_ioctl_search_header) <= v.size());
 		memcpy(static_cast<btrfs_ioctl_search_header *>(this), &v[offset], sizeof(btrfs_ioctl_search_header));
 		offset += sizeof(btrfs_ioctl_search_header);
 		THROW_CHECK2(invalid_argument, offset + len, v.size(), offset + len <= v.size());
-		m_data = Spanner<const uint8_t>(&v[offset], &v[offset + len]);
+		m_data = ByteVector(v, offset, len);
 		return offset + len;
 	}
 
 	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
 	{
-		// Normally we like to be paranoid and fill empty bytes with zero,
-		// but these buffers can be huge.  80% of a 4GHz CPU huge.
-
-		// Keep the ioctl buffer from one run to the next to save on malloc costs
-		size_t target_buf_size = sizeof(btrfs_ioctl_search_args_v2) + m_buf_size;
-
-		m_ioctl_arg = vector_copy_struct<btrfs_ioctl_search_key>(this);
-		m_ioctl_arg.resize(target_buf_size);
+		// It would be really nice if the kernel tells us whether our
+		// buffer overflowed or how big the overflowing object
+		// was; instead, we have to guess.
 
 		m_result.clear();
+		// Make sure there is space for at least the search key and one (empty) header
+		size_t buf_size = max(m_buf_size, sizeof(btrfs_ioctl_search_args_v2) + sizeof(btrfs_ioctl_search_header));
+		ByteVector ioctl_arg;
+		btrfs_ioctl_search_args_v2 *ioctl_ptr;
+		do {
+			// ioctl buffer size does not include search key header or buffer size
+			ioctl_arg = ByteVector(buf_size + sizeof(btrfs_ioctl_search_args_v2));
+			ioctl_ptr = ioctl_arg.get<btrfs_ioctl_search_args_v2>();
+			ioctl_ptr->key = static_cast<btrfs_ioctl_search_key&>(*this);
+			ioctl_ptr->buf_size = buf_size;
+			// Don't bother supporting V1.  Kernels that old have other problems.
+			int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_arg.data());
+			if (rv != 0 && errno != EOVERFLOW) {
+				return false;
+			}
+			if (rv == 0 && nr_items <= ioctl_ptr->key.nr_items) {
+				// got all the items we wanted, thanks
+				m_buf_size = max(m_buf_size, buf_size);
+				break;
+			}
+			// Didn't get all the items we wanted.  Increase the buf size and try again.
+			// These sizes are very common on default-formatted btrfs, so use these
+			// instead of naive doubling.
+			if (buf_size < 4096) {
+				buf_size = 4096;
+			} else if (buf_size < 16384) {
+				buf_size = 16384;
+			} else if (buf_size < 65536) {
+				buf_size = 65536;
+			} else {
+				buf_size *= 2;
+			}
+			// don't automatically raise the buf size higher than 64K, the largest possible btrfs item
+		} while (buf_size < 65536);
 
-		btrfs_ioctl_search_args_v2 *ioctl_ptr = reinterpret_cast<btrfs_ioctl_search_args_v2 *>(m_ioctl_arg.data());
-
-		ioctl_ptr->buf_size = m_buf_size;
-
-		// Don't bother supporting V1.  Kernels that old have other problems.
-		int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_ptr);
-		if (rv != 0) {
-			return false;
-		}
-
+		// ioctl changes nr_items, this has to be copied back
 		static_cast<btrfs_ioctl_search_key&>(*this) = ioctl_ptr->key;
 
 		size_t offset = pointer_distance(ioctl_ptr->buf, ioctl_ptr);
 		for (decltype(nr_items) i = 0; i < nr_items; ++i) {
 			BtrfsIoctlSearchHeader item;
-			offset = item.set_data(m_ioctl_arg, offset);
+			offset = item.set_data(ioctl_arg, offset);
 			m_result.insert(item);
 		}
-
 		return true;
 	}
 
@@ -815,7 +832,7 @@ namespace crucible {
 	ostream &
 	hexdump(ostream &os, const V &v)
 	{
-		os << "vector<uint8_t> { size = " << v.size() << ", data:\n";
+		os << "V { size = " << v.size() << ", data:\n";
 		for (size_t i = 0; i < v.size(); i += 8) {
 			string hex, ascii;
 			for (size_t j = i; j < i + 8; ++j) {

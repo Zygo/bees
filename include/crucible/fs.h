@@ -1,9 +1,9 @@
 #ifndef CRUCIBLE_FS_H
 #define CRUCIBLE_FS_H
 
+#include "crucible/bytevector.h"
 #include "crucible/endian.h"
 #include "crucible/error.h"
-#include "crucible/spanner.h"
 
 // Terribly Linux-specific FS-wrangling functions
 
@@ -63,7 +63,7 @@ namespace crucible {
 		decltype(elem_cnt) get_elem_cnt() const;
 		decltype(elem_missed) get_elem_missed() const;
 
-		vector<uint8_t> m_data;
+		ByteVector m_data;
 	};
 
 	struct BtrfsIoctlLogicalInoArgs : public btrfs_ioctl_logical_ino_args {
@@ -170,8 +170,8 @@ namespace crucible {
 
 	struct BtrfsIoctlSearchHeader : public btrfs_ioctl_search_header {
 		BtrfsIoctlSearchHeader();
-		Spanner<const uint8_t> m_data;
-		size_t set_data(const vector<uint8_t> &v, size_t offset);
+		ByteVector m_data;
+		size_t set_data(const ByteVector &v, size_t offset);
 		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
 
@@ -185,7 +185,7 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchHeader &hdr);
 
 	struct BtrfsIoctlSearchKey : public btrfs_ioctl_search_key {
-		BtrfsIoctlSearchKey(size_t buf_size = 4096);
+		BtrfsIoctlSearchKey(size_t buf_size = 1024);
 		bool do_ioctl_nothrow(int fd);
 		void do_ioctl(int fd);
 
@@ -193,9 +193,7 @@ namespace crucible {
 		void next_min(const BtrfsIoctlSearchHeader& ref);
 
 		size_t m_buf_size;
-		vector<uint8_t> m_ioctl_arg;
 		set<BtrfsIoctlSearchHeader> m_result;
-
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_key &key);
