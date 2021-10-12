@@ -19,15 +19,6 @@ namespace crucible {
 		memset(that, 0, sizeof(Base));
 	}
 
-	// Copy a base class object (usually a C struct) into a vector<uint8_t>
-	template <class Base>
-	vector<uint8_t>
-	vector_copy_struct(Base *that)
-	{
-		const uint8_t *begin_that = reinterpret_cast<const uint8_t *>(static_cast<const Base *>(that));
-		return vector<uint8_t>(begin_that, begin_that + sizeof(Base));
-	}
-
 	// int->hex conversion with sprintf
 	string to_hex(uint64_t i);
 
