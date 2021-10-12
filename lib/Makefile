@@ -4,6 +4,7 @@ default: libcrucible.a
 %.a: Makefile
 
 CRUCIBLE_OBJS = \
+	bytevector.o \
 	chatter.o \
 	city.o \
 	cleanup.o \
