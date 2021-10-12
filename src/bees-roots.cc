@@ -209,7 +209,7 @@ BeesRoots::transid_max_nocache()
 	sk.min_objectid = sk.max_objectid = BTRFS_EXTENT_TREE_OBJECTID;
 
 	while (true) {
-		sk.nr_items = 1024;
+		sk.nr_items = 4;
 		BEESTRACE("transid_max search sk " << sk);
 		sk.do_ioctl(m_ctx->root_fd());
 
@@ -632,7 +632,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 
 	BEESTRACE("sk " << sk);
 	while (sk.min_objectid <= rootid) {
-		sk.nr_items = 1024;
+		sk.nr_items = 1;
 		sk.do_ioctl(m_ctx->root_fd());
 
 		if (sk.m_result.empty()) {
@@ -769,7 +769,7 @@ BeesRoots::next_root(uint64_t root)
 	sk.min_objectid = root + 1;
 
 	while (true) {
-		sk.nr_items = 1024;
+		sk.nr_items = 1;
 		sk.do_ioctl(m_ctx->root_fd());
 
 		if (sk.m_result.empty()) {
@@ -1005,7 +1005,7 @@ BeesCrawl::fetch_extents()
 
 	Timer crawl_timer;
 
-	BtrfsIoctlSearchKey sk(BEES_MAX_CRAWL_BYTES);
+	BtrfsIoctlSearchKey sk;
 	sk.tree_id = old_state.m_root;
 	sk.min_objectid = old_state.m_objectid;
 	sk.min_type = sk.max_type = BTRFS_EXTENT_DATA_KEY;
@@ -1013,7 +1013,7 @@ BeesCrawl::fetch_extents()
 	sk.min_transid = old_state.m_min_transid;
 	// Don't set max_transid to m_max_transid here.	 See below.
 	sk.max_transid = numeric_limits<uint64_t>::max();
-	sk.nr_items = BEES_MAX_CRAWL_ITEMS;
+	sk.nr_items = 4;
 
 	// Lock in the old state
 	set_state(old_state);
