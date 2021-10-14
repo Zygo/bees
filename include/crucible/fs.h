@@ -192,6 +192,9 @@ namespace crucible {
 		// Copy objectid/type/offset so we move forward
 		void next_min(const BtrfsIoctlSearchHeader& ref);
 
+		// move forward to next object of a single type
+		void next_min(const BtrfsIoctlSearchHeader& ref, const uint8_t type);
+
 		size_t m_buf_size;
 		set<BtrfsIoctlSearchHeader> m_result;
 	};

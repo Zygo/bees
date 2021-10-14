@@ -823,8 +823,46 @@ namespace crucible {
 		min_type = ref.type;
 		min_offset = ref.offset + 1;
 		if (min_offset < ref.offset) {
-			// We wrapped, try the next objectid
-			++min_objectid;
+			// We wrapped, try the next type
+			++min_type;
+			assert(min_offset == 0);
+			if (min_type < ref.type) {
+				assert(min_type == 0);
+				// We wrapped, try the next objectid
+				++min_objectid;
+				// no advancement possible at end
+				THROW_CHECK1(runtime_error, min_type, min_type == 0);
+			}
+		}
+	}
+
+	void
+	BtrfsIoctlSearchKey::next_min(const BtrfsIoctlSearchHeader &ref, const uint8_t type)
+	{
+		if (ref.type < type) {
+			// forward to type in same object with zero offset
+			min_objectid = ref.objectid;
+			min_type = type;
+			min_offset = 0;
+		} else if (ref.type > type) {
+			// skip directly to start of next objectid with target type
+			min_objectid = ref.objectid + 1;
+			// no advancement possible at end
+			THROW_CHECK2(out_of_range, min_objectid, ref.objectid, min_objectid > ref.objectid);
+			min_type = type;
+			min_offset = 0;
+		} else {
+			// advance within this type
+			min_objectid = ref.objectid;
+			min_type = ref.type;
+			min_offset = ref.offset + 1;
+			if (min_offset < ref.offset) {
+				// We wrapped, try the next objectid, same type
+				++min_objectid;
+				THROW_CHECK2(out_of_range, min_objectid, ref.objectid, min_objectid > ref.objectid);
+				min_type = type;
+				assert(min_offset == 0);
+			}
 		}
 	}
 
