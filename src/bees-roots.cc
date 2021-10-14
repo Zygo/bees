@@ -220,7 +220,7 @@ BeesRoots::transid_max_nocache()
 		// We are just looking for the highest transid on the filesystem.
 		// We don't care which object it comes from.
 		for (auto i : sk.m_result) {
-			sk.next_min(i);
+			sk.next_min(i, BTRFS_ROOT_ITEM_KEY);
 			if (i.transid > rv) {
 				rv = i.transid;
 			}
@@ -639,7 +639,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 		}
 
 		for (auto i : sk.m_result) {
-			sk.next_min(i);
+			sk.next_min(i, BTRFS_ROOT_BACKREF_KEY);
 			if (i.type == BTRFS_ROOT_BACKREF_KEY && i.objectid == rootid) {
 				auto dirid = btrfs_get_member(&btrfs_root_ref::dirid, i.m_data);
 				auto name_len = btrfs_get_member(&btrfs_root_ref::name_len, i.m_data);
@@ -775,7 +775,7 @@ BeesRoots::next_root(uint64_t root)
 		}
 
 		for (auto i : sk.m_result) {
-			sk.next_min(i);
+			sk.next_min(i, BTRFS_ROOT_BACKREF_KEY);
 			if (i.type == BTRFS_ROOT_BACKREF_KEY) {
 				// BEESLOGDEBUG("Found root " << i.objectid << " parent " << i.offset << " transid " << i.transid);
 				return i.objectid;
@@ -1087,7 +1087,7 @@ BeesCrawl::fetch_extents()
 	size_t count_high = 0;
 	BeesFileRange last_bfr;
 	for (auto i : sk.m_result) {
-		sk.next_min(i);
+		sk.next_min(i, BTRFS_EXTENT_DATA_KEY);
 		--results_left;
 		BEESCOUNT(crawl_items);
 
