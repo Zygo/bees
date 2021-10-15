@@ -17,6 +17,7 @@ KillSignal=SIGTERM
 MemoryAccounting=true
 Nice=19
 Restart=on-abnormal
+RuntimeDirectory=bees
 StartupCPUWeight=25
 StartupIOWeight=25
 
