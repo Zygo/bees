@@ -2,6 +2,7 @@
 #define _CRUCIBLE_BYTEVECTOR_H_
 
 #include <memory>
+#include <ostream>
 
 #include <cstdint>
 #include <cstdlib>
@@ -66,6 +67,7 @@ namespace crucible {
 		return reinterpret_cast<T*>(data());
 	}
 
+	ostream & operator<<(ostream &os, const ByteVector &bv);
 }
 
 #endif // _CRUCIBLE_BYTEVECTOR_H_

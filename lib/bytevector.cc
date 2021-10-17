@@ -1,6 +1,8 @@
 #include "crucible/bytevector.h"
 
 #include "crucible/error.h"
+#include "crucible/hexdump.h"
+#include "crucible/string.h"
 
 namespace crucible {
 	using namespace std;
@@ -143,5 +145,11 @@ namespace crucible {
 	ByteVector::data() const
 	{
 		return m_ptr.get();
+	}
+
+	ostream&
+	operator<<(ostream &os, const ByteVector &bv) {
+		hexdump(os, bv);
+		return os;
 	}
 }
