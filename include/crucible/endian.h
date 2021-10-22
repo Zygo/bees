@@ -28,7 +28,7 @@ namespace crucible {
 	};
 
 	template<> struct le_to_cpu_helper<uint16_t> {
-		uint16_t operator()(const uint16_t v) { return le64toh(v); }
+		uint16_t operator()(const uint16_t v) { return le16toh(v); }
 	};
 
 	template<> struct le_to_cpu_helper<uint8_t> {
