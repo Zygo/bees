@@ -754,6 +754,10 @@ namespace crucible {
 		return offset + len;
 	}
 
+	thread_local size_t BtrfsIoctlSearchKey::s_calls = 0;
+	thread_local size_t BtrfsIoctlSearchKey::s_loops = 0;
+	thread_local size_t BtrfsIoctlSearchKey::s_loops_empty = 0;
+
 	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
 	{
@@ -774,6 +778,7 @@ namespace crucible {
 			ioctl_ptr->buf_size = buf_size;
 			// Don't bother supporting V1.  Kernels that old have other problems.
 			int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_arg.data());
+			++s_calls;
 			if (rv != 0 && errno == ENOENT) {
 				// If we are searching a tree that is deleted or no longer exists, just return an empty list
 				nr_items = 0;
@@ -800,6 +805,10 @@ namespace crucible {
 				buf_size *= 2;
 			}
 			// don't automatically raise the buf size higher than 64K, the largest possible btrfs item
+			++s_loops;
+			if (ioctl_ptr->key.nr_items == 0) {
+				++s_loops_empty;
+			}
 		} while (buf_size < 65536);
 
 		// ioctl changes nr_items, this has to be copied back

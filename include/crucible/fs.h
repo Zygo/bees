@@ -197,6 +197,10 @@ namespace crucible {
 
 		size_t m_buf_size;
 		set<BtrfsIoctlSearchHeader> m_result;
+
+		static thread_local size_t s_calls;
+		static thread_local size_t s_loops;
+		static thread_local size_t s_loops_empty;
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_key &key);
