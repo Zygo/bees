@@ -206,8 +206,11 @@ BeesHashTable::writeback_loop()
 	}
 	catch_all([&]() {
 		// trigger writeback on our way out
+#if 0
+		// seems to trigger huge latency spikes
 		BEESTOOLONG("unreadahead hash table size " << pretty(m_size));
 		bees_unreadahead(m_fd, 0, m_size);
+#endif
 	});
 	BEESLOGDEBUG("Exited hash table writeback_loop");
 }
