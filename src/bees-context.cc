@@ -717,6 +717,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		BEESLOGINFO("scan: " << pretty(e.size()) << " " << to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end()) << ' ' << name_fd(bfr.fd()));
 	}
 
+	// Costs 10% on benchmarks
+	// bees_unreadahead(bfr.fd(), bfr.begin(), bfr.size());
 	return bfr;
 }
 
