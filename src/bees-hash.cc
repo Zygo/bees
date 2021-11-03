@@ -3,6 +3,7 @@
 #include "crucible/city.h"
 #include "crucible/crc64.h"
 #include "crucible/string.h"
+#include "crucible/uname.h"
 
 #include <algorithm>
 
@@ -225,6 +226,7 @@ percent(size_t num, size_t den)
 void
 BeesHashTable::prefetch_loop()
 {
+	Uname uname;
 	bool not_locked = true;
 	while (!m_stop_requested) {
 		size_t width = 64;
@@ -318,6 +320,7 @@ BeesHashTable::prefetch_loop()
 		graph_blob << "Now:     " << format_time(time(NULL)) << "\n";
 		graph_blob << "Uptime:  " << m_ctx->total_timer().age() << " seconds\n";
 		graph_blob << "Version: " << BEES_VERSION << "\n";
+		graph_blob << "Kernel:  " << uname.sysname << " " << uname.release << " " << uname.machine << " " << uname.version << "\n";
 
 		graph_blob
 			<< "\nHash table page occupancy histogram (" << occupied_count << "/" << total_count << " cells occupied, " << (occupied_count * 100 / total_count) << "%)\n"
