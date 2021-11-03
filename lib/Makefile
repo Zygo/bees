@@ -19,6 +19,7 @@ CRUCIBLE_OBJS = \
 	string.o \
 	task.o \
 	time.o \
+	uname.o \
 
 include ../makeflags
 -include ../localconf
