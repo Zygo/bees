@@ -5,6 +5,7 @@ default: libcrucible.a
 
 CRUCIBLE_OBJS = \
 	bytevector.o \
+	btrfs-tree.o \
 	chatter.o \
 	city.o \
 	cleanup.o \
