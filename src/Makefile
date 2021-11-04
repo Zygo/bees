@@ -1,11 +1,6 @@
 BEES = ../bin/bees
-PROGRAMS = \
-	../bin/fiemap \
-	../bin/fiewalk \
 
-PROGRAM_OBJS = $(foreach b,$(PROGRAMS),$(patsubst ../bin/%,%.o,$(b)))
-
-all: $(BEES) $(PROGRAMS)
+all: $(BEES)
 
 include ../makeflags
 -include ../localconf
@@ -50,11 +45,6 @@ include depends.mk
 
 %.o: %.cc ../makeflags
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
-
-$(PROGRAMS): ../bin/%: %.o
-	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $< $(LIBS)
-
-$(PROGRAMS): ../lib/libcrucible.a
 
 $(BEES): $(BEES_OBJS) bees-version.o bees-usage.o ../lib/libcrucible.a
 	$(CXX) $(BEES_CXXFLAGS) $(BEES_LDFLAGS) -o $@ $^ $(LIBS)
