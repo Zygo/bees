@@ -1,7 +1,8 @@
 *.[ao]
 *.bak
-*.new
 *.dep
+*.new
+*.tmp
 *.so*
 Doxyfile
 README.html
