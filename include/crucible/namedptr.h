@@ -82,7 +82,7 @@ namespace crucible {
 		// "our" map entry if it exists and is expired.  The other
 		// thread would have done the same for us if the race had
 		// a different winner.
-		auto found = m_map_rep->m_map.find(m_ret_key);
+		const auto found = m_map_rep->m_map.find(m_ret_key);
 		if (found != m_map_rep->m_map.end() && found->second.expired()) {
 			m_map_rep->m_map.erase(found);
 		}
@@ -93,10 +93,10 @@ namespace crucible {
 	NamedPtr<Return, Arguments...>::lookup_item(const Key &k)
 	{
 		// Must be called with lock held
-		auto found = m_map_rep->m_map.find(k);
+		const auto found = m_map_rep->m_map.find(k);
 		if (found != m_map_rep->m_map.end()) {
 			// Get the strong pointer back
-			auto rv = found->second.lock();
+			const auto rv = found->second.lock();
 			if (rv) {
 				// Have strong pointer.  Return value that shares map entry.
 				return shared_ptr<Return>(rv, rv->m_ret_ptr.get());
@@ -116,34 +116,36 @@ namespace crucible {
 		Key k(args...);
 
 		// Is it already in the map?
-		unique_lock<mutex> lock(m_map_rep->m_mutex);
+		unique_lock<mutex> lock_lookup(m_map_rep->m_mutex);
 		auto rv = lookup_item(k);
 		if (rv) {
 			return rv;
 		}
 
 		// Release map lock and acquire key lock
-		lock.unlock();
-		auto key_lock = m_lockset.make_lock(k);
+		lock_lookup.unlock();
+		const auto key_lock = m_lockset.make_lock(k);
 
 		// Did item appear in map while we were waiting for key?
-		lock.lock();
+		lock_lookup.lock();
 		rv = lookup_item(k);
 		if (rv) {
 			return rv;
 		}
 
 		// We now hold key and index locks, but item not in map (or expired).
-		// Release map lock
-		lock.unlock();
+		// Release map lock so other threads can use the map
+		lock_lookup.unlock();
 
-		// Call the function and create a new Value
-		auto new_value_ptr = make_shared<Value>(fn(args...), k, m_map_rep);
+		// Call the function and create a new Value outside of the map
+		const auto new_value_ptr = make_shared<Value>(fn(args...), k, m_map_rep);
+
 		// Function must return a non-null pointer
 		THROW_CHECK0(runtime_error, new_value_ptr->m_ret_ptr);
 
-		// Reacquire index lock for map insertion
-		lock.lock();
+		// Reacquire index lock for map insertion.  We still hold the key lock.
+		// Use a different lock object to make exceptions unlock in the right order
+		unique_lock<mutex> lock_insert(m_map_rep->m_mutex);
 
 		// Insert return value in map or overwrite existing
 		// empty or expired weak_ptr value.
@@ -158,14 +160,13 @@ namespace crucible {
 		// to find and fix.
 		assert(new_item_ref.expired());
 
-		// Update the empty map slot
+		// Update the map slot we are sure is empty
 		new_item_ref = new_value_ptr;
-
-		// Drop lock so we don't deadlock in constructor exceptions
-		lock.unlock();
 
 		// Return shared_ptr to Return using strong pointer's reference counter
 		return shared_ptr<Return>(new_value_ptr, new_value_ptr->m_ret_ptr.get());
+
+		// Release map lock, then key lock
 	}
 
 	template <class Return, class... Arguments>
@@ -188,7 +189,7 @@ namespace crucible {
 	NamedPtr<Return, Arguments...>::insert(const Ptr &r, Arguments... args)
 	{
 		THROW_CHECK0(invalid_argument, r);
-		return insert_item([&](Arguments...) -> Ptr { return r; }, args...);
+		return insert_item([&](Arguments...) { return r; }, args...);
 	}
 
 }
