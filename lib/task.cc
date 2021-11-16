@@ -89,6 +89,7 @@ namespace crucible {
 
 		TaskState &operator=(const TaskState &) = delete;
 		TaskState(const TaskState &) = delete;
+		TaskState(TaskState &&) = delete;
 
 	public:
 		~TaskState();
