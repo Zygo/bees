@@ -268,6 +268,13 @@ bees_unreadahead(int const fd, off_t offset, size_t size)
 	BEESCOUNTADD(readahead_unread_ms, unreadahead_timer.age() * 1000);
 }
 
+thread_local random_device bees_random_device;
+thread_local uniform_int_distribution<default_random_engine::result_type> bees_random_seed_dist(
+	numeric_limits<default_random_engine::result_type>::min(),
+	numeric_limits<default_random_engine::result_type>::max()
+);
+thread_local default_random_engine bees_generator(bees_random_seed_dist(bees_random_device));
+
 BeesStringFile::BeesStringFile(Fd dir_fd, string name, size_t limit) :
 	m_dir_fd(dir_fd),
 	m_name(name),

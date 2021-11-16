@@ -18,6 +18,7 @@
 #include <list>
 #include <mutex>
 #include <string>
+#include <random>
 #include <thread>
 
 #include <syslog.h>
@@ -496,6 +497,8 @@ private:
 
 	BeesHashTable(const BeesHashTable &) = delete;
 	BeesHashTable &operator=(const BeesHashTable &) = delete;
+
+	static thread_local uniform_int_distribution<size_t> tl_distribution;
 };
 
 ostream &operator<<(ostream &os, const BeesHashTable::Cell &bhte);
@@ -881,6 +884,7 @@ public:
 extern int bees_log_level;
 extern const char *BEES_USAGE;
 extern const char *BEES_VERSION;
+extern thread_local default_random_engine bees_generator;
 string pretty(double d);
 void bees_sync(int fd);
 void bees_readahead(int fd, off_t offset, size_t size);

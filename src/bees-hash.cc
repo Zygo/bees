@@ -5,7 +5,6 @@
 #include "crucible/string.h"
 
 #include <algorithm>
-#include <random>
 
 #include <sys/mman.h>
 
@@ -538,6 +537,8 @@ BeesHashTable::push_front_hash_addr(HashType hash, AddrType addr)
 	return found;
 }
 
+thread_local uniform_int_distribution<size_t> BeesHashTable::tl_distribution(0, c_cells_per_bucket - 1);
+
 /// Insert a hash entry at some unspecified point in the list.
 /// If entry is already present in list, returns true and does not
 /// modify list.  If entry is not present in list, returns false and
@@ -555,9 +556,7 @@ BeesHashTable::push_random_hash_addr(HashType hash, AddrType addr)
 	Cell *ip = find(er.first, er.second, mv);
 	bool found = (ip < er.second);
 
-	thread_local default_random_engine generator;
-	thread_local uniform_int_distribution<int> distribution(0, c_cells_per_bucket - 1);
-	auto pos = distribution(generator);
+	const auto pos = tl_distribution(bees_generator);
 
 	int case_cond = 0;
 #if 0
