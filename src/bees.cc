@@ -601,7 +601,7 @@ bees_main(int argc, char *argv[])
 	unsigned thread_min = 0;
 	double load_target = 0;
 	bool workaround_btrfs_send = false;
-	BeesRoots::ScanMode root_scan_mode = BeesRoots::SCAN_MODE_LOCKSTEP;
+	BeesRoots::ScanMode root_scan_mode = BeesRoots::SCAN_MODE_INDEPENDENT;
 
 	// Configure getopt_long
 	static const struct option long_options[] = {
