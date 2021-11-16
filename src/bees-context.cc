@@ -807,8 +807,7 @@ BeesContext::wait_for_balance()
 	Timer balance_timer;
 	BEESNOTE("WORKAROUND: waiting for balance to stop");
 	while (true) {
-		btrfs_ioctl_balance_args args;
-		memset_zero<btrfs_ioctl_balance_args>(&args);
+		btrfs_ioctl_balance_args args {};
 		const int ret = ioctl(root_fd(), BTRFS_IOC_BALANCE_PROGRESS, &args);
 		if (ret < 0) {
 			// Either can't get balance status or not running, exit either way
