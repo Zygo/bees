@@ -32,17 +32,24 @@ namespace crucible {
 #endif
 	}
 
-	BtrfsExtentInfo::BtrfsExtentInfo(int dst_fd, off_t dst_offset)
+	BtrfsExtentInfo::BtrfsExtentInfo(int dst_fd, off_t dst_offset) :
+		btrfs_ioctl_same_extent_info( (btrfs_ioctl_same_extent_info) { } )
 	{
-		memset_zero<btrfs_ioctl_same_extent_info>(this);
+		assert(fd == 0);
+		assert(logical_offset == 0);
+		assert(bytes_deduped == 0);
+		assert(status == 0);
+		assert(reserved == 0);
 		fd = dst_fd;
 		logical_offset = dst_offset;
 	}
 
 	BtrfsExtentSame::BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length) :
+		btrfs_ioctl_same_args( (btrfs_ioctl_same_args) { } ),
 		m_fd(src_fd)
 	{
-		memset_zero<btrfs_ioctl_same_args>(this);
+		assert(logical_offset == 0);
+		assert(length == 0);
 		logical_offset = src_offset;
 		length = src_length;
 	}
@@ -126,12 +133,12 @@ namespace crucible {
 	void
 	btrfs_clone_range(int src_fd, off_t src_offset, off_t src_length, int dst_fd, off_t dst_offset)
 	{
-		struct btrfs_ioctl_clone_range_args args;
-		memset_zero(&args);
-		args.src_fd = src_fd;
-		args.src_offset = src_offset;
-		args.src_length = src_length;
-		args.dest_offset = dst_offset;
+		btrfs_ioctl_clone_range_args args ( (btrfs_ioctl_clone_range_args) {
+			.src_fd = src_fd,
+			.src_offset = ranged_cast<uint64_t, off_t>(src_offset),
+			.src_length = ranged_cast<uint64_t, off_t>(src_length),
+			.dest_offset = ranged_cast<uint64_t, off_t>(dst_offset),
+		} );
 		DIE_IF_MINUS_ONE(ioctl(dst_fd, BTRFS_IOC_CLONE_RANGE, &args));
 	}
 
@@ -257,10 +264,13 @@ namespace crucible {
 	}
 
 	BtrfsIoctlLogicalInoArgs::BtrfsIoctlLogicalInoArgs(uint64_t new_logical, size_t new_size) :
+		btrfs_ioctl_logical_ino_args( (btrfs_ioctl_logical_ino_args) { } ),
 		m_container_size(new_size),
 		m_container(new_size)
 	{
-		memset_zero<btrfs_ioctl_logical_ino_args>(this);
+		assert(logical == 0);
+		assert(size == 0);
+		assert(flags == 0);
 		logical = new_logical;
 	}
 
@@ -396,9 +406,10 @@ namespace crucible {
 	}
 
 	BtrfsIoctlInoPathArgs::BtrfsIoctlInoPathArgs(uint64_t inode, size_t new_size) :
+		btrfs_ioctl_ino_path_args( (btrfs_ioctl_ino_path_args) { } ),
 		m_container_size(new_size)
 	{
-		memset_zero<btrfs_ioctl_ino_path_args>(this);
+		assert(inum == 0);
 		inum = inode;
 	}
 
@@ -458,9 +469,10 @@ namespace crucible {
 		return os;
 	}
 
-	BtrfsIoctlInoLookupArgs::BtrfsIoctlInoLookupArgs(uint64_t new_objectid)
+	BtrfsIoctlInoLookupArgs::BtrfsIoctlInoLookupArgs(uint64_t new_objectid) :
+		btrfs_ioctl_ino_lookup_args( (btrfs_ioctl_ino_lookup_args) { } )
 	{
-		memset_zero<btrfs_ioctl_ino_lookup_args>(this);
+		assert(objectid == 0);
 		objectid = new_objectid;
 	}
 
@@ -478,9 +490,9 @@ namespace crucible {
 		}
 	}
 
-	BtrfsIoctlDefragRangeArgs::BtrfsIoctlDefragRangeArgs()
+	BtrfsIoctlDefragRangeArgs::BtrfsIoctlDefragRangeArgs() :
+		btrfs_ioctl_defrag_range_args( (btrfs_ioctl_defrag_range_args) { } )
 	{
-		memset_zero<btrfs_ioctl_defrag_range_args>(this);
 	}
 
 	bool
@@ -537,9 +549,9 @@ namespace crucible {
 		return os;
 	}
 
-	FiemapExtent::FiemapExtent()
+	FiemapExtent::FiemapExtent() :
+		fiemap_extent( (fiemap_extent) { } )
 	{
-		memset_zero<fiemap_extent>(this);
 	}
 
 	FiemapExtent::FiemapExtent(const fiemap_extent &that)
@@ -660,14 +672,15 @@ namespace crucible {
 		return os << "\n}";
 	}
 
-	Fiemap::Fiemap(uint64_t start, uint64_t length)
+	Fiemap::Fiemap(uint64_t start, uint64_t length) :
+		fiemap( (fiemap) {
+			.fm_start = start,
+			.fm_length = length,
+			// FIEMAP is slow and full of lies.
+			// This makes FIEMAP even slower, but reduces the lies a little.
+			.fm_flags = FIEMAP_FLAG_SYNC,
+		})
 	{
-		memset_zero<fiemap>(this);
-		fm_start = start;
-		fm_length = length;
-		// FIEMAP is slow and full of lines.
-		// This makes FIEMAP even slower, but reduces the lies a little.
-		fm_flags = FIEMAP_FLAG_SYNC;
 	}
 
 	void
@@ -727,19 +740,20 @@ namespace crucible {
 	}
 
 	BtrfsIoctlSearchKey::BtrfsIoctlSearchKey(size_t buf_size) :
+		btrfs_ioctl_search_key( (btrfs_ioctl_search_key) {
+			.max_objectid = numeric_limits<decltype(max_objectid)>::max(),
+			.max_offset = numeric_limits<decltype(max_offset)>::max(),
+			.max_transid = numeric_limits<decltype(max_transid)>::max(),
+			.max_type = numeric_limits<decltype(max_type)>::max(),
+			.nr_items = 1,
+		}),
 		m_buf_size(buf_size)
 	{
-		memset_zero<btrfs_ioctl_search_key>(this);
-		max_objectid = numeric_limits<decltype(max_objectid)>::max();
-		max_offset = numeric_limits<decltype(max_offset)>::max();
-		max_transid = numeric_limits<decltype(max_transid)>::max();
-		max_type = numeric_limits<decltype(max_type)>::max();
-		nr_items = 1;
 	}
 
-	BtrfsIoctlSearchHeader::BtrfsIoctlSearchHeader()
+	BtrfsIoctlSearchHeader::BtrfsIoctlSearchHeader() :
+		btrfs_ioctl_search_header( (btrfs_ioctl_search_header) { } )
 	{
-		memset_zero<btrfs_ioctl_search_header>(this);
 	}
 
 	size_t
@@ -1084,9 +1098,9 @@ namespace crucible {
 		return rv;
 	}
 
-	Statvfs::Statvfs()
+	Statvfs::Statvfs() :
+		statvfs( (statvfs) { } )
 	{
-		memset_zero<statvfs>(this);
 	}
 
 	Statvfs::Statvfs(int fd) :
@@ -1137,10 +1151,11 @@ namespace crucible {
 		return os << " }";
 	};
 
-	BtrfsIoctlFsInfoArgs::BtrfsIoctlFsInfoArgs()
+	BtrfsIoctlFsInfoArgs::BtrfsIoctlFsInfoArgs() :
+		btrfs_ioctl_fs_info_args_v2( (btrfs_ioctl_fs_info_args_v2) {
+			.flags = BTRFS_FS_INFO_FLAG_CSUM_INFO,
+		})
 	{
-		memset_zero<btrfs_ioctl_fs_info_args_v2>(this);
-		flags = BTRFS_FS_INFO_FLAG_CSUM_INFO;
 	}
 
 	void

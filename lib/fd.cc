@@ -477,9 +477,9 @@ namespace crucible {
 		return pwrite_or_die(fd, text.data(), text.size(), offset);
 	}
 
-	Stat::Stat()
+	Stat::Stat() :
+		stat( (stat) { } )
 	{
-		memset_zero<stat>(this);
 	}
 
 	Stat &
@@ -498,15 +498,15 @@ namespace crucible {
 		return *this;
 	}
 
-	Stat::Stat(int fd)
+	Stat::Stat(int fd) :
+		stat( (stat) { } )
 	{
-		memset_zero<stat>(this);
 		fstat(fd);
 	}
 
-	Stat::Stat(const string &filename)
+	Stat::Stat(const string &filename) :
+		stat( (stat) { } )
 	{
-		memset_zero<stat>(this);
 		lstat(filename);
 	}
 

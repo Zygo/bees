@@ -11,14 +11,6 @@
 namespace crucible {
 	using namespace std;
 
-	// Zero-initialize a base class object (usually a C struct)
-	template <class Base>
-	void
-	memset_zero(Base *that)
-	{
-		memset(that, 0, sizeof(Base));
-	}
-
 	// int->hex conversion with sprintf
 	string to_hex(uint64_t i);
 

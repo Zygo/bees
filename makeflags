@@ -10,4 +10,4 @@ CCFLAGS = -Wall -Wextra -Werror -O3
 CCFLAGS += -I../include -D_FILE_OFFSET_BITS=64
 
 BEES_CFLAGS   = $(CCFLAGS) -std=c99 $(CFLAGS)
-BEES_CXXFLAGS = $(CCFLAGS) -std=c++11 -Wold-style-cast $(CXXFLAGS)
+BEES_CXXFLAGS = $(CCFLAGS) -std=c++11 -Wold-style-cast -Wno-missing-field-initializers $(CXXFLAGS)
