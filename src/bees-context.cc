@@ -332,29 +332,23 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	if (e.flags() & Extent::PREALLOC) {
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
-		Task(
-			"dedup_prealloc",
-			[m_ctx, bfr, e]() {
-				BEESLOGINFO("prealloc extent " << e);
-				// Must not extend past EOF
-				auto extent_size = min(e.end(), bfr.file_size()) - e.begin();
-				// Must hold tmpfile until dedupe is done
-				auto tmpfile = m_ctx->tmpfile();
-				BeesFileRange prealloc_bfr(tmpfile->make_hole(extent_size));
-				// Apparently they can both extend past EOF
-				BeesFileRange copy_bfr(bfr.fd(), e.begin(), e.begin() + extent_size);
-				BeesRangePair brp(prealloc_bfr, copy_bfr);
-				// Raw dedupe here - nothing else to do with this extent, nothing to merge with
-				if (m_ctx->dedup(brp)) {
-					BEESCOUNT(dedup_prealloc_hit);
-					BEESCOUNTADD(dedup_prealloc_bytes, e.size());
-					// return bfr;
-				} else {
-					BEESCOUNT(dedup_prealloc_miss);
-				}
-			}
-		).run();
-		return bfr; // if dedupe success, which we now blindly assume
+		BEESLOGINFO("prealloc extent " << e);
+		// Must not extend past EOF
+		auto extent_size = min(e.end(), bfr.file_size()) - e.begin();
+		// Must hold tmpfile until dedupe is done
+		const auto tmpfile = m_ctx->tmpfile();
+		BeesFileRange prealloc_bfr(tmpfile->make_hole(extent_size));
+		// Apparently they can both extend past EOF
+		BeesFileRange copy_bfr(bfr.fd(), e.begin(), e.begin() + extent_size);
+		BeesRangePair brp(prealloc_bfr, copy_bfr);
+		// Raw dedupe here - nothing else to do with this extent, nothing to merge with
+		if (m_ctx->dedup(brp)) {
+			BEESCOUNT(dedup_prealloc_hit);
+			BEESCOUNTADD(dedup_prealloc_bytes, e.size());
+			return bfr;
+		} else {
+			BEESCOUNT(dedup_prealloc_miss);
+		}
 	}
 
 	// OK we need to read extent now
