@@ -231,17 +231,23 @@ bees_readahead(int const fd, off_t offset, size_t size)
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+#if 1
 	// In the kernel, readahead() is identical to posix_fadvise(..., POSIX_FADV_DONTNEED)
 	DIE_IF_NON_ZERO(readahead(fd, offset, size));
-#if 0
+#else
 	// Make sure this data is in page cache by brute force
-	// This isn't necessary and it might even be slower
+	// This isn't necessary and it might even be slower,
+	// but the btrfs kernel code does readahead with lower ioprio
+	// and might discard the readahead request entirely,
+	// so it's maybe, *maybe*, worth doing both.
 	BEESNOTE("emulating readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	while (size) {
+		// don't care about multithreaded writes to this buffer--it is garbage anyway
 		static uint8_t dummy[BEES_READAHEAD_SIZE];
 		size_t this_read_size = min(size, sizeof(dummy));
-		// Ignore errors and short reads.
-		// It turns out our size parameter isn't all that accurate.
+		// Ignore errors and short reads.  It turns out our size
+		// parameter isn't all that accurate, so we can't use
+		// the pread_or_die template.
 		(void)!pread(fd, dummy, this_read_size, offset);
 		BEESCOUNT(readahead_count);
 		BEESCOUNTADD(readahead_bytes, this_read_size);
