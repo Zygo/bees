@@ -212,6 +212,7 @@ namespace crucible {
 				TaskMasterState::push_front(tq_one);
 			}
 		}
+		assert(queue.empty());
 	}
 
 	TaskState::~TaskState()
@@ -292,23 +293,23 @@ namespace crucible {
 			--m_run_count;
 			m_is_running = true;
 		}
+
+		TaskStatePtr this_task = shared_from_this();
+		swap(this_task, tl_current_task);
 		lock.unlock();
 
 		char buf[24] = { 0 };
 		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
 		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
 
-		TaskStatePtr this_task = shared_from_this();
-		swap(this_task, tl_current_task);
-
 		catch_all([&]() {
 			m_exec_fn();
 		});
 
-		swap(this_task, tl_current_task);
 		pthread_setname_np(pthread_self(), buf);
 
 		lock.lock();
+		swap(this_task, tl_current_task);
 		m_is_running = false;
 
 		// Splice task post_exec queue at front of local queue
@@ -755,6 +756,7 @@ namespace crucible {
 		// There is no longer a current consumer, but hold our own shared
 		// state so it's still there in the destructor
 		swap(this_consumer, tl_current_consumer);
+		assert(!tl_current_consumer);
 
 		// Release lock to rescue queue (may attempt to queue a new task at TaskMaster).
 		// rescue_queue normally sends tasks to the local queue of the current TaskConsumer thread,
