@@ -40,16 +40,16 @@
 
 * `--scan-mode MODE` or `-m`
 
- Specify extent scanning algorithm.  Default `MODE` is 0.
+ Specify extent scanning algorithm.  Default `MODE` is 3.
  **EXPERIMENTAL** feature that may go away.
 
-  * Mode 0: scan extents in ascending order of (inode, subvol, offset).
-  Keeps shared extents between snapshots together.  Reads files sequentially.
-  Minimizes temporary space usage.
-  * Mode 1: scan extents from all subvols in parallel.  Good performance
-  on non-spinning media when subvols are unrelated.
-  * Mode 2: scan all extents from one subvol at a time.  Good sequential
-  read performance for spinning media.  Maximizes temporary space usage.
+  * Mode 0: lockstep
+  * Mode 1: independent
+  * Mode 2: sequential
+  * Mode 3: recent
+
+ For details of the different scanning modes, see
+ [bees configuration](docs/config.md).
 
 ## Workarounds
 

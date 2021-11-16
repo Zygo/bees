@@ -94,38 +94,76 @@ every time a new client machine's data is added to the server.
 Scanning modes for multiple subvols
 -----------------------------------
 
-The `--scan-mode` option affects how bees divides resources between
-subvolumes.  This is particularly relevant when there are snapshots,
-as there are tradeoffs to be made depending on how snapshots are used
-on the filesystem.
+The `--scan-mode` option affects how bees schedules worker threads
+between subvolumes.  Scan modes are an experimental feature and will
+likely be deprecated in favor of a better solution.
 
-Note that if a filesystem has only one subvolume (i.e. the root,
-subvol ID 5) then the `--scan-mode` option has no effect, as there is
-only one subvolume to scan.
+Scan mode can be changed at any time by restarting bees with a different
+mode option.  Scan state tracking is the same for all of the currently
+implemented modes.  The difference between the modes is the order in
+which subvols are selected.
 
-The default mode is mode 0, "lockstep".  In this mode, each inode of each
-subvol is scanned at the same time, before moving to the next inode in
-each subvol.  This maximizes the likelihood that all of the references to
-a snapshot of a file are scanned at the same time, which takes advantage
-of VFS caching in the Linux kernel.  If snapshots are created very often,
-bees will not make very good progress as it constantly restarts the
-filesystem scan from the beginning each time a new snapshot is created.
+If a filesystem has only one subvolume with data in it, then the
+`--scan-mode` option has no effect.  In this case, there is only one
+subvolume to scan, so worker threads will all scan that one.
 
-Scan mode 1, "independent", simply scans every subvol independently
-in parallel.  Each subvol's scanner shares time equally with all other
-subvol scanners.  Whenever a new subvol appears, a new scanner is
-created and the new subvol scanner doesn't affect the behavior of any
-existing subvol scanner.
+Within a subvol, there is a single optimal scan order:  files are scanned
+in ascending numerical inode order.  Each worker will scan a different
+inode to avoid having the threads contend with each other for locks.
+File data is read sequentially and in order, but old blocks from earlier
+scans are skipped.
 
-Scan mode 2, "sequential", processes each subvol completely before
-proceeding to the next subvol.  This is a good mode when using bees for
-the first time on a filesystem that already has many existing snapshots
-and a high rate of new snapshot creation.  Short-lived snapshots
-(e.g. those used for `btrfs send`) are effectively ignored, and bees
-directs its efforts toward older subvols that are more likely to be
-origin subvols for snapshots.  By deduping origin subvols first, bees
-ensures that future snapshots will already be deduplicated and do not
-need to be deduplicated again.
+Between subvols, there are several scheduling algorithms with different
+trade-offs:
+
+Scan mode 0, "lockstep", scans the same inode number in each subvol at
+close to the same time.  This is useful if the subvols are snapshots
+with a common ancestor, since the same inode number in each subvol will
+have similar or identical contents.  This maximizes the likelihood
+that all of the references to a snapshot of a file are scanned at
+close to the same time, improving dedupe hit rate and possibly taking
+advantage of VFS caching in the Linux kernel.  If the subvols are
+unrelated (i.e. not snapshots of a single subvol) then this mode does
+not provide significant benefit over random selection.  This mode uses
+smaller amounts of temporary space for shorter periods of time when most
+subvols are snapshots.  When a new snapshot is created, this mode will
+stop scanning other subvols and scan the new snapshot until the same
+inode number is reached in each subvol, which will effectively stop
+dedupe temporarily as this data has already been scanned and deduped
+in the other snapshots.
+
+Scan mode 1, "independent", scans the next inode with new data in each
+subvol.  Each subvol's scanner shares inodes uniformly with all other
+subvol scanners until the subvol has no new inodes left.  This mode makes
+continuous forward progress across the filesystem and provides average
+performance across a variety of workloads, but is slow to respond to new
+data, and may spend a lot of time deduping short-lived subvols that will
+soon be deleted when it is preferable to dedupe long-lived subvols that
+will be the origin of future snapshots.  When a new snapshot is created,
+previous subvol scans continue as before, but the time is now divided
+among one more subvol.
+
+Scan mode 2, "sequential", scans one subvol at a time, in numerical subvol
+ID order, processing each subvol completely before proceeding to the
+next subvol.  This avoids spending time scanning short-lived snapshots
+that will be deleted before they can be fully deduped (e.g. those used
+for `btrfs send`).  Scanning is concentrated on older subvols that are
+more likely to be origin subvols for future snapshots, eliminating the
+need to dedupe future snapshots separately.  This mode uses the largest
+amount of temporary space for the longest time, and typically requires
+a larger hash table to maintain dedupe hit rate.
+
+Scan mode 3, "recent", scans the subvols with the highest `min_transid`
+value first (i.e. the ones that were most recently completely scanned),
+then the highest `max_transid` (i.e. the ones that were created later),
+then falls back to "independent" mode to break ties.  This interrupts
+long scans of old subvols to give a rapid dedupe response to new data,
+then returns to the old subvols after the new data is scanned.  It is
+useful for large filesystems with multiple active subvols and rotating
+snapshots, where the first-pass scan can take months, but new duplicate
+data appears every day.
+
+The default scan mode is 1, "independent".
 
 If you are using bees for the first time on a filesystem with many
 existing snapshots, you should read about [snapshot gotchas](gotchas.md).
