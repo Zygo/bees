@@ -13,7 +13,6 @@
 #include "crucible/time.h"
 #include "crucible/task.h"
 
-#include <atomic>
 #include <functional>
 #include <list>
 #include <mutex>
@@ -21,8 +20,8 @@
 #include <random>
 #include <thread>
 
-#include <syslog.h>
 #include <endian.h>
+#include <syslog.h>
 
 using namespace crucible;
 using namespace std;
