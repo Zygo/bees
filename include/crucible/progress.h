@@ -20,8 +20,8 @@ namespace crucible {
 		using ProgressHolder = shared_ptr<ProgressHolderState>;
 
 		ProgressTracker(const value_type &v);
-		value_type begin();
-		value_type end();
+		value_type begin() const;
+		value_type end() const;
 
 		ProgressHolder hold(const value_type &v);
 
@@ -51,7 +51,7 @@ namespace crucible {
 
 	template <class T>
 	typename ProgressTracker<T>::value_type
-	ProgressTracker<T>::begin()
+	ProgressTracker<T>::begin() const
 	{
 		unique_lock<mutex> lock(m_state->m_mutex);
 		return m_state->m_begin;
@@ -59,7 +59,7 @@ namespace crucible {
 
 	template <class T>
 	typename ProgressTracker<T>::value_type
-	ProgressTracker<T>::end()
+	ProgressTracker<T>::end() const
 	{
 		unique_lock<mutex> lock(m_state->m_mutex);
 		return m_state->m_end;
