@@ -134,7 +134,7 @@ ulimit -c 0
 
 # If there were core files, generate reports for them
 for x in core*; do
-	if [ -e "$x" ]; then 
+	if [ -e "$x" ]; then
 		gdb --core="$x" \
 		--eval-command='set pagination off' \
 		--eval-command='info shared' \
