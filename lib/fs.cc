@@ -812,7 +812,7 @@ namespace crucible {
 	BtrfsIoctlSearchKey::do_ioctl(int fd)
 	{
 		if (!do_ioctl_nothrow(fd)) {
-			THROW_ERRNO("BTRFS_IOC_TREE_SEARCH_V2: " << name_fd(fd));
+			THROW_ERRNO("BTRFS_IOC_TREE_SEARCH_V2: " << name_fd(fd) << ": " << *this);
 		}
 	}
 
