@@ -408,6 +408,8 @@ BeesRoots::crawl_roots()
 	}
 
 	// Now we insert some number of crawl batches into the task queue
+	BEESNOTE("Scanning roots in " << scan_mode_ntoa(m_scan_mode) << " mode");
+	BEESTRACE("scanning roots in " << scan_mode_ntoa(m_scan_mode) << " mode");
 	switch (m_scan_mode) {
 
 		case SCAN_MODE_LOCKSTEP: {
@@ -1124,7 +1126,7 @@ BeesCrawl::fetch_extents()
 		// We immediately defer further crawling on this subvol.
 		// We track max_transid if the subvol scan has never started.
 		// We postpone the started timestamp since we haven't started.
-		auto crawl_state = get_state_end();
+		auto crawl_state = old_state;
 		if (crawl_state.m_objectid == 0) {
 			// This will keep the max_transid up to date so if the root
 			// is ever switched back to read-write, it won't trigger big
@@ -1146,7 +1148,7 @@ BeesCrawl::fetch_extents()
 		return false;
 	}
 
-	BEESNOTE("crawling " << get_state_end());
+	BEESNOTE("crawling " << old_state);
 
 	// Find an extent data item in this subvol in the transid range
 	BEESTRACE("looking for new objects " << old_state);
