@@ -1077,6 +1077,7 @@ BeesCrawl::next_transid()
 
 	if (m_finished) {
 		m_deferred = true;
+		BEESLOGINFO("Crawl finished " << crawl_state);
 	} else {
 		// Log performance stats from the old crawl
 		const auto current_time = time(NULL);
@@ -1110,7 +1111,6 @@ BeesCrawl::fetch_extents()
 
 	// We can't scan an empty transid interval.
 	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
-		BEESTRACE("Crawl finished " << get_state_end());
 		return next_transid();
 	}
 
@@ -1162,6 +1162,8 @@ BeesCrawl::fetch_extents()
 		return false;
 	}
 	if (!m_next_extent_data) {
+		// Ran out of data in this subvol and transid.
+		// Try to restart immediately if more transids are available.
 		return next_transid();
 	}
 	auto new_state = old_state;
