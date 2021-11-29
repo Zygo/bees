@@ -604,7 +604,7 @@ public:
 	void set_workaround_btrfs_send(bool do_avoid);
 
 private:
-	ScanMode m_scan_mode = SCAN_MODE_INDEPENDENT;
+	ScanMode m_scan_mode = SCAN_MODE_COUNT; // must be set
 	static string scan_mode_ntoa(ScanMode new_mode);
 
 };
