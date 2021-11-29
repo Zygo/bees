@@ -31,20 +31,18 @@ help(){
     exec "$bees_bin" --help
 }
 
-get_bees_supp_opts(){
-    "$bees_bin" --help |& awk '/--../ { gsub( ",", "" ); print $1 " " $2}'
-}
-
-SUPPORTED_ARGS=(
-    $(get_bees_supp_opts)
-)
+for i in $(/usr/lib/bees/bees --help 2>&1 | grep "\-\-" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
+do
+   TMP_ARGS="$TMP_ARGS $i"
+done
+IFS=" " read -r -a SUPPORTED_ARGS <<< $TMP_ARGS
 NOT_SUPPORTED_ARGS=()
 ARGUMENTS=()
 
 for arg in "${@}"; do
     supp=false
     for supp_arg in "${SUPPORTED_ARGS[@]}"; do
-        if [ "$arg" == "$supp_arg" ]; then
+        if [[ "$arg" == ${supp_arg}* ]]; then
             supp=true
             break
         fi
