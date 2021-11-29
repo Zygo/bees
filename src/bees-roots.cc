@@ -57,6 +57,7 @@ BeesRoots::scan_mode_ntoa(BeesRoots::ScanMode mode)
 		{ .n = SCAN_MODE_LOCKSTEP, .mask = ~0ULL, .a = "lockstep" },
 		{ .n = SCAN_MODE_INDEPENDENT, .mask = ~0ULL, .a = "independent" },
 		{ .n = SCAN_MODE_SEQUENTIAL, .mask = ~0ULL, .a = "sequential" },
+		{ .n = SCAN_MODE_RECENT, .mask = ~0ULL, .a = "recent" },
 		NTOA_TABLE_ENTRY_END()
 	};
 	return bits_ntoa(mode, table);
@@ -480,7 +481,48 @@ BeesRoots::crawl_roots()
 			break;
 		}
 
-		case SCAN_MODE_COUNT: assert(false); break;
+		case SCAN_MODE_RECENT: {
+			// Scan highest min_transid first, then oldest, then lockstep
+			using crawl_tuple = shared_ptr<BeesCrawl>;
+			vector<crawl_tuple> crawl_vector;
+			for (const auto &i : crawl_map_copy) {
+				crawl_vector.push_back(i.second);
+			}
+			sort(crawl_vector.begin(), crawl_vector.end(), [&](const crawl_tuple &a, const crawl_tuple &b) {
+				const auto a_state = a->get_state_end();
+				const auto b_state = b->get_state_end();
+				return tie(
+					b_state.m_min_transid,
+					a_state.m_started,
+					a_state.m_objectid,
+					a_state.m_root,
+					a_state.m_offset
+				) < tie(
+					a_state.m_min_transid,
+					b_state.m_started,
+					b_state.m_objectid,
+					b_state.m_root,
+					b_state.m_offset
+				);
+			});
+			size_t count = 0;
+			for (const auto &i : crawl_vector) {
+				++count;
+				BEESNOTE("crawling " << count << " of " << crawl_vector.size() << " roots in recent order");
+				const auto batch_count = crawl_batch(i);
+
+				if (batch_count) {
+					return true;
+				}
+			}
+
+			break;
+		}
+
+		case SCAN_MODE_COUNT:
+		default:
+			assert(false);
+			break;
 	}
 
 	BEESNOTE("Crawl done");
