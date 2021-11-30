@@ -45,7 +45,7 @@ bees will loop billions of times considering all possibilities.  This is
 a waste of time, so an exception is currently used to break out of such
 loops early.  The exception text in this case is:
 
-	`FIXME: bailing out here, need to fix this further up the call stack`
+	`FIXME: too many duplicate candidates, bailing out here`
 
 
 Terminating bees with SIGTERM

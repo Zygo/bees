@@ -418,7 +418,7 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
 			BEESCOUNT(replacedst_same);
 			// stop looping here, all the other srcs will probably fail this test too
 			BeesTracer::set_silent();
-			throw runtime_error("FIXME: bailing out here, need to fix this further up the call stack");
+			throw runtime_error("FIXME: too many duplicate candidates, bailing out here");
 		}
 
 		// Make pair(src, dst)
