@@ -100,12 +100,6 @@ const size_t BEES_MAX_EXTENT_REF_COUNT = (16 * 1024 * 1024 / 24) - 1;
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 
-// Stop growing the work queue after we have this many tasks queued
-const size_t BEES_MAX_QUEUE_SIZE = 128;
-
-// Insert this many items before switching to a new subvol
-const size_t BEES_MAX_CRAWL_BATCH = 128;
-
 // Wait this many transids between crawls
 const size_t BEES_TRANSID_FACTOR = 10;
 
@@ -509,24 +503,27 @@ class BeesCrawl {
 	shared_ptr<BeesContext>			m_ctx;
 
 	mutex					m_mutex;
-	set<BeesFileRange>			m_extents;
+	BtrfsTreeItem				m_next_extent_data;
 	bool					m_deferred = false;
 	bool					m_finished = false;
 
 	mutex					m_state_mutex;
 	ProgressTracker<BeesCrawlState>		m_state;
 
+	BtrfsTreeObjectFetcher			m_btof;
+
 	bool fetch_extents();
 	void fetch_extents_harder();
 	bool next_transid();
+	BeesFileRange bti_to_bfr(const BtrfsTreeItem &bti) const;
 
 public:
 	BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state);
 	BeesFileRange peek_front();
 	BeesFileRange pop_front();
-	ProgressTracker<BeesCrawlState>::ProgressHolder hold_state(const BeesFileRange &bfr);
+	ProgressTracker<BeesCrawlState>::ProgressHolder hold_state(const BeesCrawlState &bcs);
 	BeesCrawlState get_state_begin();
-	BeesCrawlState get_state_end();
+	BeesCrawlState get_state_end() const;
 	void set_state(const BeesCrawlState &bcs);
 	void deferred(bool def_setting);
 };
@@ -574,7 +571,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	uint64_t next_root(uint64_t root = 0);
 	void current_state_set(const BeesCrawlState &bcs);
 	RateEstimator& transid_re();
-	size_t crawl_batch(shared_ptr<BeesCrawl> crawl);
+	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
 	void insert_tmpfile(Fd fd);
 	void erase_tmpfile(Fd fd);

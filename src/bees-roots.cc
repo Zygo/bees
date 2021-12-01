@@ -16,7 +16,7 @@ using namespace std;
 string
 format_time(time_t t)
 {
-	struct tm *tmp = localtime(&t);
+	const struct tm *const tmp = localtime(&t);
 	char buf[1024];
 	strftime(buf, sizeof(buf), "%Y-%m-%d-%H-%M-%S", tmp);
 	return buf;
@@ -25,8 +25,8 @@ format_time(time_t t)
 ostream &
 operator<<(ostream &os, const BeesCrawlState &bcs)
 {
-	time_t now = time(NULL);
-	auto age = now - bcs.m_started;
+	const time_t now = time(NULL);
+	const auto age = now - bcs.m_started;
 	return os << "BeesCrawlState "
 		<< bcs.m_root << ":" << bcs.m_objectid << " offset " << to_hex(bcs.m_offset)
 		<< " transid " << bcs.m_min_transid << ".." << bcs.m_max_transid
@@ -221,34 +221,163 @@ BeesRoots::transid_max()
 	return m_transid_re.count();
 }
 
-size_t
-BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
+struct BeesFileCrawl {
+	shared_ptr<BeesContext>				m_ctx;
+	shared_ptr<BeesCrawl>				m_crawl;
+	shared_ptr<BeesRoots>				m_roots;
+	/// Progress tracker hold object
+	ProgressTracker<BeesCrawlState>::ProgressHolder m_hold;
+	/// Crawl state snapshot when created
+	BeesCrawlState					m_state;
+	/// Currently processed offset in file
+	off_t						m_offset;
+	/// Btrfs file fetcher
+	BtrfsExtentDataFetcher				m_bedf;
+
+	/// Method that does one unit of work for the Task
+	bool crawl_one_extent();
+};
+
+bool
+BeesFileCrawl::crawl_one_extent()
 {
-	BEESNOTE("Crawling batch " << this_crawl->get_state_begin());
-	BEESTRACE("Crawling batch " << this_crawl->get_state_begin());
-	auto ctx_copy = m_ctx;
-	size_t batch_count = 0;
-	auto subvol = this_crawl->get_state_begin().m_root;
-	ostringstream oss;
-	oss << "crawl_" << subvol;
-	auto task_title = oss.str();
-	while (batch_count < BEES_MAX_CRAWL_BATCH) {
-		auto this_range = this_crawl->pop_front();
-		if (!this_range) {
+	BEESNOTE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
+	BEESTRACE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
+	// If we hit an exception here we don't try to catch it.
+	// It will mean the file or subvol was deleted or there's metadata corruption,
+	// and we should stop trying to scan the inode in that case.
+	// The calling Task will be aborted.
+	const auto bti = m_bedf.lower_bound(m_offset);
+	if (!bti) {
+		return false;
+	}
+	// Make sure we advance
+	m_offset = max(bti.offset() + m_bedf.block_size(), bti.offset());
+	// Check extent item generation is in range
+	const auto gen = bti.file_extent_generation();
+	if (gen < m_state.m_min_transid) {
+		BEESCOUNT(crawl_gen_low);
+		// The header generation refers to the transid
+		// of the metadata page holding the current ref.
+		// This includes anything else in that page that
+		// happened to be modified, regardless of how
+		// old it is.
+		// The file_extent_generation refers to the
+		// transid of the extent item's page, which is
+		// what we really want when we are slicing up
+		// the extent data by transid.
+		return true;
+	}
+	if (gen > m_state.m_max_transid) {
+		BEESCOUNT(crawl_gen_high);
+		// We want to see old extents with references in
+		// new pages, which means we have to get extent
+		// refs from every page older than min_transid,
+		// not every page between min_transid and
+		// max_transid.  This means that we will get
+		// refs to new extent data that we don't want to
+		// process yet, because we'll process it again
+		// on the next crawl cycle.  We filter out refs
+		// to new extents here.
+		return true;
+	}
+
+	const auto type = bti.file_extent_type();
+	switch (type) {
+		default:
+			BEESLOGDEBUG("Unhandled file extent type " << btrfs_search_type_ntoa(type) << " in root " << m_state.m_root << " " << bti);
+			BEESCOUNT(crawl_unknown);
+			break;
+		case BTRFS_FILE_EXTENT_INLINE:
+			// Ignore these for now.
+			// TODO:  replace with out-of-line dup extents
+			BEESCOUNT(crawl_inline);
+			break;
+		case BTRFS_FILE_EXTENT_PREALLOC:
+			BEESCOUNT(crawl_prealloc);
+			// fallthrough
+		case BTRFS_FILE_EXTENT_REG: {
+			const auto physical = bti.file_extent_bytenr();
+			const auto len = bti.file_extent_logical_bytes();
+			BEESTRACE("Root " << m_state.m_root << " ino " << bti.objectid() << " physical " << to_hex(physical)
+				<< " logical " << to_hex(bti.offset()) << ".." << to_hex(bti.offset() + len)
+				<< " gen " << gen);
+			if (physical) {
+				THROW_CHECK1(runtime_error, len, len > 0);
+				BeesFileId bfi(m_state.m_root, bti.objectid());
+				if (m_ctx->is_blacklisted(bfi)) {
+					BEESCOUNT(crawl_blacklisted);
+				} else {
+					BeesFileRange bfr(bfi, bti.offset(), bti.offset() + len);
+					BEESCOUNT(crawl_push);
+					auto bcs = m_state;
+					bcs.m_objectid = bfr.fid().ino();
+					bcs.m_offset = bfr.begin();
+					const auto new_holder = m_crawl->hold_state(bcs);
+					// If we hit an exception here, ignore it.
+					// It might be corrupted data, the file might have been deleted or truncated,
+					// or we might hit some other recoverable error.  We'll try again with
+					// the next extent.
+					catch_all([&]() {
+						BEESNOTE("scan_forward " << bfr);
+						// BEESLOGDEBUG("scan_forward #" << Task::current_task().id() << " " << bfr);
+						m_ctx->scan_forward(bfr);
+						// BEESLOGDEBUG("done_forward #" << Task::current_task().id() << " " << bfr);
+					} );
+					m_hold = new_holder;
+				}
+			} else {
+				BEESCOUNT(crawl_hole);
+			}
 			break;
 		}
-		auto this_hold = this_crawl->hold_state(this_range);
-		auto shared_this_copy = shared_from_this();
-		BEESNOTE("Starting task " << this_range);
-		Task(task_title, [ctx_copy, this_hold, this_range, shared_this_copy]() {
-			BEESNOTE("scan_forward " << this_range);
-			ctx_copy->scan_forward(this_range);
-			shared_this_copy->crawl_state_set_dirty();
-		}).run();
-		BEESCOUNT(crawl_scan);
-		++batch_count;
 	}
-	return batch_count;
+	return true;
+}
+
+bool
+BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
+{
+	const auto this_state = this_crawl->get_state_end();
+	BEESNOTE("Crawling batch " << this_state);
+	BEESTRACE("Crawling batch " << this_state);
+	const auto this_range = this_crawl->pop_front();
+	if (!this_range) {
+		return false;
+	}
+	const auto subvol = this_range.fid().root();
+	const auto inode = this_range.fid().ino();
+	ostringstream oss;
+	oss << "crawl_" << subvol << "_" << inode;
+	const auto task_title = oss.str();
+	const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
+		.m_ctx = m_ctx,
+		.m_crawl = this_crawl,
+		.m_roots = shared_from_this(),
+		.m_hold = this_crawl->hold_state(this_state),
+		.m_state = this_state,
+		.m_offset = this_range.begin(),
+		.m_bedf = BtrfsExtentDataFetcher(m_ctx->root_fd()),
+	});
+	bfc->m_bedf.tree(subvol);
+	bfc->m_bedf.objectid(inode);
+	bfc->m_bedf.transid(this_state.m_min_transid);
+	BEESNOTE("Starting task " << this_range);
+	Task(task_title, [bfc]() {
+		BEESNOTE("crawl_batch " << bfc->m_hold->get());
+		if (bfc->crawl_one_extent()) {
+			// Append the current task to itself to make
+			// sure we keep a worker processing this file
+			Task::current_task().append(Task::current_task());
+		}
+	}).run();
+	auto next_state = this_state;
+	// Skip to EOF.  Will repeat up to 16 times if there happens to be an extent at 16EB,
+	// which would be a neat trick given that off64_t is signed.
+	next_state.m_offset = max(next_state.m_offset, numeric_limits<uint64_t>::max() - 65536 + 1);
+	this_crawl->set_state(next_state);
+	BEESCOUNT(crawl_scan);
+	return true;
 }
 
 bool
@@ -258,7 +387,7 @@ BeesRoots::crawl_roots()
 
 	unique_lock<mutex> lock(m_mutex);
 	// Work from a copy because BeesCrawl might change the world under us
-	auto crawl_map_copy = m_root_crawl_map;
+	const auto crawl_map_copy = m_root_crawl_map;
 	lock.unlock();
 
 	// Nothing to crawl?  Seems suspicious...
@@ -266,15 +395,16 @@ BeesRoots::crawl_roots()
 		BEESLOGINFO("idle: crawl map is empty!");
 	}
 
+	// Now we insert some number of crawl batches into the task queue
 	switch (m_scan_mode) {
 
 		case SCAN_MODE_LOCKSTEP: {
 			// Scan the same inode/offset tuple in each subvol (bad for locking)
 			BeesFileRange first_range;
 			shared_ptr<BeesCrawl> first_crawl;
-			for (auto i : crawl_map_copy) {
-				auto this_crawl = i.second;
-				auto this_range = this_crawl->peek_front();
+			for (const auto &i : crawl_map_copy) {
+				const auto this_crawl = i.second;
+				const auto this_range = this_crawl->peek_front();
 				if (this_range) {
 					// Use custom ordering here to avoid abusing BeesFileRange::operator<().
 					if (!first_range ||
@@ -291,7 +421,7 @@ BeesRoots::crawl_roots()
 				return false;
 			}
 
-			auto batch_count = crawl_batch(first_crawl);
+			const auto batch_count = crawl_batch(first_crawl);
 
 			if (batch_count) {
 				return true;
@@ -310,7 +440,6 @@ BeesRoots::crawl_roots()
 			if (batch_count) {
 				return true;
 			}
-
 			break;
 		}
 
@@ -321,14 +450,14 @@ BeesRoots::crawl_roots()
 				crawl_vector.push_back(i.second);
 			}
 			sort(crawl_vector.begin(), crawl_vector.end(), [&](const shared_ptr<BeesCrawl> &a, const shared_ptr<BeesCrawl> &b) -> bool {
-				auto a_state = a->get_state_end();
-				auto b_state = b->get_state_end();
+				const auto a_state = a->get_state_end();
+				const auto b_state = b->get_state_end();
 				return tie(a_state.m_started, a_state.m_root) < tie(b_state.m_started, b_state.m_root);
 			});
 
-			size_t batch_count = 0;
-			for (auto i : crawl_vector) {
-				batch_count += crawl_batch(i);
+			for (const auto &i : crawl_vector) {
+				const auto batch_count = crawl_batch(i);
+
 				if (batch_count) {
 					return true;
 				}
@@ -345,7 +474,7 @@ BeesRoots::crawl_roots()
 
 	auto want_transid = m_transid_re.count() + m_transid_factor;
 	auto ran_out_time = m_crawl_timer.lap();
-	BEESLOGINFO("Crawl master ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
+	BEESLOGINFO("Crawl more ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
 
 	// Do not run again
 	return false;
@@ -363,15 +492,10 @@ BeesRoots::crawl_thread()
 	BEESNOTE("creating crawl task");
 
 	// Create the Task that does the crawling
-	auto shared_this = shared_from_this();
-	m_crawl_task = Task("crawl_master", [shared_this]() {
-		auto tqs = TaskMaster::get_queue_count();
-		BEESNOTE("queueing extents to scan, " << tqs << " of " << BEES_MAX_QUEUE_SIZE);
-		bool run_again = true;
-		while (tqs < BEES_MAX_QUEUE_SIZE && run_again) {
-			run_again = shared_this->crawl_roots();
-			tqs = TaskMaster::get_queue_count();
-		}
+	const auto shared_this = shared_from_this();
+	m_crawl_task = Task("crawl_more", [shared_this]() {
+		BEESTRACE("crawl_more " << shared_this);
+		const auto run_again = shared_this->crawl_roots();
 		if (run_again) {
 			shared_this->m_crawl_task.run();
 		}
@@ -403,7 +527,7 @@ BeesRoots::crawl_thread()
 		}
 		last_count = new_count;
 
-		// If no crawl task is running, start a new one
+		// If crawl_more stopped running (i.e. ran out of data), start it up again
 		m_crawl_task.run();
 
 		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
@@ -919,8 +1043,12 @@ BeesRoots::erase_tmpfile(Fd fd)
 
 BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) :
 	m_ctx(ctx),
-	m_state(initial_state)
+	m_state(initial_state),
+	m_btof(ctx->root_fd())
 {
+	m_btof.scale_size(1);
+	m_btof.tree(initial_state.m_root);
+	m_btof.type(BTRFS_EXTENT_DATA_KEY);
 }
 
 bool
@@ -957,14 +1085,14 @@ BeesCrawl::next_transid()
 bool
 BeesCrawl::fetch_extents()
 {
-	THROW_CHECK1(runtime_error, m_extents.size(), m_extents.empty());
-
+	BEESTRACE("fetch_extents " << get_state_end());
+	BEESNOTE("fetch_extents " << get_state_end());
 	// insert_root will undefer us.  Until then, nothing.
 	if (m_deferred) {
 		return false;
 	}
 
-	auto old_state = get_state_end();
+	const auto old_state = get_state_end();
 
 	// We can't scan an empty transid interval.
 	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
@@ -972,55 +1100,12 @@ BeesCrawl::fetch_extents()
 		return next_transid();
 	}
 
-	BEESNOTE("crawling " << get_state_end());
-
-	Timer crawl_timer;
-
-	BtrfsIoctlSearchKey sk;
-	sk.tree_id = old_state.m_root;
-	sk.min_objectid = old_state.m_objectid;
-	sk.min_type = sk.max_type = BTRFS_EXTENT_DATA_KEY;
-	sk.min_offset = old_state.m_offset;
-	sk.min_transid = old_state.m_min_transid;
-	// Don't set max_transid to m_max_transid here.	 See below.
-	sk.max_transid = numeric_limits<uint64_t>::max();
-	sk.nr_items = 4;
-
-	// Lock in the old state
-	set_state(old_state);
-
-	BEESTRACE("Searching crawl sk " << sk);
-	bool ioctl_ok = false;
-	{
-		BEESNOTE("searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
-		BEESTOOLONG("Searching crawl sk " << static_cast<btrfs_ioctl_search_key&>(sk));
-		Timer crawl_timer;
-		ioctl_ok = sk.do_ioctl_nothrow(m_ctx->root_fd());
-		BEESCOUNTADD(crawl_ms, crawl_timer.age() * 1000);
-	}
-
-	if (ioctl_ok) {
-		BEESCOUNT(crawl_search);
-	} else {
-		BEESLOGWARN("Search ioctl(" << sk << ") failed: " << strerror(errno));
-		BEESCOUNT(crawl_fail);
-	}
-
-	if (!ioctl_ok || sk.m_result.empty()) {
-		BEESCOUNT(crawl_empty);
-		BEESLOGINFO("Crawl finished " << get_state_end());
-		return next_transid();
-	}
-
 	// Check for btrfs send workaround: don't scan RO roots at all, pretend
 	// they are just empty.  We can't free any space there, and we
 	// don't have the necessary analysis logic to be able to use
 	// them as dedupe src extents (yet).
-	bool ro_root = true;
-	catch_all([&](){
-		ro_root = m_ctx->is_root_ro(old_state.m_root);
-	});
-	if (ro_root) {
+	BEESTRACE("is_root_ro(" << old_state.m_root << ")");
+	if (m_ctx->is_root_ro(old_state.m_root)) {
 		BEESLOGDEBUG("WORKAROUND: skipping scan of RO root " << old_state.m_root);
 		BEESCOUNT(root_workaround_btrfs_send);
 		// We would call next_transid() here, but we want to do a few things differently.
@@ -1049,129 +1134,36 @@ BeesCrawl::fetch_extents()
 		return false;
 	}
 
-	// BEESLOGINFO("Crawling " << sk.m_result.size() << " results from " << get_state_end());
-	auto results_left = sk.m_result.size();
-	BEESNOTE("crawling " << results_left << " results from " << get_state_end());
-	size_t count_other = 0;
-	size_t count_inline = 0;
-	size_t count_unknown = 0;
-	size_t count_data = 0;
-	size_t count_low = 0;
-	size_t count_high = 0;
-	BeesFileRange last_bfr;
-	for (auto i : sk.m_result) {
-		sk.next_min(i, BTRFS_EXTENT_DATA_KEY);
-		--results_left;
-		BEESCOUNT(crawl_items);
+	BEESNOTE("crawling " << get_state_end());
 
-		BEESTRACE("i = " << i);
-
-		// We need the "+ 1" and objectid rollover that next_min does.
-		auto new_state = get_state_end();
-		new_state.m_objectid = sk.min_objectid;
-		new_state.m_offset = sk.min_offset;
-
-		// Saving state here means we can skip a search result
-		// if we are interrupted.  Not saving state here means we
-		// can fail to make forward progress in cases where there
-		// is a lot of metadata we can't process.  Favor forward
-		// progress over losing search results.
-		set_state(new_state);
-
-		// Ignore things that aren't EXTENT_DATA_KEY
-		if (i.type != BTRFS_EXTENT_DATA_KEY) {
-			++count_other;
-			BEESCOUNT(crawl_nondata);
-			continue;
-		}
-
-		auto gen = btrfs_get_member(&btrfs_file_extent_item::generation, i.m_data);
-		if (gen < get_state_end().m_min_transid) {
-			BEESCOUNT(crawl_gen_low);
-			++count_low;
-			// The header generation refers to the transid
-			// of the metadata page holding the current ref.
-			// This includes anything else in that page that
-			// happened to be modified, regardless of how
-			// old it is.
-			// The file_extent_generation refers to the
-			// transid of the extent item's page, which is
-			// what we really want when we are slicing up
-			// the extent data by transid.
-			continue;
-		}
-		if (gen > get_state_end().m_max_transid) {
-			BEESCOUNT(crawl_gen_high);
-			++count_high;
-			// We want to see old extents with references in
-			// new pages, which means we have to get extent
-			// refs from every page older than min_transid,
-			// not every page between min_transid and
-			// max_transid.  This means that we will get
-			// refs to new extent data that we don't want to
-			// process yet, because we'll process it again
-			// on the next crawl cycle.  We filter out refs
-			// to new extents here.
-			continue;
-		}
-
-		auto type = btrfs_get_member(&btrfs_file_extent_item::type, i.m_data);
-		switch (type) {
-			default:
-				BEESLOGDEBUG("Unhandled file extent type " << type << " in root " << get_state_end().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
-				++count_unknown;
-				BEESCOUNT(crawl_unknown);
-				break;
-			case BTRFS_FILE_EXTENT_INLINE:
-				// Ignore these for now.
-				// BEESLOGDEBUG("Ignored file extent type INLINE in root " << get_state_end().m_root << " ino " << i.objectid << " offset " << to_hex(i.offset));
-				++count_inline;
-				// TODO:  replace with out-of-line dup extents
-				BEESCOUNT(crawl_inline);
-				break;
-			case BTRFS_FILE_EXTENT_PREALLOC:
-				BEESCOUNT(crawl_prealloc);
-				// fallthrough
-			case BTRFS_FILE_EXTENT_REG: {
-				auto physical = btrfs_get_member(&btrfs_file_extent_item::disk_bytenr, i.m_data);
-				auto ram = btrfs_get_member(&btrfs_file_extent_item::ram_bytes, i.m_data);
-				auto len = btrfs_get_member(&btrfs_file_extent_item::num_bytes, i.m_data);
-				auto offset = btrfs_get_member(&btrfs_file_extent_item::offset, i.m_data);
-				BEESTRACE("Root " << get_state_end().m_root << " ino " << i.objectid << " physical " << to_hex(physical)
-					<< " logical " << to_hex(i.offset) << ".." << to_hex(i.offset + len)
-					<< " gen " << gen);
-				++count_data;
-				if (physical) {
-					THROW_CHECK1(runtime_error, ram, ram > 0);
-					THROW_CHECK1(runtime_error, len, len > 0);
-					THROW_CHECK2(runtime_error, offset, ram, offset < ram);
-					BeesFileId bfi(get_state_end().m_root, i.objectid);
-					if (m_ctx->is_blacklisted(bfi)) {
-						BEESCOUNT(crawl_blacklisted);
-					} else {
-						BeesFileRange bfr(bfi, i.offset, i.offset + len);
-						// BEESNOTE("pushing bfr " << bfr << " limit " << BEES_MAX_QUEUE_SIZE);
-						m_extents.insert(bfr);
-						BEESCOUNT(crawl_push);
-					}
-				} else {
-					BEESCOUNT(crawl_hole);
-				}
-				break;
-			}
-		}
+	// Find an extent data item in this subvol in the transid range
+	BEESTRACE("looking for new objects " << old_state);
+	// Don't set max_transid to m_max_transid here.	 See crawl_one_extent.
+	m_btof.transid(old_state.m_min_transid);
+	if (catch_all([&]() {
+		m_next_extent_data = m_btof.lower_bound(old_state.m_objectid);
+	})) {
+		// Whoops that didn't work.  Stop scanning this subvol, move on to the next.
+		m_deferred = true;
+		return false;
 	}
-	// BEESLOGINFO("Crawled inline " << count_inline << " data " << count_data << " other " << count_other << " unknown " << count_unknown << " gen_low " << count_low << " gen_high " << count_high << " " << get_state_end() << " in " << crawl_timer << "s");
-
+	if (!m_next_extent_data) {
+		return next_transid();
+	}
+	auto new_state = old_state;
+	new_state.m_objectid = max(m_next_extent_data.objectid() + 1, m_next_extent_data.objectid());
+	new_state.m_offset = 0;
+	set_state(new_state);
 	return true;
 }
 
 void
 BeesCrawl::fetch_extents_harder()
 {
-	BEESNOTE("fetch_extents_harder " << get_state_end() << " with " << m_extents.size() << " extents");
-	while (m_extents.empty()) {
-		bool progress_made = fetch_extents();
+	BEESNOTE("fetch_extents_harder " << get_state_end());
+	BEESTRACE("fetch_extents_harder " << get_state_end());
+	while (!m_next_extent_data) {
+		const bool progress_made = fetch_extents();
 		if (!progress_made) {
 			return;
 		}
@@ -1179,15 +1171,24 @@ BeesCrawl::fetch_extents_harder()
 }
 
 BeesFileRange
+BeesCrawl::bti_to_bfr(const BtrfsTreeItem &bti) const
+{
+	if (!bti) {
+		return BeesFileRange();
+	}
+	return BeesFileRange(
+		BeesFileId(get_state_end().m_root, bti.objectid()),
+		bti.offset(),
+		bti.offset() + bti.file_extent_logical_bytes()
+	);
+}
+
+BeesFileRange
 BeesCrawl::peek_front()
 {
 	unique_lock<mutex> lock(m_mutex);
 	fetch_extents_harder();
-	if (m_extents.empty()) {
-		return BeesFileRange();
-	}
-	auto rv = *m_extents.begin();
-	return rv;
+	return bti_to_bfr(m_next_extent_data);
 }
 
 BeesFileRange
@@ -1195,12 +1196,9 @@ BeesCrawl::pop_front()
 {
 	unique_lock<mutex> lock(m_mutex);
 	fetch_extents_harder();
-	if (m_extents.empty()) {
-		return BeesFileRange();
-	}
-	auto rv = *m_extents.begin();
-	m_extents.erase(m_extents.begin());
-	return rv;
+	BtrfsTreeItem rv;
+	swap(rv, m_next_extent_data);
+	return bti_to_bfr(rv);
 }
 
 BeesCrawlState
@@ -1210,17 +1208,14 @@ BeesCrawl::get_state_begin()
 }
 
 BeesCrawlState
-BeesCrawl::get_state_end()
+BeesCrawl::get_state_end() const
 {
 	return m_state.end();
 }
 
 ProgressTracker<BeesCrawlState>::ProgressHolder
-BeesCrawl::hold_state(const BeesFileRange &bfr)
+BeesCrawl::hold_state(const BeesCrawlState &bcs)
 {
-	auto bcs = m_state.end();
-	bcs.m_objectid = bfr.fid().ino();
-	bcs.m_offset = bfr.begin();
 	return m_state.hold(bcs);
 }
 
