@@ -1,6 +1,7 @@
 #ifndef BEES_H
 #define BEES_H
 
+#include "crucible/btrfs-tree.h"
 #include "crucible/cache.h"
 #include "crucible/chatter.h"
 #include "crucible/error.h"
@@ -533,6 +534,7 @@ public:
 class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
+	BtrfsRootFetcher			m_root_fetcher;
 	BeesStringFile				m_crawl_state_file;
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
@@ -545,7 +547,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
 	Task					m_crawl_task;
 	bool					m_workaround_btrfs_send = false;
-	LRUCache<bool, uint64_t>		m_root_ro_cache;
 
 	mutex					m_tmpfiles_mutex;
 	map<BeesFileId, Fd>			m_tmpfiles;
@@ -558,7 +559,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	void insert_root(const BeesCrawlState &bcs);
 	Fd open_root_nocache(uint64_t root);
 	Fd open_root_ino_nocache(uint64_t root, uint64_t ino);
-	bool is_root_ro_nocache(uint64_t root);
 	uint64_t transid_min();
 	uint64_t transid_max();
 	uint64_t transid_max_nocache();

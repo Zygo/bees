@@ -1,5 +1,6 @@
 #include "bees.h"
 
+#include "crucible/btrfs-tree.h"
 #include "crucible/cache.h"
 #include "crucible/ntoa.h"
 #include "crucible/string.h"
@@ -199,35 +200,14 @@ BeesRoots::transid_min()
 uint64_t
 BeesRoots::transid_max_nocache()
 {
-	uint64_t rv = 0;
 	BEESNOTE("Calculating transid_max");
 	BEESTRACE("Calculating transid_max");
 
 	// We look for the root of the extent tree and read its transid.
 	// Should run in O(1) time and be fairly reliable.
-	BtrfsIoctlSearchKey sk;
-	sk.tree_id = BTRFS_ROOT_TREE_OBJECTID;
-	sk.min_type = sk.max_type = BTRFS_ROOT_ITEM_KEY;
-	sk.min_objectid = sk.max_objectid = BTRFS_EXTENT_TREE_OBJECTID;
-
-	while (true) {
-		sk.nr_items = 4;
-		BEESTRACE("transid_max search sk " << sk);
-		sk.do_ioctl(m_ctx->root_fd());
-
-		if (sk.m_result.empty()) {
-			break;
-		}
-
-		// We are just looking for the highest transid on the filesystem.
-		// We don't care which object it comes from.
-		for (auto i : sk.m_result) {
-			sk.next_min(i, BTRFS_ROOT_ITEM_KEY);
-			if (i.transid > rv) {
-				rv = i.transid;
-			}
-		}
-	}
+	const auto bti = m_root_fetcher.root(BTRFS_EXTENT_TREE_OBJECTID);
+	BEESTRACE("extracting transid from " << bti);
+	const auto rv = bti.transid();
 
 	// transid must be greater than zero, or we did something very wrong
 	THROW_CHECK1(runtime_error, rv, rv > 0);
@@ -376,7 +356,6 @@ void
 BeesRoots::clear_caches()
 {
 	m_ctx->fd_cache()->clear();
-	m_root_ro_cache.clear();
 }
 
 void
@@ -563,14 +542,11 @@ BeesRoots::state_load()
 
 BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
+	m_root_fetcher(ctx->root_fd()),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_crawl_thread("crawl_transid"),
 	m_writeback_thread("crawl_writeback")
 {
-	m_root_ro_cache.func([&](uint64_t root) -> bool {
-		return is_root_ro_nocache(root);
-	});
-	m_root_ro_cache.max_size(BEES_ROOT_FD_CACHE_SIZE);
 }
 
 void
@@ -731,31 +707,21 @@ BeesRoots::open_root(uint64_t rootid)
 }
 
 bool
-BeesRoots::is_root_ro_nocache(uint64_t root)
-{
-	BEESTRACE("checking subvol flags on root " << root);
-	Fd root_fd = open_root(root);
-	BEESTRACE("checking subvol flags on root " << root << " path " << name_fd(root_fd));
-
-	uint64_t flags = 0;
-	DIE_IF_NON_ZERO(ioctl(root_fd, BTRFS_IOC_SUBVOL_GETFLAGS, &flags));
-	if (flags & BTRFS_SUBVOL_RDONLY) {
-		BEESLOGDEBUG("WORKAROUND: Avoiding RO root " << root);
-		BEESCOUNT(root_workaround_btrfs_send);
-		return true;
-	}
-	return false;
-}
-
-bool
 BeesRoots::is_root_ro(uint64_t root)
 {
-	// If we are not implementing the workaround there is no need for cache
+	// If we are not working around btrfs send, all roots are rw to us
 	if (!m_workaround_btrfs_send) {
 		return false;
 	}
 
-	return m_root_ro_cache(root);
+	BEESTRACE("checking subvol flags on root " << root);
+
+	const auto item = m_root_fetcher.root(root);
+	// If we can't access the subvol's root item...guess it's ro?
+	if (!item || item.root_flags() & BTRFS_ROOT_SUBVOL_RDONLY) {
+		return true;
+	}
+	return false;
 }
 
 uint64_t
