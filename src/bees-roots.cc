@@ -731,17 +731,23 @@ BeesRoots::crawl_thread()
 
 	// Create the Task that does the crawling
 	const auto shared_this = shared_from_this();
-	m_crawl_task = Task("crawl_more", [shared_this]() {
+	const auto crawl_task = Task("crawl_more", [shared_this]() {
 		BEESTRACE("crawl_more " << shared_this);
-		const auto run_again = shared_this->crawl_roots();
-		if (run_again) {
-			shared_this->m_crawl_task.run();
+		if (shared_this->crawl_roots()) {
+			Task::current_task().run();
 		}
+	});
+	const auto crawl_new = Task("crawl_new", [shared_this, crawl_task]() {
+		BEESTRACE("crawl_new " << shared_this);
+		catch_all([&]() {
+			shared_this->insert_new_crawl();
+		});
+		crawl_task.run();
 	});
 
 	// Monitor transid_max and wake up roots when it changes
 	BEESNOTE("tracking transid");
-	auto last_count = m_transid_re.count();
+	auto last_transid = m_transid_re.count();
 	while (!m_stop_requested) {
 		BEESTRACE("Measure current transid");
 		catch_all([&]() {
@@ -749,24 +755,20 @@ BeesRoots::crawl_thread()
 			m_transid_re.update(transid_max_nocache());
 		});
 
-		BEESTRACE("Make sure we have a full complement of crawlers");
-		catch_all([&]() {
-			BEESTRACE("calling insert_new_crawl");
-			insert_new_crawl();
-		});
-
-		// Don't hold root FDs open too long.
-		// The open FDs prevent snapshots from being deleted.
-		// cleaner_kthread just keeps skipping over the open dir and all its children.
-		// Even open files are a problem if they're big enough.
-		auto new_count = m_transid_re.count();
-		if (new_count != last_count) {
+		const auto new_transid = m_transid_re.count();
+		if (new_transid != last_transid) {
+			// Don't hold root FDs open too long.
+			// The open FDs prevent snapshots from being deleted.
+			// cleaner_kthread just keeps skipping over the open dir and all its children.
+			// Even open files are a problem if they're big enough.
+			// Always run this even if we have no worker threads.
 			clear_caches();
-		}
-		last_count = new_count;
 
-		// If crawl_more stopped running (i.e. ran out of data), start it up again
-		m_crawl_task.run();
+			// Insert new roots and restart crawl_more.
+			// Don't run this if we have no worker threads.
+			crawl_new.run();
+		}
+		last_transid = new_transid;
 
 		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
 		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
