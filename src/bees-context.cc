@@ -43,12 +43,13 @@ BeesFdCache::BeesFdCache(shared_ptr<BeesContext> ctx) :
 void
 BeesFdCache::clear()
 {
-	BEESNOTE("Clearing root FD cache to enable subvol delete");
-	BEESLOGDEBUG("Clearing root FD cache to enable subvol delete");
+	BEESLOGDEBUG("Clearing root FD cache with size " << m_root_cache.size() << " to enable subvol delete");
+	BEESNOTE("Clearing root FD cache with size " << m_root_cache.size());
 	m_root_cache.clear();
 	BEESCOUNT(root_clear);
-	BEESLOGDEBUG("Clearing open FD cache to enable file delete");
-	BEESNOTE("Clearing open FD cache to enable file delete");
+
+	BEESLOGDEBUG("Clearing open FD cache with size " << m_file_cache.size() << " to enable file delete");
+	BEESNOTE("Clearing open FD cache with size " << m_file_cache.size());
 	m_file_cache.clear();
 	BEESCOUNT(open_clear);
 }
@@ -852,6 +853,14 @@ void
 BeesContext::invalidate_addr(BeesAddress addr)
 {
 	return m_resolve_cache.expire(addr.get_physical_or_zero());
+}
+
+void
+BeesContext::resolve_cache_clear()
+{
+	BEESNOTE("clearing resolve cache with size " << m_resolve_cache.size());
+	BEESLOGDEBUG("Clearing resolve cache with size " << m_resolve_cache.size());
+	return m_resolve_cache.clear();
 }
 
 void

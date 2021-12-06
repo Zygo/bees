@@ -766,6 +766,7 @@ public:
 
 	BeesResolveAddrResult resolve_addr(BeesAddress addr);
 	void invalidate_addr(BeesAddress addr);
+	void resolve_cache_clear();
 
 	void dump_status();
 	void show_progress();

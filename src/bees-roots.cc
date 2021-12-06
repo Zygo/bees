@@ -722,6 +722,7 @@ void
 BeesRoots::clear_caches()
 {
 	m_ctx->fd_cache()->clear();
+	m_ctx->resolve_cache_clear();
 }
 
 void
