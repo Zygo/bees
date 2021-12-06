@@ -30,7 +30,7 @@ namespace crucible {
 		map<Key, ListIter>	m_map;
 		LockSet<Key>		m_lockset;
 		size_t			m_max_size;
-		mutex			m_mutex;
+		mutable mutex		m_mutex;
 
 		void check_overflow();
 		void recent_use(ListIter vp);
@@ -48,6 +48,7 @@ namespace crucible {
 		void expire(Arguments... args);
 		void insert(const Return &r, Arguments... args);
 		void clear();
+		size_t size() const;
 	};
 
 	template <class Return, class... Arguments>
@@ -188,6 +189,14 @@ namespace crucible {
 		m_list.swap(new_list);
 		m_map.swap(new_map);
 		lock.unlock();
+	}
+
+	template <class Return, class... Arguments>
+	size_t
+	LRUCache<Return, Arguments...>::size() const
+	{
+		unique_lock<mutex> lock(m_mutex);
+		return m_map.size();
 	}
 
 	template<class Return, class... Arguments>
