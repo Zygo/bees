@@ -193,7 +193,7 @@ namespace crucible {
 		if (queue.empty()) {
 			return;
 		}
-		auto tlcc = tl_current_consumer;
+		const auto tlcc = tl_current_consumer;
 		if (tlcc) {
 			// We are executing under a TaskConsumer, splice our post-exec queue at front.
 			// No locks needed because we are using only thread-local objects.
