@@ -791,11 +791,13 @@ namespace crucible {
 	void
 	BarrierState::release()
 	{
+		set<Task> tasks_local;
 		unique_lock<mutex> lock(m_mutex);
-		for (auto i : m_tasks) {
+		swap(tasks_local, m_tasks);
+		lock.unlock();
+		for (const auto &i : tasks_local) {
 			i.run();
 		}
-		m_tasks.clear();
 	}
 
 	BarrierState::~BarrierState()
