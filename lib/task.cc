@@ -254,9 +254,7 @@ namespace crucible {
 	void
 	TaskState::clear_queue(TaskQueue &tq)
 	{
-		while (!tq.empty()) {
-			auto i = *tq.begin();
-			tq.pop_front();
+		for (auto &i : tq) {
 			i->clear();
 		}
 	}
