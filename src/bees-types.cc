@@ -287,7 +287,7 @@ BeesFileRange::fd() const
 }
 
 Fd
-BeesFileRange::fd(const shared_ptr<BeesContext> &ctx) const
+BeesFileRange::fd(const shared_ptr<BeesContext> &ctx)
 {
 	// If we don't have a fid we can't do much here
 	if (m_fid) {

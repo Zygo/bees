@@ -385,14 +385,15 @@ BeesResolver::for_each_extent_ref(BeesBlockData bbd, function<bool(const BeesFil
 }
 
 BeesFileRange
-BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
+BeesResolver::replace_dst(const BeesFileRange &dst_bfr_in)
 {
-	BEESTRACE("replace_dst dst_bfr " << dst_bfr);
+	BEESTRACE("replace_dst dst_bfr " << dst_bfr_in);
 	BEESCOUNT(replacedst_try);
 
 	// Open dst, reuse it for all src
-	BEESNOTE("Opening dst bfr " << dst_bfr);
-	BEESTRACE("Opening dst bfr " << dst_bfr);
+	BEESNOTE("Opening dst bfr " << dst_bfr_in);
+	BEESTRACE("Opening dst bfr " << dst_bfr_in);
+	auto dst_bfr = dst_bfr_in;
 	dst_bfr.fd(m_ctx);
 
 	BeesFileRange overlap_bfr;
@@ -400,10 +401,11 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr)
 
 	BeesBlockData bbd(dst_bfr);
 
-	for_each_extent_ref(bbd, [&](const BeesFileRange &src_bfr) -> bool {
+	for_each_extent_ref(bbd, [&](const BeesFileRange &src_bfr_in) -> bool {
 		// Open src
-		BEESNOTE("Opening src bfr " << src_bfr);
-		BEESTRACE("Opening src bfr " << src_bfr);
+		BEESNOTE("Opening src bfr " << src_bfr_in);
+		BEESTRACE("Opening src bfr " << src_bfr_in);
+		auto src_bfr = src_bfr_in;
 		src_bfr.fd(m_ctx);
 
 		if (dst_bfr.overlaps(src_bfr)) {

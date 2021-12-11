@@ -187,20 +187,20 @@ BeesContext::is_root_ro(uint64_t root)
 }
 
 bool
-BeesContext::dedup(const BeesRangePair &brp)
+BeesContext::dedup(const BeesRangePair &brp_in)
 {
 	// TOOLONG and NOTE can retroactively fill in the filename details, but LOG can't
-	BEESNOTE("dedup " << brp);
+	BEESNOTE("dedup " << brp_in);
 
-	brp.second.fd(shared_from_this());
-
-	if (is_root_ro(brp.second.fid().root())) {
-		// BEESLOGDEBUG("WORKAROUND: dst root is read-only in " << name_fd(brp.second.fd()));
+	if (is_root_ro(brp_in.second.fid().root())) {
+		// BEESLOGDEBUG("WORKAROUND: dst root " << (brp_in.second.fid().root()) << " is read-only);
 		BEESCOUNT(dedup_workaround_btrfs_send);
 		return false;
 	}
 
+	auto brp = brp_in;
 	brp.first.fd(shared_from_this());
+	brp.second.fd(shared_from_this());
 
 	BEESTOOLONG("dedup " << brp);
 
@@ -725,23 +725,22 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 }
 
 BeesFileRange
-BeesContext::scan_forward(const BeesFileRange &bfr)
+BeesContext::scan_forward(const BeesFileRange &bfr_in)
 {
-	// What are we doing here?
-	BEESTRACE("scan_forward " << bfr);
+	BEESTRACE("scan_forward " << bfr_in);
 	BEESCOUNT(scan_forward);
 
 	Timer scan_timer;
 
 	// Silently filter out blacklisted files
-	if (is_blacklisted(bfr.fid())) {
+	if (is_blacklisted(bfr_in.fid())) {
 		BEESCOUNT(scan_blacklisted);
-		return bfr;
+		return bfr_in;
 	}
 
-	BEESNOTE("scan open " << bfr);
-
 	// Reconstitute FD
+	BEESNOTE("scan open " << bfr_in);
+	auto bfr = bfr_in;
 	bfr.fd(shared_from_this());
 
 	BEESNOTE("scan extent " << bfr);

@@ -260,7 +260,7 @@ ostream& operator<<(ostream &os, const BeesFileId &bfi);
 
 class BeesFileRange {
 protected:
-	mutable Fd		m_fd;
+	Fd			m_fd;
 	mutable BeesFileId	m_fid;
 	off_t			m_begin = 0, m_end = 0;
 	mutable off_t		m_file_size = -1;
@@ -301,7 +301,7 @@ public:
 	Fd fd() const;
 
 	// Get the fd, opening it if necessary
-	Fd fd(const shared_ptr<BeesContext> &ctx) const;
+	Fd fd(const shared_ptr<BeesContext> &ctx);
 
 	BeesFileRange copy_closed() const;
 
