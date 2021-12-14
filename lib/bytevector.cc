@@ -65,9 +65,21 @@ namespace crucible {
 		return m_ptr.get()[size];
 	}
 
+	static
+	void *
+	bv_allocate(size_t size)
+	{
+#ifdef BEES_VALGRIND
+		// XXX: only do this to shut up valgrind
+		return calloc(1, size);
+#else
+		return malloc(size);
+#endif
+	}
+
 	ByteVector::ByteVector(size_t size)
 	{
-		m_ptr = Pointer(static_cast<value_type*>(malloc(size)), free);
+		m_ptr = Pointer(static_cast<value_type*>(bv_allocate(size)), free);
 		// bad_alloc doesn't fit THROW_CHECK's template
 		THROW_CHECK0(runtime_error, m_ptr);
 		m_size = size;
@@ -77,7 +89,7 @@ namespace crucible {
 	{
 		const size_t size = end - begin;
 		const size_t alloc_size = max(size, min_size);
-		m_ptr = Pointer(static_cast<value_type*>(malloc(alloc_size)), free);
+		m_ptr = Pointer(static_cast<value_type*>(bv_allocate(alloc_size)), free);
 		THROW_CHECK0(runtime_error, m_ptr);
 		m_size = alloc_size;
 		memcpy(m_ptr.get(), begin, size);
