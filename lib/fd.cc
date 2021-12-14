@@ -524,7 +524,14 @@ namespace crucible {
 	void
 	ioctl_iflags_set(int fd, int attr)
 	{
-		DIE_IF_MINUS_ONE(ioctl(fd, FS_IOC_SETFLAGS, &attr));
+		// This bit of nonsense brought to you by Valgrind.
+		union {
+			int attr;
+			long zero;
+		} u;
+		u.zero = 0;
+		u.attr = attr;
+		DIE_IF_MINUS_ONE(ioctl(fd, FS_IOC_SETFLAGS, &u.attr));
 	}
 
 	string
