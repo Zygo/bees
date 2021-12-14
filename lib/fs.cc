@@ -783,7 +783,7 @@ namespace crucible {
 			// ioctl buffer size does not include search key header or buffer size
 			ioctl_arg = ByteVector(buf_size + sizeof(btrfs_ioctl_search_args_v2));
 			ioctl_ptr = ioctl_arg.get<btrfs_ioctl_search_args_v2>();
-			ioctl_ptr->key = static_cast<btrfs_ioctl_search_key&>(*this);
+			ioctl_ptr->key = static_cast<const btrfs_ioctl_search_key&>(*this);
 			ioctl_ptr->buf_size = buf_size;
 			// Don't bother supporting V1.  Kernels that old have other problems.
 			int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_arg.data());
