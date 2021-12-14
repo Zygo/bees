@@ -2,6 +2,7 @@
 #define _CRUCIBLE_BYTEVECTOR_H_
 
 #include <memory>
+#include <mutex>
 #include <ostream>
 
 #include <cstdint>
@@ -21,6 +22,8 @@ namespace crucible {
 		using iterator = value_type*;
 
 		ByteVector() = default;
+		ByteVector(const ByteVector &that);
+		ByteVector& operator=(const ByteVector &that);
 		ByteVector(size_t size);
 		ByteVector(const ByteVector &that, size_t start, size_t length);
 		ByteVector(iterator begin, iterator end, size_t min_size = 0);
@@ -49,6 +52,8 @@ namespace crucible {
 	private:
 		Pointer m_ptr;
 		size_t m_size = 0;
+		mutable mutex m_mutex;
+	friend ostream & operator<<(ostream &os, const ByteVector &bv);
 	};
 
 	template <class T>
@@ -66,8 +71,6 @@ namespace crucible {
 	{
 		return reinterpret_cast<T*>(data());
 	}
-
-	ostream & operator<<(ostream &os, const ByteVector &bv);
 }
 
 #endif // _CRUCIBLE_BYTEVECTOR_H_
