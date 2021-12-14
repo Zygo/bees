@@ -459,7 +459,7 @@ private:
 	// Mutex/condvar for the writeback thread
 	mutex			m_dirty_mutex;
 	condition_variable	m_dirty_condvar;
-	bool			m_dirty;
+	bool			m_dirty = false;
 
 	// Mutex/condvar to stop
 	mutex			m_stop_mutex;
