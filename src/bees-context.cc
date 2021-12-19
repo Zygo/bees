@@ -872,15 +872,15 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	struct rusage usage_after;
 	DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_after));
 
-	double sys_usage_delta =
+	const double sys_usage_delta =
 		(usage_after.ru_stime.tv_sec + usage_after.ru_stime.tv_usec / 1000000.0) -
 		(usage_before.ru_stime.tv_sec + usage_before.ru_stime.tv_usec / 1000000.0);
 
-	double user_usage_delta =
+	const double user_usage_delta =
 		(usage_after.ru_utime.tv_sec + usage_after.ru_utime.tv_usec / 1000000.0) -
 		(usage_before.ru_utime.tv_sec + usage_before.ru_utime.tv_usec / 1000000.0);
 
-	auto rt_age = resolve_timer.age();
+	const auto rt_age = resolve_timer.age();
 
 	BeesResolveAddrResult rv;
 
@@ -904,12 +904,13 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 
 	// Count how many times this happens so we can figure out how
 	// important this case is
-	static size_t most_refs_ever = 2730;
+	static const size_t max_logical_ino_v1_refs = 2730; // (65536 - header_len) / (sizeof(uint64_t) * 3)
+	static size_t most_refs_ever = max_logical_ino_v1_refs;
 	if (rv_count > most_refs_ever) {
 		BEESLOGINFO("addr " << addr << " refs " << rv_count << " beats previous record " << most_refs_ever);
 		most_refs_ever = rv_count;
 	}
-	if (rv_count > 2730) {
+	if (rv_count > max_logical_ino_v1_refs) {
 		BEESCOUNT(resolve_large);
 	}
 

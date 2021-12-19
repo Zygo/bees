@@ -805,7 +805,7 @@ class BeesResolver {
 	BeesAddress				m_addr;
 	vector<BtrfsInodeOffsetRoot>		m_biors;
 	set<BeesFileRange>			m_ranges;
-	unsigned				m_bior_count;
+	size_t					m_bior_count;
 
 	// We found matching data, so we can dedupe
 	bool					m_found_data = false;
