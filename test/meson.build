@@ -16,6 +16,7 @@ foreach test_name: tests
   exe = executable(
     test_name,
     [ '@0@.cc'.format(test_name) ],
+    implicit_include_directories: false,
     include_directories: [ inc ],
     link_with: [ crucible_lib ],
   )

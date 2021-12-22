@@ -26,5 +26,6 @@ crucible_lib = static_library(
     crucible_version_cc,
   ],
   dependencies: [ thread_dep ],
+  implicit_include_directories: false,
   include_directories: [ inc ],
 )

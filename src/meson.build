@@ -26,6 +26,7 @@ executable(
     bees_usage_c,
   ],
   dependencies: [ thread_dep ],
+  implicit_include_directories: false,
   include_directories: [ inc ],
   install: true,
   install_dir: beeslibdir,
@@ -35,6 +36,7 @@ executable(
 executable(
   'fiemap',
   [ 'fiemap.cc' ],
+  implicit_include_directories: false,
   include_directories: [ inc ],
   install: get_option('tools'),
   link_with: [ crucible_lib ],
@@ -43,6 +45,7 @@ executable(
 executable(
   'fiewalk',
   [ 'fiewalk.cc' ],
+  implicit_include_directories: false,
   include_directories: [ inc ],
   install: get_option('tools'),
   install_dir: get_option('sbindir'),
