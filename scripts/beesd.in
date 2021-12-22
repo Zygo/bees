@@ -31,7 +31,7 @@ help(){
     exec "$bees_bin" --help
 }
 
-for i in $(/usr/lib/bees/bees --help 2>&1 | grep "\-\-" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
+for i in $("$bees_bin" --help 2>&1 | grep "\-\-" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
 do
    TMP_ARGS="$TMP_ARGS $i"
 done

@@ -1,0 +1,4 @@
+option('docs', type: 'feature', value: 'auto',
+  description: 'Build HTML documentation from Markdown source')
+option('systemd', type: 'feature', value: 'auto',
+  description: 'Install systemd unit files')
