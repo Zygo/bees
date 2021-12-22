@@ -36,7 +36,7 @@ executable(
   'fiemap',
   [ 'fiemap.cc' ],
   include_directories: [ inc ],
-  install: true,
+  install: get_option('tools'),
   link_with: [ crucible_lib ],
 )
 
@@ -44,7 +44,7 @@ executable(
   'fiewalk',
   [ 'fiewalk.cc' ],
   include_directories: [ inc ],
-  install: true,
+  install: get_option('tools'),
   install_dir: get_option('sbindir'),
   link_with: [ crucible_lib ],
 )
