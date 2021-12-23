@@ -5,10 +5,9 @@ bees_version_c = vcs_tag(
 )
 
 bees_usage_c = custom_target(
-  input: [ 'bees-usage.py', 'bees-usage.txt' ],
+  input: 'bees-usage.txt',
   output: 'bees-usage.c',
-  command: [ python, '@INPUT@' ],
-  capture: true,
+  command: [ python, files('bees-usage.py'), '@INPUT@', '@OUTPUT@' ],
 )
 
 executable(

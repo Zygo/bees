@@ -14,10 +14,9 @@ else
 endif
 
 index_md = custom_target(
-  input: [ 'index.py', '../README.md' ],
+  input: '../README.md',
   output: 'index.md',
-  command: [ python, '@INPUT@' ],
-  capture: true,
+  command: [ python, files('index.py'), '@INPUT@', '@OUTPUT@' ],
 )
 
 docs_md = [

@@ -11,9 +11,7 @@ project(
 )
 
 # Helper scripts for source generation are written in python.
-# Use the same python as meson was run with.
-pymod = import('python')
-python = pymod.find_installation()
+python = find_program('python3')
 
 systemd_dep = dependency('systemd', disabler: true, required: get_option('systemd'))
 systemdsystemunitdir = systemd_dep.get_variable('systemdsystemunitdir')
