@@ -1,6 +1,8 @@
 #ifndef _CRUCIBLE_BYTEVECTOR_H_
 #define _CRUCIBLE_BYTEVECTOR_H_
 
+#include <crucible/error.h>
+
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -69,6 +71,7 @@ namespace crucible {
 	T*
 	ByteVector::get() const
 	{
+		THROW_CHECK2(out_of_range, size(), sizeof(T), size() >= sizeof(T));
 		return reinterpret_cast<T*>(data());
 	}
 }
