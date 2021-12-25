@@ -131,7 +131,6 @@ namespace crucible {
 	}
 
 	uint64_t
-
 	BtrfsTreeItem::inode_size() const
 	{
 		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_INODE_ITEM_KEY);
@@ -433,7 +432,7 @@ namespace crucible {
 		do {
 			assert(sk.max_offset == s_max_logical);
 			sk.do_ioctl(fd());
-			for (auto &i : sk.m_result) {
+			for (const auto &i : sk.m_result) {
 				if (hdr_match(i)) {
 					return i;
 				}
