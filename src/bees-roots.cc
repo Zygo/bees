@@ -643,14 +643,14 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 		for (auto i : sk.m_result) {
 			sk.next_min(i, BTRFS_ROOT_BACKREF_KEY);
 			if (i.type == BTRFS_ROOT_BACKREF_KEY && i.objectid == rootid) {
-				auto dirid = btrfs_get_member(&btrfs_root_ref::dirid, i.m_data);
-				auto name_len = btrfs_get_member(&btrfs_root_ref::name_len, i.m_data);
-				auto name_start = sizeof(struct btrfs_root_ref);
-				auto name_end = name_len + name_start;
+				const auto dirid = btrfs_get_member(&btrfs_root_ref::dirid, i.m_data);
+				const auto name_len = btrfs_get_member(&btrfs_root_ref::name_len, i.m_data);
+				const auto name_start = sizeof(struct btrfs_root_ref);
+				const auto name_end = name_len + name_start;
 				THROW_CHECK2(runtime_error, i.m_data.size(), name_end, i.m_data.size() >= name_end);
-				string name(i.m_data.data() + name_start, i.m_data.data() + name_end);
+				const string name(i.m_data.data() + name_start, i.m_data.data() + name_end);
 
-				auto parent_rootid = i.offset;
+				const auto parent_rootid = i.offset;
 				// BEESLOG("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
 				BEESTRACE("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
 				BEESCOUNT(root_parent_open_try);
