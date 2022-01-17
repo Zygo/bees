@@ -70,6 +70,6 @@ You can also use Github:
 Copyright & License
 -------------------
 
-Copyright 2015-2018 Zygo Blaxell <bees@furryterror.org>.
+Copyright 2015-2022 Zygo Blaxell <bees@furryterror.org>.
 
 GPL (version 3 or later).
