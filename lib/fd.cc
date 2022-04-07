@@ -361,7 +361,10 @@ namespace crucible {
                         THROW_ERROR(invalid_argument, "pwrite: trying to write on a closed file descriptor");
                 }
 		int rv = ::pwrite(fd, buf, size, offset);
-		if (rv != static_cast<int>(size)) {
+		if (rv < 0) {
+			THROW_ERRNO("pwrite: could not write " << size << " bytes at fd " << name_fd(fd) << " offset " << offset);
+		}
+		if (rv != static_cast<ssize_t>(size)) {
 			THROW_ERROR(runtime_error, "pwrite: only " << rv << " of " << size << " bytes written at fd " << name_fd(fd) << " offset " << offset);
 		}
 	}
@@ -392,7 +395,7 @@ namespace crucible {
 				}
 				THROW_ERRNO("read: " << size << " bytes");
 			}
-			if (rv > static_cast<int>(size)) {
+			if (rv > static_cast<ssize_t>(size)) {
 				THROW_ERROR(runtime_error, "read: somehow read more bytes (" << rv << ") than requested (" << size << ")");
 			}
 			if (rv == 0) break;
@@ -441,7 +444,7 @@ namespace crucible {
 					}
 					THROW_ERRNO("pread: " << size << " bytes");
 				}
-				if (rv != static_cast<int>(size)) {
+				if (rv != static_cast<ssize_t>(size)) {
 					THROW_ERROR(runtime_error, "pread: " << size << " bytes at fd " << name_fd(fd) << " offset " << offset << " returned " << rv);
 				}
 				break;
