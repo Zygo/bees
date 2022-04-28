@@ -229,6 +229,8 @@ BeesRoots::transid_max_nocache()
 
 	// transid must be greater than zero, or we did something very wrong
 	THROW_CHECK1(runtime_error, rv, rv > 0);
+	// transid must be less than max, or we did something very wrong
+	THROW_CHECK1(runtime_error, rv, rv < numeric_limits<uint64_t>::max());
 	return rv;
 }
 
