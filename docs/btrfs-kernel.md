@@ -9,7 +9,7 @@ This issue is fixed in kernel 5.4.14 and later.
 
 **Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, or 5.12,
 with recent LTS and -stable updates.**  The latest released kernel as
-of this writing is 5.12.3.
+of this writing is 5.18.15.
 
 4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with
 some issues.  Older kernels will be slower (a little slower or a lot
@@ -31,7 +31,7 @@ In some future bees release, this API version may become mandatory.
 Kernel Bug Tracking Table
 -------------------------
 
-These bugs are particularly popular among bees users:
+These bugs are particularly popular among bees users, though not all are specifically relevant to bees:
 
 | First bad kernel | Last bad kernel | Issue Description | Fixed Kernel Versions | Fix Commit
 | :---: | :---: | --- | :---: | ---
@@ -61,7 +61,11 @@ These bugs are particularly popular among bees users:
 | 5.4 | 5.11 | spurious tree checker failures on extent ref hash | 5.11.5, 5.12 and later | 1119a72e223f btrfs: tree-checker: do not error out if extent ref hash doesn't match
 | - | 5.11 | tree mod log issue #5 | 4.4.263, 4.9.263, 4.14.227, 4.19.183, 5.4.108, 5.10.26, 5.11.9, 5.12 and later | dbcc7d57bffc btrfs: fix race when cloning extent buffer during rewind of an old root
 | - | 5.12 | tree mod log issue #6 | 4.14.233, 4.19.191, 5.4.118, 5.10.36, 5.11.20, 5.12.3, 5.13 and later | f9690f426b21 btrfs: fix race when picking most recent mod log operation for an old root
-| 4.15 | - | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | - | workaround:  comment out the `WARN_ON`
+| 4.15 | 5.16 | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | 5.15.27, 5.16.13, 5.17 and later | a0f0cf8341e3 btrfs: get rid of warning on transaction commit when using flushoncommit
+| - | 5.17 | crash during device removal can make filesystem unmountable | 5.15.54, 5.16.20, 5.17.3, 5.18 and later | bbac58698a55 btrfs: remove device item and update super block in the same transaction
+| - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3 | d201238ccd2f btrfs: repair super block num_devices automatically
+| 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.20-rc1 and later | (not available upstream yet) btrfs: join running log transaction when logging new name
+| 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl | - | workaround: reduce bees thread count to 1 with `-c1`
 
 "Last bad kernel" refers to that version's last stable update from
 kernel.org.  Distro kernels may backport additional fixes.  Consult
@@ -77,7 +81,7 @@ A "-" for "first bad kernel" indicates the bug has been present since
 the relevant feature first appeared in btrfs.
 
 A "-" for "last bad kernel" indicates the bug has not yet been fixed as
-of 5.8.14.
+of 5.18.15.
 
 In cases where issues are fixed by commits spread out over multiple
 kernel versions, "fixed kernel version" refers to the version that
@@ -86,6 +90,11 @@ contains all components of the fix.
 
 Workarounds for known kernel bugs
 ---------------------------------
+
+* **Hangs with high worker thread counts**:  On kernels newer than
+  5.4, multiple threads running `LOGICAL_INO` and dedupe ioctls
+  at the same time can lead to a kernel hang.  The workaround is
+  to reduce the thread count to 1 with `-c1`.
 
 * **Tree mod log issues**:  bees will detect that a btrfs balance is
   running, and pause bees activity until the balance is done.  This avoids
@@ -128,7 +137,7 @@ Workarounds for known kernel bugs
 Unfixed kernel bugs
 -------------------
 
-As of 5.12.3:
+As of 5.18.15:
 
 * **The kernel does not permit `btrfs send` and dedupe to run at the
   same time**.  Recent kernels no longer crash, but now refuse one
@@ -151,22 +160,3 @@ As of 5.12.3:
   still saves some IO.
 
   `btrfs receive` is not affected by this issue.
-
-* **Spurious warnings in `fs/fs-writeback.c`** on kernel 4.15 and later
-  when filesystem is mounted with `flushoncommit`.  These
-  seem to be harmless (there are other locks which prevent
-  concurrent umount of the filesystem), but the underlying
-  problems that trigger the `WARN_ON` are [not trivial to
-  fix](https://www.spinics.net/lists/linux-btrfs/msg87752.html).
-
-  The warnings can be especially voluminous when bees is running.
-
-  Workarounds:
-
-  1. mount with `-o noflushoncommit`
-  2. patch kernel to remove warning in `fs/fs-writeback.c`.
-
-  Note that using kernels 4.14 and earlier is *not* a viable workaround
-  for this issue, because kernels 4.14 and earlier will eventually
-  deadlock when a filesystem is mounted with `-o flushoncommit` (a single
-  commit fixes one bug and introduces the other).
