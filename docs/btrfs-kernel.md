@@ -9,7 +9,7 @@ This issue is fixed in kernel 5.4.14 and later.
 
 **Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, or 5.12,
 with recent LTS and -stable updates.**  The latest released kernel as
-of this writing is 5.18.15.
+of this writing is 5.18.18.
 
 4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with
 some issues.  Older kernels will be slower (a little slower or a lot
@@ -63,8 +63,8 @@ These bugs are particularly popular among bees users, though not all are specifi
 | - | 5.12 | tree mod log issue #6 | 4.14.233, 4.19.191, 5.4.118, 5.10.36, 5.11.20, 5.12.3, 5.13 and later | f9690f426b21 btrfs: fix race when picking most recent mod log operation for an old root
 | 4.15 | 5.16 | spurious warnings from `fs/fs-writeback.c` when `flushoncommit` is enabled | 5.15.27, 5.16.13, 5.17 and later | a0f0cf8341e3 btrfs: get rid of warning on transaction commit when using flushoncommit
 | - | 5.17 | crash during device removal can make filesystem unmountable | 5.15.54, 5.16.20, 5.17.3, 5.18 and later | bbac58698a55 btrfs: remove device item and update super block in the same transaction
-| - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3 | d201238ccd2f btrfs: repair super block num_devices automatically
-| 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.20-rc1 and later | (not available upstream yet) btrfs: join running log transaction when logging new name
+| - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3, 5.19 and later | d201238ccd2f btrfs: repair super block num_devices automatically
+| 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.18.18, 5.19.2, 6.0 and later | 723df2bcc9e1 btrfs: join running log transaction when logging new name
 | 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl | - | workaround: reduce bees thread count to 1 with `-c1`
 
 "Last bad kernel" refers to that version's last stable update from
@@ -81,7 +81,7 @@ A "-" for "first bad kernel" indicates the bug has been present since
 the relevant feature first appeared in btrfs.
 
 A "-" for "last bad kernel" indicates the bug has not yet been fixed as
-of 5.18.15.
+of 5.18.18.
 
 In cases where issues are fixed by commits spread out over multiple
 kernel versions, "fixed kernel version" refers to the version that
@@ -137,7 +137,7 @@ Workarounds for known kernel bugs
 Unfixed kernel bugs
 -------------------
 
-As of 5.18.15:
+As of 5.18.18:
 
 * **The kernel does not permit `btrfs send` and dedupe to run at the
   same time**.  Recent kernels no longer crash, but now refuse one
