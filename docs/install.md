@@ -60,8 +60,43 @@ If you want to start hacking on bees and contribute changes, just emerge
 the live version which automatically pulls in all required development
 packages.
 
-Build from source
------------------
+Build from source with meson
+-----------------------------
+
+The quick steps to build and test:
+
+```sh
+$ cd /path/to/source/bees
+$ meson builddir && cd builddir
+$ meson compile
+$ meson test
+```
+
+The build produces `src/bees` in the `builddir`.
+
+It will also generate `scripts/beesd@.service` for systemd users. This
+service makes use of a helper script `scripts/beesd` to boot the service.
+Both of the latter use the filesystem UUID to mount the root subvolume
+within a temporary runtime directory.
+
+You can install these files to the configured prefix using `meson install`
+or manually copy them as you like.
+
+Depending on your Linux distribution, you may need to install some
+dependencies first:
+
+### Ubuntu 16.04 - 17.04:
+```sh
+$ apt -y install build-essential btrfs-tools markdown meson
+```
+
+### Ubuntu 18.10:
+```sh
+$ apt -y install build-essential btrfs-progs markdown meson
+```
+
+Build from source with make
+---------------------------
 
 Build with `make`. The build produces `bin/bees` which must be copied
 to somewhere in `$PATH` on the target system respectively.
@@ -80,12 +115,11 @@ within a temporary runtime directory.
 Packaging
 ---------
 
-See 'Dependencies' below. Package maintainers can pick ideas for building and
+See 'Dependencies' above. Package maintainers can pick ideas for building and
 configuring the source package from the Gentoo ebuild:
 
 <https://github.com/gentoo/gentoo/tree/master/sys-fs/bees>
 
-You can configure some build options by creating a file `localconf` and
-adjust settings for your distribution environment there.
-
-Please also review the Makefile for additional hints.
+When using the `make` build system, you can configure some build options by
+creating a file `localconf` and adjust settings for your distribution
+environment there. Please also review the Makefile for additional hints.
