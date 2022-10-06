@@ -31,7 +31,7 @@ help(){
     exec "$bees_bin" --help
 }
 
-for i in $("$bees_bin" --help 2>&1 | grep "\-\-" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
+for i in $("$bees_bin" --help 2>&1 | grep -E "--" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
 do
    TMP_ARGS="$TMP_ARGS $i"
 done
@@ -71,7 +71,7 @@ done
 [ -z "$UUID" ] && help
 
 
-FILE_CONFIG="$(egrep -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
+FILE_CONFIG="$(grep -E -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
 [ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
 INFO "Find $UUID in $FILE_CONFIG, use as conf"
 source "$FILE_CONFIG"
