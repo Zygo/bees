@@ -31,12 +31,14 @@ namespace crucible {
 		BtrfsExtentInfo(int dst_fd, off_t dst_offset);
 	};
 
-	struct BtrfsExtentSame : public btrfs_ioctl_same_args {
+	struct BtrfsExtentSame {
 		virtual ~BtrfsExtentSame();
 		BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length);
 		void add(int fd, off_t offset);
 		virtual void do_ioctl();
 
+		uint64_t m_logical_offset = 0;
+		uint64_t m_length = 0;
 		int m_fd;
 		vector<BtrfsExtentInfo> m_info;
 	};

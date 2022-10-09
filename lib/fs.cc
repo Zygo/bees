@@ -45,13 +45,10 @@ namespace crucible {
 	}
 
 	BtrfsExtentSame::BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length) :
-		btrfs_ioctl_same_args( (btrfs_ioctl_same_args) { } ),
+		m_logical_offset(src_offset),
+		m_length(src_length),
 		m_fd(src_fd)
 	{
-		assert(logical_offset == 0);
-		assert(length == 0);
-		logical_offset = src_offset;
-		length = src_length;
 	}
 
 	BtrfsExtentSame::~BtrfsExtentSame()
@@ -118,11 +115,8 @@ namespace crucible {
 				os << " '" << fd_name << "'";
 			});
 		}
-		os << ", .logical_offset = " << to_hex(bes.logical_offset);
-		os << ", .length = " << to_hex(bes.length);
-		os << ", .dest_count = " << bes.dest_count;
-		os << ", .reserved1 = " << bes.reserved1;
-		os << ", .reserved2 = " << bes.reserved2;
+		os << ", .logical_offset = " << to_hex(bes.m_logical_offset);
+		os << ", .length = " << to_hex(bes.m_length);
 		os << ", .info[] = {";
 		for (size_t i = 0; i < bes.m_info.size(); ++i) {
 			os << " [" << i << "] = " << &(bes.m_info[i]) << ",";
@@ -145,9 +139,11 @@ namespace crucible {
 	void
 	BtrfsExtentSame::do_ioctl()
 	{
-		dest_count = m_info.size();
-		const size_t buf_size = sizeof(btrfs_ioctl_same_args) + dest_count * sizeof(btrfs_ioctl_same_extent_info);
-		ByteVector ioctl_arg(static_cast<btrfs_ioctl_same_args&>(*this), buf_size);
+		const size_t buf_size = sizeof(btrfs_ioctl_same_args) + m_info.size() * sizeof(btrfs_ioctl_same_extent_info);
+		ByteVector ioctl_arg( (btrfs_ioctl_same_args) {
+			.logical_offset = m_logical_offset,
+			.length = m_length,
+		}, buf_size);
 		btrfs_ioctl_same_args *const ioctl_ptr = ioctl_arg.get<btrfs_ioctl_same_args>();
 		size_t count = 0;
 		for (auto i = m_info.cbegin(); i != m_info.cend(); ++i) {
