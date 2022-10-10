@@ -45,8 +45,8 @@ namespace crucible {
 	ByteVector::ByteVector(const ByteVector &that, size_t start, size_t length)
 	{
 		THROW_CHECK0(out_of_range, that.m_ptr);
-		THROW_CHECK2(out_of_range, start, that.m_size, start < that.m_size);
-		THROW_CHECK2(out_of_range, start + length, that.m_size + length, start + length < that.m_size + length);
+		THROW_CHECK2(out_of_range, start, that.m_size, start <= that.m_size);
+		THROW_CHECK2(out_of_range, start + length, that.m_size + length, start + length <= that.m_size + length);
 		m_ptr = Pointer(that.m_ptr, that.m_ptr.get() + start);
 		m_size = length;
 	}
