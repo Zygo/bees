@@ -27,20 +27,16 @@ namespace crucible {
 	// wrapper around fallocate(...FALLOC_FL_PUNCH_HOLE...)
 	void punch_hole(int fd, off_t offset, off_t len);
 
-	struct BtrfsExtentInfo : public btrfs_ioctl_same_extent_info {
-		BtrfsExtentInfo(int dst_fd, off_t dst_offset);
-	};
-
 	struct BtrfsExtentSame {
 		virtual ~BtrfsExtentSame();
 		BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length);
-		void add(int fd, off_t offset);
+		void add(int fd, uint64_t offset);
 		virtual void do_ioctl();
 
 		uint64_t m_logical_offset = 0;
 		uint64_t m_length = 0;
 		int m_fd;
-		vector<BtrfsExtentInfo> m_info;
+		vector<btrfs_ioctl_same_extent_info> m_info;
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_same_extent_info *info);

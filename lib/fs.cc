@@ -33,18 +33,6 @@ namespace crucible {
 #endif
 	}
 
-	BtrfsExtentInfo::BtrfsExtentInfo(int dst_fd, off_t dst_offset) :
-		btrfs_ioctl_same_extent_info( (btrfs_ioctl_same_extent_info) { } )
-	{
-		assert(fd == 0);
-		assert(logical_offset == 0);
-		assert(bytes_deduped == 0);
-		assert(status == 0);
-		assert(reserved == 0);
-		fd = dst_fd;
-		logical_offset = dst_offset;
-	}
-
 	BtrfsExtentSame::BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length) :
 		m_logical_offset(src_offset),
 		m_length(src_length),
@@ -57,9 +45,12 @@ namespace crucible {
 	}
 
 	void
-	BtrfsExtentSame::add(int fd, off_t offset)
+	BtrfsExtentSame::add(int const fd, uint64_t const offset)
 	{
-		m_info.push_back(BtrfsExtentInfo(fd, offset));
+		m_info.push_back( (btrfs_ioctl_same_extent_info) {
+			.fd = fd,
+			.logical_offset = offset,
+		});
 	}
 
 	ostream &
