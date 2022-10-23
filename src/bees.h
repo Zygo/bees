@@ -336,6 +336,7 @@ public:
 	BeesAddress(Type addr = ZERO) : m_addr(addr) {}
 	BeesAddress(MagicValue addr) : m_addr(addr) {}
 	BeesAddress& operator=(const BeesAddress &that) = default;
+	BeesAddress(const BeesAddress &that) = default;
 	operator Type() const { return m_addr; }
 	bool operator==(const BeesAddress &that) const;
 	bool operator==(const MagicValue that) const { return *this == BeesAddress(that); }
@@ -396,6 +397,7 @@ public:
 		HashType	e_hash;
 		AddrType	e_addr;
 		Cell(const Cell &) = default;
+		Cell &operator=(const Cell &) = default;
 		Cell(HashType hash, AddrType addr) : e_hash(hash), e_addr(addr) { }
 		bool operator==(const Cell &e) const { return tie(e_hash, e_addr) == tie(e.e_hash, e.e_addr); }
 		bool operator!=(const Cell &e) const { return tie(e_hash, e_addr) != tie(e.e_hash, e.e_addr); }
