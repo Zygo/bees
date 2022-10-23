@@ -197,18 +197,15 @@ namespace crucible {
 	void *
 	BtrfsDataContainer::prepare(size_t container_size)
 	{
-		if (m_data.size() < container_size) {
-			m_data = ByteVector(container_size);
-		}
-		const auto p = m_data.get<btrfs_data_container>();
 		const size_t min_size = offsetof(btrfs_data_container, val);
 		if (container_size < min_size) {
 			THROW_ERROR(out_of_range, "container size " << container_size << " smaller than minimum " << min_size);
 		}
-		p->bytes_left = 0;
-		p->bytes_missing = 0;
-		p->elem_cnt = 0;
-		p->elem_missed = 0;
+		if (m_data.size() < container_size) {
+			m_data = ByteVector(container_size);
+		}
+		const auto p = m_data.get<btrfs_data_container>();
+		*p = (btrfs_data_container) { };
 		return p;
 	}
 
@@ -221,25 +218,29 @@ namespace crucible {
 	decltype(btrfs_data_container::bytes_left)
 	BtrfsDataContainer::get_bytes_left() const
 	{
-		return bytes_left;
+		const auto p = m_data.get<btrfs_data_container>();
+		return p->bytes_left;
 	}
 
 	decltype(btrfs_data_container::bytes_missing)
 	BtrfsDataContainer::get_bytes_missing() const
 	{
-		return bytes_missing;
+		const auto p = m_data.get<btrfs_data_container>();
+		return p->bytes_missing;
 	}
 
 	decltype(btrfs_data_container::elem_cnt)
 	BtrfsDataContainer::get_elem_cnt() const
 	{
-		return elem_cnt;
+		const auto p = m_data.get<btrfs_data_container>();
+		return p->elem_cnt;
 	}
 
 	decltype(btrfs_data_container::elem_missed)
 	BtrfsDataContainer::get_elem_missed() const
 	{
-		return elem_missed;
+		const auto p = m_data.get<btrfs_data_container>();
+		return p->elem_missed;
 	}
 
 	ostream &
@@ -373,8 +374,8 @@ namespace crucible {
 			bili_version = BTRFS_IOC_LOGICAL_INO_V2;
 		}
 
-		btrfs_data_container *bdc = reinterpret_cast<btrfs_data_container *>(p->inodes);
-		BtrfsInodeOffsetRoot *input_iter = reinterpret_cast<BtrfsInodeOffsetRoot *>(bdc->val);
+		btrfs_data_container *const bdc = reinterpret_cast<btrfs_data_container *>(p->inodes);
+		BtrfsInodeOffsetRoot *const input_iter = reinterpret_cast<BtrfsInodeOffsetRoot *>(bdc->val);
 
 		// elem_cnt counts uint64_t, but BtrfsInodeOffsetRoot is 3x uint64_t
 		THROW_CHECK1(runtime_error, bdc->elem_cnt, bdc->elem_cnt % 3 == 0);
@@ -423,14 +424,14 @@ namespace crucible {
 			return false;
 		}
 
-		btrfs_data_container *bdc = reinterpret_cast<btrfs_data_container *>(p->fspath);
+		btrfs_data_container *const bdc = reinterpret_cast<btrfs_data_container *>(p->fspath);
 		m_paths.reserve(bdc->elem_cnt);
 
 		const uint64_t *up = reinterpret_cast<const uint64_t *>(bdc->val);
-		const char *cp = reinterpret_cast<const char *>(bdc->val);
+		const char *const cp = reinterpret_cast<const char *>(bdc->val);
 
 		for (auto count = bdc->elem_cnt; count > 0; --count) {
-			const char *path = cp + *up++;
+			const char *const path = cp + *up++;
 			if (static_cast<size_t>(path - cp) > container.get_size()) {
 				THROW_ERROR(out_of_range, "offset " << (path - cp) << " > size " << container.get_size() << " in " << __PRETTY_FUNCTION__);
 			}

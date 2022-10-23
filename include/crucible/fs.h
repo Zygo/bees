@@ -55,15 +55,15 @@ namespace crucible {
 
 	ostream & operator<<(ostream &os, const BtrfsInodeOffsetRoot &p);
 
-	struct BtrfsDataContainer : public btrfs_data_container {
+	struct BtrfsDataContainer {
 		BtrfsDataContainer(size_t size = 64 * 1024);
 		void *prepare(size_t size);
 
 		size_t get_size() const;
-		decltype(bytes_left) get_bytes_left() const;
-		decltype(bytes_missing) get_bytes_missing() const;
-		decltype(elem_cnt) get_elem_cnt() const;
-		decltype(elem_missed) get_elem_missed() const;
+		decltype(btrfs_data_container::bytes_left) get_bytes_left() const;
+		decltype(btrfs_data_container::bytes_missing) get_bytes_missing() const;
+		decltype(btrfs_data_container::elem_cnt) get_elem_cnt() const;
+		decltype(btrfs_data_container::elem_missed) get_elem_missed() const;
 
 		ByteVector m_data;
 	};
