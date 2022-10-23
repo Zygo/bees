@@ -42,9 +42,6 @@ namespace crucible {
 		uint64_t bytenr() const;
 		bool operator==(const Extent &that) const;
 		bool operator!=(const Extent &that) const { return !(*this == that); }
-
-		Extent() = default;
-		Extent(const Extent &e) = default;
 	};
 
 	class ExtentWalker {
