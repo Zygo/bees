@@ -243,7 +243,7 @@ namespace crucible {
 			return os << "BtrfsIoctlLogicalInoArgs NULL";
 		}
 		os << "BtrfsIoctlLogicalInoArgs {";
-		os << " .logical = " << to_hex(p->logical);
+		os << " .m_logical = " << to_hex(p->m_logical);
 		os << " .inodes[] = {\n";
 		unsigned count = 0;
 		for (auto i = p->m_iors.cbegin(); i != p->m_iors.cend(); ++i) {
@@ -254,14 +254,10 @@ namespace crucible {
 	}
 
 	BtrfsIoctlLogicalInoArgs::BtrfsIoctlLogicalInoArgs(uint64_t new_logical, size_t new_size) :
-		btrfs_ioctl_logical_ino_args( (btrfs_ioctl_logical_ino_args) { } ),
 		m_container_size(new_size),
-		m_container(new_size)
+		m_container(new_size),
+		m_logical(new_logical)
 	{
-		assert(logical == 0);
-		assert(size == 0);
-		assert(flags == 0);
-		logical = new_logical;
 	}
 
 	size_t
@@ -300,11 +296,6 @@ namespace crucible {
 		return m_begin;
 	}
 
-	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::operator vector<BtrfsInodeOffsetRoot>() const
-	{
-		return vector<BtrfsInodeOffsetRoot>(m_begin, m_end);
-	}
-
 	void
 	BtrfsIoctlLogicalInoArgs::BtrfsInodeOffsetRootSpan::clear()
 	{
@@ -314,23 +305,28 @@ namespace crucible {
 	void
 	BtrfsIoctlLogicalInoArgs::set_flags(uint64_t new_flags)
 	{
-		// We are still supporting building with old headers that don't have .flags yet
-		*(&reserved[0] + 3) = new_flags;
+		m_flags = new_flags;
 	}
 
 	uint64_t
 	BtrfsIoctlLogicalInoArgs::get_flags() const
 	{
 		// We are still supporting building with old headers that don't have .flags yet
-		return *(&reserved[0] + 3);
+		return m_flags;
 	}
 
 	bool
 	BtrfsIoctlLogicalInoArgs::do_ioctl_nothrow(int fd)
 	{
-		btrfs_ioctl_logical_ino_args *const p = static_cast<btrfs_ioctl_logical_ino_args *>(this);
-		inodes = reinterpret_cast<uint64_t>(m_container.prepare(m_container_size));
-		size = m_container.get_size();
+		btrfs_ioctl_logical_ino_args args = (btrfs_ioctl_logical_ino_args) {
+			.logical = m_logical,
+			.size = m_container_size,
+			.inodes = reinterpret_cast<uint64_t>(m_container.prepare(m_container_size)),
+		};
+		// We are still supporting building with old headers that don't have .flags yet
+		*(&args.reserved[0] + 3) = m_flags;
+
+		btrfs_ioctl_logical_ino_args *const p = &args;
 
 		m_iors.clear();
 
@@ -368,12 +364,12 @@ namespace crucible {
 		}
 
 		btrfs_data_container *const bdc = reinterpret_cast<btrfs_data_container *>(p->inodes);
-		BtrfsInodeOffsetRoot *const input_iter = reinterpret_cast<BtrfsInodeOffsetRoot *>(bdc->val);
+		BtrfsInodeOffsetRoot *const ior_iter = reinterpret_cast<BtrfsInodeOffsetRoot *>(bdc->val);
 
 		// elem_cnt counts uint64_t, but BtrfsInodeOffsetRoot is 3x uint64_t
 		THROW_CHECK1(runtime_error, bdc->elem_cnt, bdc->elem_cnt % 3 == 0);
-		m_iors.m_begin = input_iter;
-		m_iors.m_end = input_iter + bdc->elem_cnt / 3;
+		m_iors.m_begin = ior_iter;
+		m_iors.m_end = ior_iter + bdc->elem_cnt / 3;
 		return true;
 	}
 

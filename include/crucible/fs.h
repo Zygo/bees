@@ -64,7 +64,7 @@ namespace crucible {
 		ByteVector m_data;
 	};
 
-	struct BtrfsIoctlLogicalInoArgs : public btrfs_ioctl_logical_ino_args {
+	struct BtrfsIoctlLogicalInoArgs {
 		BtrfsIoctlLogicalInoArgs(uint64_t logical, size_t buf_size = 16 * 1024 * 1024);
 
 		uint64_t get_flags() const;
@@ -73,7 +73,6 @@ namespace crucible {
 		virtual void do_ioctl(int fd);
 		virtual bool do_ioctl_nothrow(int fd);
 
-		size_t m_container_size;
 		struct BtrfsInodeOffsetRootSpan {
 			using iterator = BtrfsInodeOffsetRoot*;
 			using const_iterator = const BtrfsInodeOffsetRoot*;
@@ -84,13 +83,17 @@ namespace crucible {
 			const_iterator cend() const;
 			iterator data() const;
 			void clear();
-			operator vector<BtrfsInodeOffsetRoot>() const;
 		private:
 			iterator m_begin = nullptr;
 			iterator m_end = nullptr;
 		friend struct BtrfsIoctlLogicalInoArgs;
 		} m_iors;
+	private:
+		size_t m_container_size;
 		BtrfsDataContainer m_container;
+		uint64_t m_logical;
+		uint64_t m_flags = 0;
+	friend ostream & operator<<(ostream &os, const BtrfsIoctlLogicalInoArgs *p);
 	};
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlLogicalInoArgs &p);
