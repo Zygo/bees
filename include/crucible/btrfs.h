@@ -216,7 +216,28 @@ enum btrfs_compression_type {
 	#define BTRFS_FS_INFO_FLAG_CSUM_INFO                    (1 << 0)
 #endif
 
-struct btrfs_ioctl_fs_info_args_v2 {
+#ifndef BTRFS_FS_INFO_FLAG_GENERATION
+/* Request information about filesystem generation */
+#define BTRFS_FS_INFO_FLAG_GENERATION                   (1 << 1)
+#endif
+
+#ifndef BTRFS_FS_INFO_FLAG_METADATA_UUID
+/* Request information about filesystem metadata UUID */
+#define BTRFS_FS_INFO_FLAG_METADATA_UUID                (1 << 2)
+#endif
+
+// BTRFS_CSUM_TYPE_CRC32 was a #define from 2008 to 2019.
+// After that, it's an enum with the other 3 types.
+// So if we do _not_ have CRC32 defined, it means we have the other 3;
+// if we _do_ have CRC32 defined, it means we need the other 3.
+// This seems likely to break some day.
+#ifdef BTRFS_CSUM_TYPE_CRC32
+	#define BTRFS_CSUM_TYPE_XXHASH 1
+	#define BTRFS_CSUM_TYPE_SHA256 2
+	#define BTRFS_CSUM_TYPE_BLAKE2 3
+#endif
+
+struct btrfs_ioctl_fs_info_args_v3 {
 	__u64 max_id;                           /* out */
 	__u64 num_devices;                      /* out */
 	__u8 fsid[BTRFS_FSID_SIZE];             /* out */
@@ -227,7 +248,9 @@ struct btrfs_ioctl_fs_info_args_v2 {
 	__u16 csum_type;                        /* out */
 	__u16 csum_size;                        /* out */
 	__u64 flags;                            /* in/out */
-	__u8 reserved[968];                     /* pad to 1k */
+	__u64 generation;                       /* out */
+	__u8 metadata_uuid[BTRFS_FSID_SIZE];    /* out */
+	__u8 reserved[944];                     /* pad to 1k */
 };
 
 #endif // CRUCIBLE_BTRFS_H

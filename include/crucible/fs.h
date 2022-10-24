@@ -248,11 +248,12 @@ namespace crucible {
 
 	template<class V> ostream &hexdump(ostream &os, const V &v);
 
-	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v2 {
+	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v3 {
 		BtrfsIoctlFsInfoArgs();
 		void do_ioctl(int fd);
 		uint16_t csum_type() const;
 		uint16_t csum_size() const;
+		uint64_t generation() const;
 	};
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlFsInfoArgs &a);

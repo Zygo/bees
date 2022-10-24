@@ -1136,8 +1136,11 @@ namespace crucible {
 	};
 
 	BtrfsIoctlFsInfoArgs::BtrfsIoctlFsInfoArgs() :
-		btrfs_ioctl_fs_info_args_v2( (btrfs_ioctl_fs_info_args_v2) {
-			.flags = BTRFS_FS_INFO_FLAG_CSUM_INFO,
+		btrfs_ioctl_fs_info_args_v3( (btrfs_ioctl_fs_info_args_v3) {
+			.flags = 0
+				| BTRFS_FS_INFO_FLAG_CSUM_INFO
+				| BTRFS_FS_INFO_FLAG_GENERATION
+			,
 		})
 	{
 	}
@@ -1145,7 +1148,7 @@ namespace crucible {
 	void
 	BtrfsIoctlFsInfoArgs::do_ioctl(int fd)
 	{
-		btrfs_ioctl_fs_info_args_v2 *p = static_cast<btrfs_ioctl_fs_info_args_v2 *>(this);
+		btrfs_ioctl_fs_info_args_v3 *p = static_cast<btrfs_ioctl_fs_info_args_v3 *>(this);
 		if (ioctl(fd, BTRFS_IOC_FS_INFO, p)) {
 			THROW_ERRNO("BTRFS_IOC_FS_INFO: fd " << fd);
 		}
@@ -1154,13 +1157,19 @@ namespace crucible {
 	uint16_t
 	BtrfsIoctlFsInfoArgs::csum_type() const
 	{
-		return this->btrfs_ioctl_fs_info_args_v2::csum_type;
+		return this->btrfs_ioctl_fs_info_args_v3::csum_type;
 	}
 
 	uint16_t
 	BtrfsIoctlFsInfoArgs::csum_size() const
 	{
-		return this->btrfs_ioctl_fs_info_args_v2::csum_size;
+		return this->btrfs_ioctl_fs_info_args_v3::csum_size;
+	}
+
+	uint64_t
+	BtrfsIoctlFsInfoArgs::generation() const
+	{
+		return this->btrfs_ioctl_fs_info_args_v3::generation;
 	}
 
 };
