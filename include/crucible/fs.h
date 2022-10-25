@@ -143,7 +143,7 @@ namespace crucible {
 		off_t end() const;
 	};
 
-	struct Fiemap : public fiemap {
+	struct Fiemap {
 
 		// because fiemap.h insists on giving FIEMAP_MAX_OFFSET
 		// a different type from the struct fiemap members
@@ -155,8 +155,14 @@ namespace crucible {
 		void do_ioctl(int fd);
 
 		vector<FiemapExtent> m_extents;
-		uint64_t m_min_count = (4096 - sizeof(fiemap)) / sizeof(fiemap_extent);
-		uint64_t m_max_count = 16 * 1024 * 1024 / sizeof(fiemap_extent);
+		decltype(fiemap::fm_extent_count) m_min_count = (4096 - sizeof(fiemap)) / sizeof(fiemap_extent);
+		decltype(fiemap::fm_extent_count) m_max_count = 16 * 1024 * 1024 / sizeof(fiemap_extent);
+		uint64_t m_start;
+		uint64_t m_length;
+		// FIEMAP is slow and full of lies.
+		// This makes FIEMAP even slower, but reduces the lies a little.
+		decltype(fiemap::fm_flags) m_flags = FIEMAP_FLAG_SYNC;
+	friend ostream &operator<<(ostream &, const Fiemap &);
 	};
 
 	ostream & operator<<(ostream &os, const fiemap_extent *info);

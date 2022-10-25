@@ -640,9 +640,7 @@ namespace crucible {
 	ExtentWalker::get_extent_map(off_t pos)
 	{
 		EWLOG("get_extent_map(" << to_hex(pos) << ")");
-		Fiemap fm;
-		fm.fm_start = ranged_cast<uint64_t>(pos);
-		fm.fm_length = ranged_cast<uint64_t>(numeric_limits<off_t>::max() - pos);
+		Fiemap fm(ranged_cast<uint64_t>(pos), ranged_cast<uint64_t>(numeric_limits<off_t>::max() - pos));
 		fm.m_max_count = fm.m_min_count = sc_extent_fetch_max;
 		fm.do_ioctl(m_fd);
 		Vec rv;

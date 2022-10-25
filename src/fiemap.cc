@@ -22,15 +22,17 @@ main(int argc, char **argv)
 	
 		cout << "File: " << filename << endl;
 		Fd fd = open_or_die(filename, O_RDONLY);
-		Fiemap fm;
-		fm.fm_flags &= ~(FIEMAP_FLAG_SYNC);
+		uint64_t start = 0;
+		uint64_t length = Fiemap::s_fiemap_max_offset;
+		if (argc > 2) { start = stoull(argv[2], nullptr, 0); }
+		if (argc > 3) { length = stoull(argv[3], nullptr, 0); }
+		length = min(length, Fiemap::s_fiemap_max_offset - start);
+		Fiemap fm(start, length);
+		fm.m_flags &= ~(FIEMAP_FLAG_SYNC);
 		fm.m_max_count = 100;
-		if (argc > 2) { fm.fm_start = stoull(argv[2], nullptr, 0); }
-		if (argc > 3) { fm.fm_length = stoull(argv[3], nullptr, 0); }
-		if (argc > 4) { fm.fm_flags = stoull(argv[4], nullptr, 0); }
-		fm.fm_length = min(fm.fm_length, Fiemap::s_fiemap_max_offset - fm.fm_start);
-		uint64_t stop_at = fm.fm_start + fm.fm_length;
-		uint64_t last_byte = fm.fm_start;
+		if (argc > 4) { fm.m_flags = stoull(argv[4], nullptr, 0); }
+		uint64_t stop_at = start + length;
+		uint64_t last_byte = start;
 		do {
 			fm.do_ioctl(fd);
 			// cerr << fm;
@@ -45,8 +47,8 @@ main(int argc, char **argv)
 				last_logical = extent.fe_logical + extent.fe_length;
 				last_byte = last_logical;
 			}
-			fm.fm_start = last_logical;
-		} while (fm.fm_start < stop_at);
+			fm.m_start = last_logical;
+		} while (fm.m_start < stop_at);
 	});
 	exit(EXIT_SUCCESS);
 }

@@ -655,13 +655,10 @@ namespace crucible {
 	operator<<(ostream &os, const Fiemap &args)
 	{
 		os << "Fiemap {";
-		os << " .fm_start = " << to_hex(args.fm_start) << ".." << to_hex(args.fm_start + args.fm_length);
-		os << ", .fm_length = " << to_hex(args.fm_length);
-		if (args.fm_flags) os << ", .fm_flags = " << fiemap_flags_ntoa(args.fm_flags);
-		os << ", .fm_mapped_extents = " << args.fm_mapped_extents;
-		os << ", .fm_extent_count = " << args.fm_extent_count;
-		if (args.fm_reserved) os << ", .fm_reserved = " << args.fm_reserved;
-		os << ", .fm_extents[] = {";
+		os << " .m_start = " << to_hex(args.m_start) << ".." << to_hex(args.m_start + args.m_length);
+		os << ", .m_length = " << to_hex(args.m_length);
+		os << ", .m_flags = " << fiemap_flags_ntoa(args.m_flags);
+		os << ", .fm_extents[" << args.m_extents.size() << "] = {";
 		size_t count = 0;
 		for (auto i = args.m_extents.cbegin(); i != args.m_extents.cend(); ++i) {
 			os << "\n\t[" << count++ << "] = " << &(*i) << ",";
@@ -670,13 +667,8 @@ namespace crucible {
 	}
 
 	Fiemap::Fiemap(uint64_t start, uint64_t length) :
-		fiemap( (fiemap) {
-			.fm_start = start,
-			.fm_length = length,
-			// FIEMAP is slow and full of lies.
-			// This makes FIEMAP even slower, but reduces the lies a little.
-			.fm_flags = FIEMAP_FLAG_SYNC,
-		})
+		m_start(start),
+		m_length(length)
 	{
 	}
 
@@ -684,25 +676,25 @@ namespace crucible {
 	Fiemap::do_ioctl(int fd)
 	{
 		THROW_CHECK1(out_of_range, m_min_count, m_min_count <= m_max_count);
+		THROW_CHECK1(out_of_range, m_min_count, m_min_count > 0);
 
-		auto extent_count = m_min_count;
-		ByteVector ioctl_arg(static_cast<const fiemap&>(*this), sizeof(fiemap) + extent_count * sizeof(fiemap_extent));
+		const auto extent_count = m_min_count;
+		ByteVector ioctl_arg(sizeof(fiemap) + extent_count * sizeof(fiemap_extent));
 
 		fiemap *const ioctl_ptr = ioctl_arg.get<fiemap>();
 
-		auto start = fm_start;
-		auto end = fm_start + fm_length;
-
-		auto orig_start = fm_start;
-		auto orig_length = fm_length;
+		auto start = m_start;
+		const auto end = m_start + m_length;
 
 		vector<FiemapExtent> extents;
 
 		while (start < end && extents.size() < m_max_count) {
-			ioctl_ptr->fm_start = start;
-			ioctl_ptr->fm_length = end - start;
-			ioctl_ptr->fm_extent_count = extent_count;
-			ioctl_ptr->fm_mapped_extents = 0;
+			*ioctl_ptr = (fiemap) {
+				.fm_start = start,
+				.fm_length = end - start,
+				.fm_flags = m_flags,
+				.fm_extent_count = extent_count,
+			};
 
 			// cerr << "Before (fd = " << fd << ") : " << ioctl_ptr << endl;
 			DIE_IF_MINUS_ONE(ioctl(fd, FS_IOC_FIEMAP, ioctl_ptr));
@@ -728,11 +720,6 @@ namespace crucible {
 			}
 		}
 
-		fiemap *this_ptr = static_cast<fiemap *>(this);
-		*this_ptr = *ioctl_ptr;
-		fm_start = orig_start;
-		fm_length = orig_length;
-		fm_extent_count = extents.size();
 		m_extents = extents;
 	}
 
