@@ -7,7 +7,6 @@ After=sysinit.target
 Type=simple
 ExecStart=@PREFIX@/sbin/beesd --no-timestamps %i
 CPUAccounting=true
-CPUSchedulingPolicy=batch
 CPUWeight=12
 IOSchedulingClass=idle
 IOSchedulingPriority=7

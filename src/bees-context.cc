@@ -329,7 +329,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
 		Task(
-			"dedup_prealloc",
+			"dedup_prealloc", SCHED_IDLE,
 			[m_ctx, bfr, e]() {
 				BEESLOGINFO("prealloc extent " << e);
 				// Must not extend past EOF
@@ -964,10 +964,10 @@ BeesContext::start()
 
 	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_status_thread = make_shared<BeesThread>("status_report");
-	m_progress_thread->exec([=]() {
+	m_progress_thread->exec(SCHED_OTHER, [=]() {
 		show_progress();
 	});
-	m_status_thread->exec([=]() {
+	m_status_thread->exec(SCHED_OTHER, [=]() {
 		dump_status();
 	});
 

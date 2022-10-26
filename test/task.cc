@@ -33,7 +33,7 @@ test_tasks(size_t count)
 		ostringstream oss;
 		oss << "task #" << c;
 		Task t(
-			oss.str(),
+			oss.str(), SCHED_OTHER,
 			[c, &task_done, &mtx, &cv]() {
 				unique_lock<mutex> lock(mtx);
 				// cerr << "Task #" << c << endl;
@@ -101,7 +101,7 @@ test_barrier(size_t count)
 		ostringstream oss;
 		oss << "task #" << c;
 		Task t(
-			oss.str(),
+			oss.str(), SCHED_OTHER,
 			[c, &task_done, &mtx, bl]() mutable {
 				// cerr << "Task #" << c << endl;
 				unique_lock<mutex> lock(mtx);
@@ -120,7 +120,7 @@ test_barrier(size_t count)
 	bool done_flag = false;
 
 	Task completed(
-		"Waiting for Barrier",
+		"Waiting for Barrier", SCHED_OTHER,
 		[&mtx, &cv, &done_flag]() {
 			unique_lock<mutex> lock(mtx);
 			// cerr << "Running cv notify" << endl;
@@ -170,7 +170,7 @@ test_exclusion(size_t count)
 		ostringstream oss;
 		oss << "task #" << c;
 		Task t(
-			oss.str(),
+			oss.str(), SCHED_OTHER,
 			[c, &only_one, excl, &lock_success_count, &lock_failure_count, &pings, &tasks_running, &cv, &mtx]() mutable {
 				// cerr << "Task #" << c << endl;
 				(void)c;
