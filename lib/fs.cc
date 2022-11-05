@@ -143,6 +143,7 @@ namespace crucible {
 		ByteVector ioctl_arg( (btrfs_ioctl_same_args) {
 			.logical_offset = m_logical_offset,
 			.length = m_length,
+			.dest_count = ranged_cast<decltype(btrfs_ioctl_same_args::dest_count)>(m_info.size()),
 		}, buf_size);
 		btrfs_ioctl_same_args *const ioctl_ptr = ioctl_arg.get<btrfs_ioctl_same_args>();
 		size_t count = 0;
