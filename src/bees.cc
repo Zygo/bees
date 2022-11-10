@@ -220,7 +220,7 @@ bees_readahead(int const fd, off_t offset, size_t size)
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
-#if 1
+#if 0
 	// In the kernel, readahead() is identical to posix_fadvise(..., POSIX_FADV_DONTNEED)
 	DIE_IF_NON_ZERO(readahead(fd, offset, size));
 #else
