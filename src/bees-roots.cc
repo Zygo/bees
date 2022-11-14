@@ -50,25 +50,316 @@ BeesCrawlState::operator<(const BeesCrawlState &that) const
 		< tie(that.m_min_transid, that.m_max_transid, that.m_objectid, that.m_offset, that.m_root);
 }
 
-string
-BeesRoots::scan_mode_ntoa(BeesRoots::ScanMode mode)
+class BeesScanMode {
+protected:
+	shared_ptr<BeesRoots>	m_roots;
+	bool crawl_batch(const shared_ptr<BeesCrawl>& crawl);
+public:
+	virtual ~BeesScanMode() {}
+	BeesScanMode(const shared_ptr<BeesRoots>& roots) : m_roots(roots) {}
+	virtual bool scan() = 0;
+	using CrawlMap = decltype(BeesRoots::m_root_crawl_map);
+	virtual void next_transid(const CrawlMap &crawl_map) = 0;
+	virtual const char *ntoa() const = 0;
+};
+
+bool
+BeesScanMode::crawl_batch(const shared_ptr<BeesCrawl>& crawl)
 {
-	static const bits_ntoa_table table[] = {
-		{ .n = SCAN_MODE_LOCKSTEP, .mask = ~0ULL, .a = "lockstep" },
-		{ .n = SCAN_MODE_INDEPENDENT, .mask = ~0ULL, .a = "independent" },
-		{ .n = SCAN_MODE_SEQUENTIAL, .mask = ~0ULL, .a = "sequential" },
-		{ .n = SCAN_MODE_RECENT, .mask = ~0ULL, .a = "recent" },
-		NTOA_TABLE_ENTRY_END()
+	return m_roots->crawl_batch(crawl);
+}
+
+/// Scan the same inode/offset tuple in each subvol.  Good for caching and space saving,
+/// bad for filesystems with rotating snapshots.
+class BeesScanModeLockstep : public BeesScanMode {
+	using SortKey = tuple<uint64_t, uint64_t, uint64_t>;
+	using Map = map<SortKey, CrawlMap::mapped_type>;
+	mutex m_mutex;
+	shared_ptr<Map> m_sorted;
+public:
+	using BeesScanMode::BeesScanMode;
+	~BeesScanModeLockstep() override {}
+	bool scan() override;
+	void next_transid(const CrawlMap &crawl_map) override;
+	const char *ntoa() const override;
+};
+
+const char *
+BeesScanModeLockstep::ntoa() const
+{
+	return "LOCKSTEP";
+}
+
+bool
+BeesScanModeLockstep::scan()
+{
+	unique_lock<mutex> lock(m_mutex);
+	const auto hold_sorted = m_sorted;
+	lock.unlock();
+	if (!hold_sorted) {
+		BEESLOGINFO("called Lockstep scan without a sorted map");
+		return false;
+	}
+	auto &sorted = *hold_sorted;
+	while (!sorted.empty()) {
+		const auto this_crawl = sorted.begin()->second;
+		sorted.erase(sorted.begin());
+		const bool rv = crawl_batch(this_crawl);
+		if (rv) {
+			const auto this_range = this_crawl->peek_front();
+			if (this_range) {
+				const auto new_key = SortKey(this_range.fid().ino(), this_range.begin(), this_range.fid().root());
+				const auto new_value = make_pair(new_key, this_crawl);
+				const auto insert_rv = sorted.insert(new_value);
+				THROW_CHECK0(runtime_error, insert_rv.second);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void
+BeesScanModeLockstep::next_transid(const CrawlMap &crawl_map)
+{
+	auto new_map = make_shared<Map>();
+	for (const auto &i : crawl_map) {
+		const auto this_crawl = i.second;
+		const auto this_range = this_crawl->peek_front();
+		if (this_range) {
+			const auto new_key = SortKey(this_range.fid().ino(), this_range.begin(), this_range.fid().root());
+			const auto new_value = make_pair(new_key, this_crawl);
+			const auto insert_rv = new_map->insert(new_value);
+			THROW_CHECK0(runtime_error, insert_rv.second);
+		}
+	}
+	unique_lock<mutex> lock(m_mutex);
+	swap(m_sorted, new_map);
+}
+
+/// Scan each subvol in round-robin with no synchronization.
+/// Good for continuous forward progress while avoiding lock contention.
+class BeesScanModeIndependent : public BeesScanMode {
+	using List = list<CrawlMap::mapped_type>;
+	mutex m_mutex;
+	shared_ptr<List> m_subvols;
+public:
+	using BeesScanMode::BeesScanMode;
+	~BeesScanModeIndependent() override {}
+	bool scan() override;
+	void next_transid(const CrawlMap &crawl_map) override;
+	const char *ntoa() const override;
+};
+
+const char *
+BeesScanModeIndependent::ntoa() const
+{
+	return "INDEPENDENT";
+}
+
+bool
+BeesScanModeIndependent::scan()
+{
+	unique_lock<mutex> lock(m_mutex);
+	const auto hold_subvols = m_subvols;
+	lock.unlock();
+	if (!hold_subvols) {
+		BEESLOGINFO("called Independent scan without a subvol list");
+		return false;
+	}
+	auto &subvols = *hold_subvols;
+	while (!subvols.empty()) {
+		const auto this_crawl = *subvols.begin();
+		subvols.erase(subvols.begin());
+		const bool rv = crawl_batch(this_crawl);
+		if (rv) {
+			subvols.push_back(this_crawl);
+			return true;
+		}
+	}
+	return false;
+}
+
+void
+BeesScanModeIndependent::next_transid(const CrawlMap &crawl_map)
+{
+	auto new_subvols = make_shared<List>();
+	for (const auto &i : crawl_map) {
+		const auto this_crawl = i.second;
+		const auto this_range = this_crawl->peek_front();
+		if (this_range) {
+			new_subvols->push_back(this_crawl);
+		}
+	}
+	unique_lock<mutex> lock(m_mutex);
+	swap(m_subvols, new_subvols);
+}
+
+/// Scan each subvol completely, in numerical order, before moving on to the next.
+/// This was an experimental mode that requires large amounts of temporary space
+/// and has the lowest hit rate.
+class BeesScanModeSequential : public BeesScanMode {
+	using SortKey = uint64_t;
+	using Map = map<SortKey, CrawlMap::mapped_type>;
+	mutex m_mutex;
+	shared_ptr<Map> m_sorted;
+public:
+	using BeesScanMode::BeesScanMode;
+	~BeesScanModeSequential() override {}
+	bool scan() override;
+	void next_transid(const CrawlMap &crawl_map) override;
+	const char *ntoa() const override;
+};
+
+const char *
+BeesScanModeSequential::ntoa() const
+{
+	return "SEQUENTIAL";
+}
+
+bool
+BeesScanModeSequential::scan()
+{
+	unique_lock<mutex> lock(m_mutex);
+	const auto hold_sorted = m_sorted;
+	lock.unlock();
+	if (!hold_sorted) {
+		BEESLOGINFO("called Sequential scan without a sorted map");
+		return false;
+	}
+	auto &sorted = *hold_sorted;
+	while (!sorted.empty()) {
+		const auto this_crawl = sorted.begin()->second;
+		const bool rv = crawl_batch(this_crawl);
+		if (rv) {
+			return true;
+		} else {
+			sorted.erase(sorted.begin());
+		}
+	}
+	return false;
+}
+
+void
+BeesScanModeSequential::next_transid(const CrawlMap &crawl_map)
+{
+	auto new_map = make_shared<Map>();
+	for (const auto &i : crawl_map) {
+		const auto this_crawl = i.second;
+		const auto this_range = this_crawl->peek_front();
+		if (this_range) {
+			const auto new_key = this_range.fid().root();
+			const auto new_value = make_pair(new_key, this_crawl);
+			const auto insert_rv = new_map->insert(new_value);
+			THROW_CHECK0(runtime_error, insert_rv.second);
+		}
+	}
+	unique_lock<mutex> lock(m_mutex);
+	swap(m_sorted, new_map);
+}
+
+/// Scan the most recently completely scanned subvols first.  Keeps recently added data
+/// from accumulating in small subvols while large subvols are still undergoing their first scan.
+class BeesScanModeRecent : public BeesScanMode {
+	struct SortKey {
+		uint64_t min_transid, max_transid;
+		bool operator<(const SortKey &that) const {
+			return tie(that.min_transid, that.max_transid) < tie(min_transid, max_transid);
+		}
 	};
-	return bits_ntoa(mode, table);
+	using Map = map<SortKey, list<CrawlMap::mapped_type>>;
+	mutex m_mutex;
+	shared_ptr<Map> m_sorted;
+public:
+	using BeesScanMode::BeesScanMode;
+	~BeesScanModeRecent() override {}
+	bool scan() override;
+	void next_transid(const CrawlMap &crawl_map) override;
+	const char *ntoa() const override;
+};
+
+const char *
+BeesScanModeRecent::ntoa() const
+{
+	return "RECENT";
+}
+
+bool
+BeesScanModeRecent::scan()
+{
+	unique_lock<mutex> lock(m_mutex);
+	const auto hold_sorted = m_sorted;
+	lock.unlock();
+	if (!hold_sorted) {
+		BEESLOGINFO("called Recent scan without a sorted map");
+		return false;
+	}
+	auto &sorted = *hold_sorted;
+	while (!sorted.empty()) {
+		auto &this_list = sorted.begin()->second;
+		if (this_list.empty()) {
+			sorted.erase(sorted.begin());
+		} else {
+			const auto this_crawl = *this_list.begin();
+			this_list.erase(this_list.begin());
+			const bool rv = crawl_batch(this_crawl);
+			if (rv) {
+				this_list.push_back(this_crawl);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void
+BeesScanModeRecent::next_transid(const CrawlMap &crawl_map)
+{
+	auto new_map = make_shared<Map>();
+	auto &sorted = *new_map;
+	for (const auto &i : crawl_map) {
+		const auto this_crawl = i.second;
+		const auto this_range = this_crawl->peek_front();
+		if (this_range) {
+			const auto state_end = this_crawl->get_state_end();
+			const auto min_transid = state_end.m_min_transid;
+			const auto max_transid = state_end.m_max_transid;
+			const SortKey key { .min_transid = min_transid, .max_transid = max_transid };
+			sorted[key].push_back(this_crawl);
+		}
+	}
+	unique_lock<mutex> lock(m_mutex);
+	swap(m_sorted, new_map);
 }
 
 void
 BeesRoots::set_scan_mode(ScanMode mode)
 {
 	THROW_CHECK1(invalid_argument, mode, mode < SCAN_MODE_COUNT);
-	m_scan_mode = mode;
-	BEESLOGINFO("Scan mode set to " << mode << " (" << scan_mode_ntoa(mode) << ")");
+	unique_lock<mutex> lock(m_mutex);
+	switch (mode) {
+		case SCAN_MODE_LOCKSTEP: {
+			m_scanner = make_shared<BeesScanModeLockstep>(shared_from_this());
+			break;
+		}
+		case SCAN_MODE_INDEPENDENT: {
+			m_scanner = make_shared<BeesScanModeIndependent>(shared_from_this());
+			break;
+		}
+		case SCAN_MODE_SEQUENTIAL: {
+			m_scanner = make_shared<BeesScanModeSequential>(shared_from_this());
+			break;
+		}
+		case SCAN_MODE_RECENT: {
+			m_scanner = make_shared<BeesScanModeRecent>(shared_from_this());
+			break;
+		}
+		case SCAN_MODE_COUNT:
+		default:
+			assert(false);
+			break;
+	}
+	BEESLOGINFO("Scan mode set to " << mode << " (" << m_scanner->ntoa() << ")");
 }
 
 void
@@ -397,132 +688,19 @@ bool
 BeesRoots::crawl_roots()
 {
 	BEESNOTE("Crawling roots");
+	BEESTRACE("Crawling roots");
 
 	unique_lock<mutex> lock(m_mutex);
-	// Work from a copy because BeesCrawl might change the world under us
-	const auto crawl_map_copy = m_root_crawl_map;
+	const auto hold_scanner = m_scanner;
 	lock.unlock();
 
-	// Nothing to crawl?  Seems suspicious...
-	if (m_root_crawl_map.empty()) {
-		BEESLOGINFO("idle: crawl map is empty!");
-	}
+	THROW_CHECK0(runtime_error, hold_scanner);
 
-	// Now we insert some number of crawl batches into the task queue
-	BEESNOTE("Scanning roots in " << scan_mode_ntoa(m_scan_mode) << " mode");
-	BEESTRACE("scanning roots in " << scan_mode_ntoa(m_scan_mode) << " mode");
-	switch (m_scan_mode) {
+	BEESNOTE("Scanning roots in " << hold_scanner->ntoa() << " mode");
+	BEESTRACE("scanning roots in " << hold_scanner->ntoa() << " mode");
 
-		case SCAN_MODE_LOCKSTEP: {
-			// Scan the same inode/offset tuple in each subvol (bad for locking)
-			BeesFileRange first_range;
-			shared_ptr<BeesCrawl> first_crawl;
-			for (const auto &i : crawl_map_copy) {
-				const auto this_crawl = i.second;
-				const auto this_range = this_crawl->peek_front();
-				if (this_range) {
-					// Use custom ordering here to avoid abusing BeesFileRange::operator<().
-					if (!first_range ||
-						make_tuple(this_range.fid().ino(), this_range.begin(), this_range.fid().root()) <
-						make_tuple(first_range.fid().ino(), first_range.begin(), first_range.fid().root())
-					) {
-						first_crawl = this_crawl;
-						first_range = this_range;
-					}
-				}
-			}
-
-			if (!first_crawl) {
-				return false;
-			}
-
-			const auto batch_count = crawl_batch(first_crawl);
-
-			if (batch_count) {
-				return true;
-			}
-
-			break;
-		}
-
-		case SCAN_MODE_INDEPENDENT: {
-			// Scan each subvol one extent at a time (good for continuous forward progress)
-			size_t batch_count = 0;
-			for (auto i : crawl_map_copy) {
-				batch_count += crawl_batch(i.second);
-			}
-
-			if (batch_count) {
-				return true;
-			}
-			break;
-		}
-
-		case SCAN_MODE_SEQUENTIAL: {
-			// Scan oldest crawl first (requires maximum amount of temporary space)
-			vector<shared_ptr<BeesCrawl>> crawl_vector;
-			for (auto i : crawl_map_copy) {
-				crawl_vector.push_back(i.second);
-			}
-			sort(crawl_vector.begin(), crawl_vector.end(), [&](const shared_ptr<BeesCrawl> &a, const shared_ptr<BeesCrawl> &b) -> bool {
-				const auto a_state = a->get_state_end();
-				const auto b_state = b->get_state_end();
-				return tie(a_state.m_started, a_state.m_root) < tie(b_state.m_started, b_state.m_root);
-			});
-
-			for (const auto &i : crawl_vector) {
-				const auto batch_count = crawl_batch(i);
-
-				if (batch_count) {
-					return true;
-				}
-			}
-
-			break;
-		}
-
-		case SCAN_MODE_RECENT: {
-			// Scan highest min_transid first, then oldest, then lockstep
-			using crawl_tuple = shared_ptr<BeesCrawl>;
-			vector<crawl_tuple> crawl_vector;
-			for (const auto &i : crawl_map_copy) {
-				crawl_vector.push_back(i.second);
-			}
-			sort(crawl_vector.begin(), crawl_vector.end(), [&](const crawl_tuple &a, const crawl_tuple &b) {
-				const auto a_state = a->get_state_end();
-				const auto b_state = b->get_state_end();
-				return tie(
-					b_state.m_min_transid,
-					a_state.m_started,
-					a_state.m_objectid,
-					a_state.m_root,
-					a_state.m_offset
-				) < tie(
-					a_state.m_min_transid,
-					b_state.m_started,
-					b_state.m_objectid,
-					b_state.m_root,
-					b_state.m_offset
-				);
-			});
-			size_t count = 0;
-			for (const auto &i : crawl_vector) {
-				++count;
-				BEESNOTE("crawling " << count << " of " << crawl_vector.size() << " roots in recent order");
-				const auto batch_count = crawl_batch(i);
-
-				if (batch_count) {
-					return true;
-				}
-			}
-
-			break;
-		}
-
-		case SCAN_MODE_COUNT:
-		default:
-			assert(false);
-			break;
+	if (hold_scanner->scan()) {
+		return true;
 	}
 
 	BEESNOTE("Crawl done");
@@ -650,7 +828,7 @@ BeesRoots::insert_new_crawl()
 
 	unique_lock<mutex> lock(m_mutex);
 	set<uint64_t> excess_roots;
-	for (auto i : m_root_crawl_map) {
+	for (const auto &i : m_root_crawl_map) {
 		BEESTRACE("excess_roots.insert(" << i.first << ")");
 		excess_roots.insert(i.first);
 	}
@@ -666,11 +844,29 @@ BeesRoots::insert_new_crawl()
 		new_bcs.m_root = next_root(new_bcs.m_root);
 	}
 
-	for (auto i : excess_roots) {
+	for (const auto &i : excess_roots) {
 		new_bcs.m_root = i;
 		BEESTRACE("crawl_state_erase(" << new_bcs << ")");
 		crawl_state_erase(new_bcs);
 	}
+
+	BEESNOTE("rebuilding crawl map");
+	BEESTRACE("rebuilding crawl map");
+
+	lock.lock();
+	THROW_CHECK0(runtime_error, m_scanner);
+
+	// Work from a copy because BeesCrawl might change the world under us
+	const auto crawl_map_copy = m_root_crawl_map;
+	lock.unlock();
+
+	// Nothing to crawl?  Seems suspicious...
+	if (m_root_crawl_map.empty()) {
+		BEESLOGINFO("crawl map is empty!");
+	}
+
+	// We'll send an empty map to the scanner anyway, maybe we want it to stop
+	m_scanner->next_transid(crawl_map_copy);
 }
 
 void

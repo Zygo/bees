@@ -528,6 +528,8 @@ public:
 	void deferred(bool def_setting);
 };
 
+class BeesScanMode;
+
 class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
@@ -544,6 +546,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
 	Task					m_crawl_task;
 	bool					m_workaround_btrfs_send = false;
+
+	shared_ptr<BeesScanMode>		m_scanner;
 
 	mutex					m_tmpfiles_mutex;
 	map<BeesFileId, Fd>			m_tmpfiles;
@@ -573,18 +577,19 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	RateEstimator& transid_re();
 	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
-	void insert_tmpfile(Fd fd);
-	void erase_tmpfile(Fd fd);
 
-friend class BeesFdCache;
 friend class BeesCrawl;
-friend class BeesTempFile;
+friend class BeesFdCache;
+friend class BeesScanMode;
 
 public:
 	BeesRoots(shared_ptr<BeesContext> ctx);
 	void start();
 	void stop_request();
 	void stop_wait();
+
+	void insert_tmpfile(Fd fd);
+	void erase_tmpfile(Fd fd);
 
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
@@ -602,11 +607,6 @@ public:
 
 	void set_scan_mode(ScanMode new_mode);
 	void set_workaround_btrfs_send(bool do_avoid);
-
-private:
-	ScanMode m_scan_mode = SCAN_MODE_COUNT; // must be set
-	static string scan_mode_ntoa(ScanMode new_mode);
-
 };
 
 struct BeesHash {
