@@ -13,6 +13,7 @@ CRUCIBLE_OBJS = \
 	extentwalker.o \
 	fd.o \
 	fs.o \
+	multilock.o \
 	ntoa.o \
 	path.o \
 	process.o \
