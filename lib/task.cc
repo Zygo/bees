@@ -788,16 +788,6 @@ namespace crucible {
 		void insert_task(Task t);
 	};
 
-	Barrier::Barrier(shared_ptr<BarrierState> pbs) :
-		m_barrier_state(pbs)
-	{
-	}
-
-	Barrier::Barrier() :
-		m_barrier_state(make_shared<BarrierState>())
-	{
-	}
-
 	void
 	BarrierState::release()
 	{
@@ -813,22 +803,16 @@ namespace crucible {
 		release();
 	}
 
-	BarrierLock::BarrierLock(shared_ptr<BarrierState> pbs) :
-		m_barrier_state(pbs)
-	{
-	}
-
-	void
-	BarrierLock::release()
-	{
-		m_barrier_state.reset();
-	}
-
 	void
 	BarrierState::insert_task(Task t)
 	{
 		unique_lock<mutex> lock(m_mutex);
 		m_tasks.insert(t);
+	}
+
+	Barrier::Barrier() :
+		m_barrier_state(make_shared<BarrierState>())
+	{
 	}
 
 	void
@@ -837,10 +821,10 @@ namespace crucible {
 		m_barrier_state->insert_task(t);
 	}
 
-	BarrierLock
-	Barrier::lock()
+	void
+	Barrier::release()
 	{
-		return BarrierLock(m_barrier_state);
+		m_barrier_state.reset();
 	}
 
 	class ExclusionState {

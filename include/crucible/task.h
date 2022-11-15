@@ -99,36 +99,26 @@ namespace crucible {
 		static void cancel();
 	};
 
-	// Barrier executes waiting Tasks once the last BarrierLock
-	// is released.  Multiple unique Tasks may be scheduled while
-	// BarrierLocks exist and all will be run() at once upon
-	// release.  If no BarrierLocks exist, Tasks are executed
-	// immediately upon insertion.
-
 	class BarrierState;
 
-	class BarrierLock {
-		shared_ptr<BarrierState> m_barrier_state;
-		BarrierLock(shared_ptr<BarrierState> pbs);
-	friend class Barrier;
-	public:
-		// Release this Lock immediately and permanently
-		void release();
-	};
-
+	/// Barrier delays the execution of one or more Tasks.
+	/// The Tasks are executed when the last shared reference to the
+	/// BarrierState is released.  Copies of Barrier objects refer
+	/// to the same Barrier state.
 	class Barrier {
 		shared_ptr<BarrierState> m_barrier_state;
 
-		Barrier(shared_ptr<BarrierState> pbs);
 	public:
 		Barrier();
 
-		// Prevent execution of tasks behind barrier until
-		// BarrierLock destructor or release() method is called.
-		BarrierLock lock();
-
-		// Schedule a task for execution when no Locks exist
+		/// Schedule a task for execution when last Barrier is released.
 		void insert_task(Task t);
+
+		/// Release this reference to the barrier state.
+		/// Last released reference executes the task.
+		/// Barrier can only be released once, after which the
+		/// object can no longer be used.
+		void release();
 	};
 
 	// Exclusion provides exclusive access to a ExclusionLock.

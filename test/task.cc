@@ -90,47 +90,51 @@ test_barrier(size_t count)
 
 	mutex mtx;
 	condition_variable cv;
+	bool done_flag = false;
 
 	unique_lock<mutex> lock(mtx);
 
-	auto b = make_shared<Barrier>();
+	Barrier b;
 
 	// Run several tasks in parallel
 	for (size_t c = 0; c < count; ++c) {
-		auto bl = b->lock();
 		ostringstream oss;
 		oss << "task #" << c;
+		auto b_hold = b;
 		Task t(
 			oss.str(),
-			[c, &task_done, &mtx, bl]() mutable {
-				// cerr << "Task #" << c << endl;
+			[c, &task_done, &mtx, b_hold]() mutable {
+				// ostringstream oss;
+				// oss << "Task #" << c << endl;
 				unique_lock<mutex> lock(mtx);
+				// cerr << oss.str();
 				task_done.at(c) = true;
-				bl.release();
+				b_hold.release();
 			}
 		);
 		t.run();
 	}
 
+	// Need completed to go out of local scope so it will release b
+	{
+		Task completed(
+			"Waiting for Barrier",
+			[&mtx, &cv, &done_flag]() {
+				unique_lock<mutex> lock(mtx);
+				// cerr << "Running cv notify" << endl;
+				done_flag = true;
+				cv.notify_all();
+			}
+		);
+		b.insert_task(completed);
+	}
+
 	// Get current status
-	ostringstream oss;
-	TaskMaster::print_queue(oss);
-	TaskMaster::print_workers(oss);
+	// TaskMaster::print_queue(cerr);
+	// TaskMaster::print_workers(cerr);
 
-	bool done_flag = false;
-
-	Task completed(
-		"Waiting for Barrier",
-		[&mtx, &cv, &done_flag]() {
-			unique_lock<mutex> lock(mtx);
-			// cerr << "Running cv notify" << endl;
-			done_flag = true;
-			cv.notify_all();
-		}
-	);
-	b->insert_task(completed);
-
-	b.reset();
+	// Release our b
+	b.release();
 
 	while (true) {
 		size_t tasks_done = 0;
@@ -139,7 +143,7 @@ test_barrier(size_t count)
 				++tasks_done;
 			}
 		}
-		// cerr << "Tasks done: " << tasks_done << " done_flag " << done_flag << endl;
+		cerr << "Tasks done: " << tasks_done << " done_flag " << done_flag << endl;
 		if (tasks_done == count && done_flag) {
 			break;
 		}
