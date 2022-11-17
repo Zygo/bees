@@ -8,6 +8,7 @@
 #include "crucible/fd.h"
 #include "crucible/fs.h"
 #include "crucible/lockset.h"
+#include "crucible/multilock.h"
 #include "crucible/pool.h"
 #include "crucible/progress.h"
 #include "crucible/time.h"

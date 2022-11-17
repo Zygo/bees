@@ -207,11 +207,6 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
 
-	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
-		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
-	BEESNOTE("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
-		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
-
 	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
 		BEESLOGTRACE("equal physical addresses in dedup");
 		BEESCOUNT(bug_dedup_same_physical);
@@ -222,7 +217,16 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 
 	BEESCOUNT(dedup_try);
 	Timer dedup_timer;
-	bool rv = btrfs_extent_same(brp.first.fd(), brp.first.begin(), brp.first.size(), brp.second.fd(), brp.second.begin());
+
+	BEESNOTE("waiting to dedup " << brp);
+	const auto lock = MultiLocker::get_lock("dedupe");
+
+	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
+		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
+	BEESNOTE("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
+		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
+
+	const bool rv = btrfs_extent_same(brp.first.fd(), brp.first.begin(), brp.first.size(), brp.second.fd(), brp.second.begin());
 	BEESCOUNTADD(dedup_ms, dedup_timer.age() * 1000);
 
 	if (rv) {
@@ -849,16 +853,21 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// Wait for the balance to finish before we run LOGICAL_INO
 	wait_for_balance();
 
+        BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
+
 	// Time how long this takes
 	Timer resolve_timer;
 
-        BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
-
-	// Get this thread's system CPU usage
 	struct rusage usage_before;
-	DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_before));
-
 	{
+		BEESNOTE("waiting to resolve addr " << addr << " with LOGICAL_INO");
+		const auto lock = MultiLocker::get_lock("logical_ino");
+
+		// Get this thread's system CPU usage
+		DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_before));
+
+		// Restart timer now that we're no longer waiting for lock
+		resolve_timer.reset();
 		BEESTOOLONG("Resolving addr " << addr << " in " << root_path() << " refs " << log_ino.m_iors.size());
 		BEESNOTE("resolving addr " << addr << " with LOGICAL_INO");
 		if (log_ino.do_ioctl_nothrow(root_fd())) {
