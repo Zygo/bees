@@ -607,57 +607,6 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		BEESCOUNT(scan_zero_compressed);
 	}
 
-	// Turning this off because it's a waste of time on small extents
-	// and it's incorrect for large extents.
-#if 0
-	// If the extent contains obscured blocks, and we can find no
-	// other refs to the extent that reveal those blocks, nuke the incoming extent.
-	// Don't rewrite extents that are bigger than the maximum FILE_EXTENT_SAME size
-	// because we can't make extents that large with dedupe.
-	// Don't rewrite small extents because it is a waste of time without being
-	// able to combine them into bigger extents.
-	if (!rewrite_extent && (e.flags() & Extent::OBSCURED) && (e.physical_len() > BLOCK_SIZE_MAX_COMPRESSED_EXTENT) && (e.physical_len() < BLOCK_SIZE_MAX_EXTENT_SAME)) {
-		BEESCOUNT(scan_obscured);
-		BEESNOTE("obscured extent " << e);
-		// We have to map all the source blocks to see if any of them
-		// (or all of them aggregated) provide a path through the FS to the blocks
-		BeesResolver br(m_ctx, BeesAddress(e, e.begin()));
-		BeesBlockData ref_bbd(bfr.fd(), bfr.begin(), min(BLOCK_SIZE_SUMS, bfr.size()));
-		// BEESLOG("ref_bbd " << ref_bbd);
-		auto bfr_set = br.find_all_matches(ref_bbd);
-		bool non_obscured_extent_found = false;
-		set<off_t> blocks_to_find;
-		for (off_t j = 0; j < e.physical_len(); j += BLOCK_SIZE_CLONE) {
-			blocks_to_find.insert(j);
-		}
-		// Don't bother if saving less than 1%
-		auto maximum_hidden_count = blocks_to_find.size() / 100;
-		for (auto i : bfr_set) {
-			BtrfsExtentWalker ref_ew(bfr.fd(), bfr.begin(), m_ctx->root_fd());
-			Extent ref_e = ref_ew.current();
-			// BEESLOG("\tref_e " << ref_e);
-			THROW_CHECK2(out_of_range, ref_e, e, ref_e.offset() + ref_e.logical_len() <= e.physical_len());
-			for (off_t j = ref_e.offset(); j < ref_e.offset() + ref_e.logical_len(); j += BLOCK_SIZE_CLONE) {
-				blocks_to_find.erase(j);
-			}
-			if (blocks_to_find.size() <= maximum_hidden_count) {
-				BEESCOUNT(scan_obscured_miss);
-				BEESLOG("Found references to all but " << blocks_to_find.size() << " blocks");
-				non_obscured_extent_found = true;
-				break;
-			} else {
-				BEESCOUNT(scan_obscured_hit);
-				// BEESLOG("blocks_to_find: " << blocks_to_find.size() << " from " << *blocks_to_find.begin() << ".." << *blocks_to_find.rbegin());
-			}
-		}
-		if (!non_obscured_extent_found) {
-			// BEESLOG("No non-obscured extents found");
-			rewrite_extent = true;
-			BEESCOUNT(scan_obscured_rewrite);
-		}
-	}
-#endif
-
 	// If we deduped any blocks then we must rewrite the remainder of the extent
 	if (!noinsert_set.empty()) {
 		rewrite_extent = true;
