@@ -60,11 +60,15 @@ namespace crucible {
 	ByteVector&
 	ByteVector::operator=(const ByteVector &that)
 	{
-		unique_lock<mutex> lock_this(m_mutex, defer_lock);
-		unique_lock<mutex> lock_that(that.m_mutex, defer_lock);
-		lock(lock_this, lock_that);
-		m_ptr = that.m_ptr;
-		m_size = that.m_size;
+		// If &that == this, there's no need to do anything, but
+		// especially don't try to lock the same mutex twice.
+		if (&m_mutex != &that.m_mutex) {
+			unique_lock<mutex> lock_this(m_mutex, defer_lock);
+			unique_lock<mutex> lock_that(that.m_mutex, defer_lock);
+			lock(lock_this, lock_that);
+			m_ptr = that.m_ptr;
+			m_size = that.m_size;
+		}
 		return *this;
 	}
 
