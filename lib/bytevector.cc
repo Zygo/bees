@@ -26,14 +26,12 @@ namespace crucible {
 	size_t
 	ByteVector::size() const
 	{
-		unique_lock<mutex> lock(m_mutex);
 		return m_size;
 	}
 
 	bool
 	ByteVector::empty() const
 	{
-		unique_lock<mutex> lock(m_mutex);
 		return !m_ptr || !m_size;
 	}
 
