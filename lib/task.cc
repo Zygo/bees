@@ -30,7 +30,8 @@ namespace crucible {
 
 	static thread_local TaskStatePtr tl_current_task;
 
-	/// because we don't want to bump -std=c++-17 just to get scoped_lock
+	/// because we don't want to bump -std=c++-17 just to get scoped_lock.
+	/// Also we don't want to self-deadlock if both mutexes are the same mutex.
 	class PairLock {
 		unique_lock<mutex>	m_lock1, m_lock2;
 	public:
