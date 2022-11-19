@@ -155,22 +155,18 @@ BeesHashTable::flush_dirty_extents(bool slowly)
 		if (flush_dirty_extent(extent_index)) {
 			++wrote_extents;
 			if (slowly) {
+				if (m_stop_requested) {
+					slowly = false;
+					continue;
+				}
 				BEESNOTE("flush rate limited after extent #" << extent_index << " of " << m_extents << " extents");
 				chrono::duration<double> sleep_time(m_flush_rate_limit.sleep_time(BLOCK_SIZE_HASHTAB_EXTENT));
 				unique_lock<mutex> lock(m_stop_mutex);
-				if (m_stop_requested) {
-					BEESLOGDEBUG("Stop requested in hash table flush_dirty_extents");
-					// This function is called by another thread with !slowly,
-					// so we just get out of the way here.
-					break;
-				}
 				m_stop_condvar.wait_for(lock, sleep_time);
 			}
 		}
 	}
-	if (!slowly) {
-		BEESLOGINFO("Flushed " << wrote_extents << " of " << m_extents << " extents");
-	}
+	BEESLOGINFO("Flushed " << wrote_extents << " of " << m_extents << " hash table extents");
 	return wrote_extents;
 }
 
@@ -204,12 +200,27 @@ BeesHashTable::writeback_loop()
 			m_dirty_condvar.wait(lock);
 		}
 	}
+
+	// The normal loop exits at the end of one iteration when stop requested,
+	// but stop request will be in the middle of the loop, and some extents
+	// will still be dirty.  Run the flush loop again to get those.
+	BEESNOTE("flushing hash table, round 2");
+	BEESLOGDEBUG("Flushing hash table");
+	flush_dirty_extents(false);
+
+	// If there were any Tasks still running, they may have updated
+	// some hash table pages during the second flush.  These updates
+	// will be lost.  The Tasks will be repeated on the next run because
+	// they were not completed prior to the stop request, and the
+	// Crawl progress was already flushed out before the Hash table
+	// started writing, so nothing is really lost here.
+
 	catch_all([&]() {
 		// trigger writeback on our way out
 #if 0
 		// seems to trigger huge latency spikes
-		BEESTOOLONG("unreadahead hash table size " << pretty(m_size));
-		bees_unreadahead(m_fd, 0, m_size);
+		BEESTOOLONG("unreadahead hash table size " <<
+		pretty(m_size)); bees_unreadahead(m_fd, 0, m_size);
 #endif
 	});
 	BEESLOGDEBUG("Exited hash table writeback_loop");
@@ -794,7 +805,7 @@ BeesHashTable::~BeesHashTable()
 }
 
 void
-BeesHashTable::stop()
+BeesHashTable::stop_request()
 {
 	BEESNOTE("stopping BeesHashTable threads");
 	BEESLOGDEBUG("Stopping BeesHashTable threads");
@@ -808,7 +819,11 @@ BeesHashTable::stop()
 	unique_lock<mutex> dirty_lock(m_dirty_mutex);
 	m_dirty_condvar.notify_all();
 	dirty_lock.unlock();
+}
 
+void
+BeesHashTable::stop_wait()
+{
 	BEESNOTE("waiting for hash_prefetch thread");
 	BEESLOGDEBUG("Waiting for hash_prefetch thread");
 	m_prefetch_thread.join();
@@ -816,12 +831,6 @@ BeesHashTable::stop()
 	BEESNOTE("waiting for hash_writeback thread");
 	BEESLOGDEBUG("Waiting for hash_writeback thread");
 	m_writeback_thread.join();
-
-	if (m_cell_ptr && m_size) {
-		BEESLOGDEBUG("Flushing hash table");
-		BEESNOTE("flushing hash table");
-		flush_dirty_extents(false);
-	}
 
 	BEESLOGDEBUG("BeesHashTable stopped");
 }

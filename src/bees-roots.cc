@@ -595,7 +595,7 @@ BeesRoots::start()
 }
 
 void
-BeesRoots::stop()
+BeesRoots::stop_request()
 {
 	BEESLOGDEBUG("BeesRoots stop requested");
 	BEESNOTE("stopping BeesRoots");
@@ -603,7 +603,11 @@ BeesRoots::stop()
 	m_stop_requested = true;
 	m_stop_condvar.notify_all();
 	lock.unlock();
+}
 
+void
+BeesRoots::stop_wait()
+{
 	// Stop crawl writeback first because we will break progress
 	// state tracking when we cancel the TaskMaster queue
 	BEESLOGDEBUG("Waiting for crawl writeback");

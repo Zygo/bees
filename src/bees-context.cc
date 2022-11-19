@@ -826,17 +826,7 @@ BeesContext::wait_for_balance()
 		}
 
 		BEESLOGDEBUG("WORKAROUND: Waiting " << balance_timer << "s for balance to stop");
-		unique_lock<mutex> lock(m_abort_mutex);
-		if (m_abort_requested) {
-			// Force the calling function to stop.	We cannot
-			// proceed to LOGICAL_INO while balance is running
-			// until the bugs are fixed, and it's probably
-			// not going to be particularly fast to have
-			// both bees and balance banging the disk anyway.
-			BeesTracer::set_silent();
-			throw std::runtime_error("Stop requested while balance running");
-		}
-		m_abort_condvar.wait_for(lock, chrono::duration<double>(BEES_BALANCE_POLL_INTERVAL));
+		nanosleep(BEES_BALANCE_POLL_INTERVAL);
 	}
 }
 
@@ -960,12 +950,6 @@ BeesContext::set_root_fd(Fd fd)
 	});
 }
 
-const char *
-BeesHalt::what() const noexcept
-{
-	return "bees stop requested";
-}
-
 void
 BeesContext::start()
 {
@@ -1006,17 +990,37 @@ BeesContext::stop()
 	Timer stop_timer;
 	BEESLOGNOTICE("Stopping bees...");
 
-	BEESNOTE("aborting blocked tasks");
-	BEESLOGDEBUG("Aborting blocked tasks");
-	unique_lock<mutex> abort_lock(m_abort_mutex);
-	m_abort_requested = true;
-	m_abort_condvar.notify_all();
-	abort_lock.unlock();
-
+	// Stop TaskConsumers without hurting the Task objects that carry the Crawl state
 	BEESNOTE("pausing work queue");
 	BEESLOGDEBUG("Pausing work queue");
-	TaskMaster::set_thread_count(0);
+	TaskMaster::pause();
 
+	// Stop crawlers first so we get good progress persisted on disk
+	BEESNOTE("stopping crawlers and flushing crawl state");
+	BEESLOGDEBUG("Stopping crawlers and flushing crawl state");
+	if (m_roots) {
+		m_roots->stop_request();
+	} else {
+		BEESLOGDEBUG("Crawlers not running");
+	}
+
+	BEESNOTE("stopping and flushing hash table");
+	BEESLOGDEBUG("Stopping and flushing hash table");
+	if (m_hash_table) {
+		m_hash_table->stop_request();
+	} else {
+		BEESLOGDEBUG("Hash table not running");
+	}
+
+	// Wait for crawler writeback to finish
+	BEESNOTE("waiting for crawlers to stop");
+	BEESLOGDEBUG("Waiting for crawlers to stop");
+	if (m_roots) {
+		m_roots->stop_wait();
+	}
+
+	// It is now no longer possible to update progress in $BEESHOME,
+	// so we can destroy Tasks with reckless abandon.
 	BEESNOTE("setting stop_request flag");
 	BEESLOGDEBUG("Setting stop_request flag");
 	unique_lock<mutex> lock(m_stop_mutex);
@@ -1024,45 +1028,12 @@ BeesContext::stop()
 	m_stop_condvar.notify_all();
 	lock.unlock();
 
-	// Stop crawlers first so we get good progress persisted on disk
-	BEESNOTE("stopping crawlers");
-	BEESLOGDEBUG("Stopping crawlers");
-	if (m_roots) {
-		m_roots->stop();
-		m_roots.reset();
-	} else {
-		BEESLOGDEBUG("Crawlers not running");
-	}
-
-	BEESNOTE("cancelling work queue");
-	BEESLOGDEBUG("Cancelling work queue");
-	TaskMaster::cancel();
-
-	BEESNOTE("stopping hash table");
-	BEESLOGDEBUG("Stopping hash table");
+	// Wait for hash table flush to complete
+	BEESNOTE("waiting for hash table flush to stop");
+	BEESLOGDEBUG("waiting for hash table flush to stop");
 	if (m_hash_table) {
-		m_hash_table->stop();
-		m_hash_table.reset();
-	} else {
-		BEESLOGDEBUG("Hash table not running");
+		m_hash_table->stop_wait();
 	}
-
-	BEESNOTE("closing tmpfiles");
-	BEESLOGDEBUG("Closing tmpfiles");
-	m_tmpfile_pool.clear();
-
-	BEESNOTE("closing FD caches");
-	BEESLOGDEBUG("Closing FD caches");
-	if (m_fd_cache) {
-		m_fd_cache->clear();
-		BEESNOTE("destroying FD caches");
-		BEESLOGDEBUG("Destroying FD caches");
-		m_fd_cache.reset();
-	}
-
-	BEESNOTE("waiting for progress thread");
-	BEESLOGDEBUG("Waiting for progress thread");
-	m_progress_thread->join();
 
 	// Write status once with this message...
 	BEESNOTE("stopping status thread at " << stop_timer << " sec");
@@ -1079,6 +1050,9 @@ BeesContext::stop()
 	m_status_thread->join();
 
 	BEESLOGNOTICE("bees stopped in " << stop_timer << " sec");
+
+	// Skip all destructors, do not pass GO, do not collect atexit() functions
+	_exit(EXIT_SUCCESS);
 }
 
 bool
@@ -1119,13 +1093,7 @@ shared_ptr<BeesTempFile>
 BeesContext::tmpfile()
 {
 	unique_lock<mutex> lock(m_stop_mutex);
-
-	if (m_stop_requested) {
-		throw BeesHalt();
-	}
-
 	lock.unlock();
-
 	return m_tmpfile_pool();
 }
 
@@ -1133,9 +1101,6 @@ shared_ptr<BeesFdCache>
 BeesContext::fd_cache()
 {
 	unique_lock<mutex> lock(m_stop_mutex);
-	if (m_stop_requested) {
-		throw BeesHalt();
-	}
 	if (!m_fd_cache) {
 		m_fd_cache = make_shared<BeesFdCache>(shared_from_this());
 	}
@@ -1146,9 +1111,6 @@ shared_ptr<BeesRoots>
 BeesContext::roots()
 {
 	unique_lock<mutex> lock(m_stop_mutex);
-	if (m_stop_requested) {
-		throw BeesHalt();
-	}
 	if (!m_roots) {
 		m_roots = make_shared<BeesRoots>(shared_from_this());
 	}
@@ -1159,9 +1121,6 @@ shared_ptr<BeesHashTable>
 BeesContext::hash_table()
 {
 	unique_lock<mutex> lock(m_stop_mutex);
-	if (m_stop_requested) {
-		throw BeesHalt();
-	}
 	if (!m_hash_table) {
 		m_hash_table = make_shared<BeesHashTable>(shared_from_this(), "beeshash.dat");
 	}

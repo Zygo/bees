@@ -423,7 +423,8 @@ public:
 	BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t size = BLOCK_SIZE_HASHTAB_EXTENT);
 	~BeesHashTable();
 
-	void stop();
+	void stop_request();
+	void stop_wait();
 
 	vector<Cell>	find_cell(HashType hash);
 	bool		push_random_hash_addr(HashType hash, AddrType addr);
@@ -595,7 +596,8 @@ friend class BeesTempFile;
 public:
 	BeesRoots(shared_ptr<BeesContext> ctx);
 	void start();
-	void stop();
+	void stop_request();
+	void stop_wait();
 
 	Fd open_root(uint64_t root);
 	Fd open_root_ino(uint64_t root, uint64_t ino);
@@ -720,10 +722,6 @@ struct BeesResolveAddrResult {
 	bool is_toxic() const { return m_is_toxic; }
 };
 
-struct BeesHalt : exception {
-	const char *what() const noexcept override;
-};
-
 class BeesContext : public enable_shared_from_this<BeesContext> {
 	Fd						m_home_fd;
 
@@ -748,10 +746,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	condition_variable				m_stop_condvar;
 	bool						m_stop_requested = false;
 	bool						m_stop_status = false;
-
-	mutable mutex					m_abort_mutex;
-	condition_variable				m_abort_condvar;
-	bool						m_abort_requested = false;
 
 	shared_ptr<BeesThread>				m_progress_thread;
 	shared_ptr<BeesThread>				m_status_thread;
