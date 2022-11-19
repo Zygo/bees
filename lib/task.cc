@@ -300,7 +300,7 @@ namespace crucible {
 		swap(this_task, tl_current_task);
 		lock.unlock();
 
-		char buf[24] = { 0 };
+		char buf[64] = { 0 };
 		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
 		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
 
