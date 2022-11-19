@@ -108,12 +108,6 @@ const size_t BEES_MAX_CRAWL_BATCH = 128;
 // Wait this many transids between crawls
 const size_t BEES_TRANSID_FACTOR = 10;
 
-// Wait this long for a balance to stop
-const double BEES_BALANCE_POLL_INTERVAL = 60.0;
-
-// Workaround for tree mod log bugs
-const bool BEES_SERIALIZE_BALANCE = false;
-
 // Workaround for silly dedupe / ineffective readahead behavior
 const size_t BEES_READAHEAD_SIZE = 1024 * 1024;
 
@@ -753,7 +747,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	void set_root_fd(Fd fd);
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
-	void wait_for_balance();
 
 	BeesFileRange scan_one_extent(const BeesFileRange &bfr, const Extent &e);
 	void rewrite_file_range(const BeesFileRange &bfr);

@@ -96,16 +96,6 @@ Workarounds for known kernel bugs
   at the same time can lead to a kernel hang.  The workaround is
   to reduce the thread count to 1 with `-c1`.
 
-* **Tree mod log issues**:  bees will detect that a btrfs balance is
-  running, and pause bees activity until the balance is done.  This avoids
-  running both the `LOGICAL_INO` ioctl and btrfs balance at the same time,
-  which avoids kernel crashes on old kernel versions.
-
-  The numbers for "tree mod log issue #" in the above table are arbitrary.
-  There are a lot of them, and they all behave fairly similarly.
-
-  This workaround is less necessary for kernels 5.4.19 and later.
-
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
   if the number of references to a single shared extent grows too
   high, the kernel consumes more and more CPU while also holding locks

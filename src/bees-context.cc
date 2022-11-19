@@ -752,33 +752,6 @@ BeesResolveAddrResult::BeesResolveAddrResult()
 {
 }
 
-void
-BeesContext::wait_for_balance()
-{
-	if (!BEES_SERIALIZE_BALANCE) {
-		return;
-	}
-
-	Timer balance_timer;
-	BEESNOTE("WORKAROUND: waiting for balance to stop");
-	while (true) {
-		btrfs_ioctl_balance_args args {};
-		const int ret = ioctl(root_fd(), BTRFS_IOC_BALANCE_PROGRESS, &args);
-		if (ret < 0) {
-			// Either can't get balance status or not running, exit either way
-			break;
-		}
-
-		if (!(args.state & BTRFS_BALANCE_STATE_RUNNING)) {
-			// Balance not running, doesn't matter if paused or cancelled
-			break;
-		}
-
-		BEESLOGDEBUG("WORKAROUND: Waiting " << balance_timer << "s for balance to stop");
-		nanosleep(BEES_BALANCE_POLL_INTERVAL);
-	}
-}
-
 BeesResolveAddrResult
 BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
@@ -789,9 +762,6 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// how badly btrfs is performing without confounding factors like
 	// transaction latency, competing threads, and freeze/SIGSTOP
 	// pausing the bees process.
-
-	// Wait for the balance to finish before we run LOGICAL_INO
-	wait_for_balance();
 
         BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
 
