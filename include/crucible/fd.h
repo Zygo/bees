@@ -27,9 +27,9 @@
 namespace crucible {
 	using namespace std;
 
-	// IOHandle is a file descriptor owner object.  It closes them when destroyed.
-	// Most of the functions here don't use it because these functions don't own FDs.
-	// All good names for such objects are taken.
+	/// File descriptor owner object.  It closes them when destroyed.
+	/// Most of the functions here don't use it because these functions don't own FDs.
+	/// All good names for such objects are taken.
 	class IOHandle {
 		IOHandle(const IOHandle &) = delete;
 		IOHandle(IOHandle &&) = delete;
@@ -43,6 +43,7 @@ namespace crucible {
 		int get_fd() const;
 	};
 
+	/// Copyable file descriptor.
 	class Fd {
 		static NamedPtr<IOHandle, int> s_named_ptr;
 		shared_ptr<IOHandle> m_handle;
@@ -62,24 +63,29 @@ namespace crucible {
 
 	// Functions named "foo_or_die" throw exceptions on failure.
 
-	// Attempt to open the file with the given mode
+	/// Attempt to open the file with the given mode, throw exception on failure.
 	int open_or_die(const string &file, int flags = O_RDONLY, mode_t mode = 0777);
+	/// Attempt to open the file with the given mode, throw exception on failure.
 	int openat_or_die(int dir_fd, const string &file, int flags = O_RDONLY, mode_t mode = 0777);
 
-	// Decode open parameters
+	/// Decode open flags
 	string o_flags_ntoa(int flags);
+	/// Decode open mode
 	string o_mode_ntoa(mode_t mode);
 
-	// mmap with its one weird error case
+	/// mmap with its one weird error case
 	void *mmap_or_die(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
-	// Decode mmap parameters
+	/// Decode mmap prot
 	string mmap_prot_ntoa(int prot);
+	/// Decode mmap flags
 	string mmap_flags_ntoa(int flags);
 
-	// Unlink, rename
+	/// Rename, throw exception on failure.
 	void rename_or_die(const string &from, const string &to);
+	/// Rename, throw exception on failure.
 	void renameat_or_die(int fromfd, const string &frompath, int tofd, const string &topath);
 
+	/// Truncate, throw exception on failure.
 	void ftruncate_or_die(int fd, off_t size);
 
 	// Read or write structs:
@@ -87,19 +93,25 @@ namespace crucible {
 	// Three-arg version of read_or_die/write_or_die throws an error on incomplete read/writes
 	// Four-arg version returns number of bytes read/written through reference arg
 
+	/// Attempt read by pointer and length, throw exception on IO error or short read.
 	void read_or_die(int fd, void *buf, size_t size);
+	/// Attempt read of a POD struct, throw exception on IO error or short read.
 	template <class T> void read_or_die(int fd, T& buf)
 	{
 		return read_or_die(fd, static_cast<void *>(&buf), sizeof(buf));
 	}
 
+	/// Attempt read by pointer and length, throw exception on IO error but not short read.
 	void read_partial_or_die(int fd, void *buf, size_t size_wanted, size_t &size_read);
+	/// Attempt read of a POD struct, throw exception on IO error but not short read.
 	template <class T> void read_partial_or_die(int fd, T& buf, size_t &size_read)
 	{
 		return read_partial_or_die(fd, static_cast<void *>(&buf), sizeof(buf), size_read);
 	}
 
+	/// Attempt read at position by pointer and length, throw exception on IO error but not short read.
 	void pread_or_die(int fd, void *buf, size_t size, off_t offset);
+	/// Attempt read at position of a POD struct, throw exception on IO error but not short read.
 	template <class T> void pread_or_die(int fd, T& buf, off_t offset)
 	{
 		return pread_or_die(fd, static_cast<void *>(&buf), sizeof(buf), offset);
@@ -135,14 +147,14 @@ namespace crucible {
 	template<> void pread_or_die<vector<char>>(int fd, vector<char>& str, off_t offset) = delete;
 	template<> void pwrite_or_die<vector<char>>(int fd, const vector<char>& str, off_t offset) = delete;
 
-	// A different approach to reading a simple string
+	/// Read a simple string.
 	string read_string(int fd, size_t size);
 
-	// A lot of Unix API wants you to initialize a struct and call
-	// one function to fill it, another function to throw it away,
-	// and has some unknown third thing you have to do when there's
-	// an error.  That's also a C++ object with an exception-throwing
-	// constructor.
+	/// A lot of Unix API wants you to initialize a struct and call
+	/// one function to fill it, another function to throw it away,
+	/// and has some unknown third thing you have to do when there's
+	/// an error.  That's also a C++ object with an exception-throwing
+	/// constructor.
 	struct Stat : public stat {
 		Stat();
 		Stat(int f);
@@ -156,17 +168,17 @@ namespace crucible {
 
 	string st_mode_ntoa(mode_t mode);
 
-	// Because it's not trivial to do correctly
+	/// Because it's not trivial to do correctly
 	string readlink_or_die(const string &path);
 
-	// Determine the name of a FD by readlink through /proc/self/fd/
+	/// Determine the name of a FD by readlink through /proc/self/fd/
 	string name_fd(int fd);
 
-	// Returns Fd objects because it does own them.
+	/// Returns Fd objects because it does own them.
 	pair<Fd, Fd> socketpair_or_die(int domain = AF_UNIX, int type = SOCK_STREAM, int protocol = 0);
 
-	// like unique_lock but for flock instead of mutexes...and not trying
-	// to hide the many and subtle differences between those two things *at all*.
+	/// like unique_lock but for flock instead of mutexes...and not trying
+	/// to hide the many and subtle differences between those two things *at all*.
 	class Flock {
 		int	m_fd;
 		bool	m_locked;
@@ -187,7 +199,7 @@ namespace crucible {
 		int fd();
 	};
 
-	// Doesn't use Fd objects because it's usually just used to replace stdin/stdout/stderr.
+	/// Doesn't use Fd objects because it's usually just used to replace stdin/stdout/stderr.
 	void dup2_or_die(int fd_in, int fd_out);
 
 }
