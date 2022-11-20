@@ -12,13 +12,18 @@
 namespace crucible {
 	using namespace std;
 
-	/// Storage for objects with unique names
+	/// A thread-safe container for RAII of shared resources with unique names.
 
 	template <class Return, class... Arguments>
 	class NamedPtr {
 	public:
+		/// The name in "NamedPtr"
 		using Key = tuple<Arguments...>;
+		/// A shared pointer to the named object with ownership
+		/// tracking that erases the object's stored name when
+		/// the last shared pointer is destroyed.
 		using Ptr = shared_ptr<Return>;
+		/// A function that translates a name into a shared pointer to an object.
 		using Func = function<Ptr(Arguments...)>;
 	private:
 		struct Value;
@@ -29,6 +34,7 @@ namespace crucible {
 			mutex		m_mutex;
 		};
 		using MapPtr = shared_ptr<MapRep>;
+		/// Container for Return pointers.  Destructor removes entry from map.
 		struct Value {
 			Ptr	m_ret_ptr;
 			MapPtr	m_map_rep;
@@ -50,15 +56,21 @@ namespace crucible {
 		void func(Func f);
 
 		Ptr operator()(Arguments... args);
+
 		Ptr insert(const Ptr &r, Arguments... args);
 	};
 
+	/// Construct NamedPtr map and define a function to turn a name into a pointer.
 	template <class Return, class... Arguments>
 	NamedPtr<Return, Arguments...>::NamedPtr(Func f) :
 		m_fn(f)
 	{
 	}
 
+	/// Construct a Value wrapper: the value to store, the argument key to store the value under,
+	/// and a pointer to the map.  Everything needed to remove the key from the map when the
+	/// last NamedPtr is deleted.  NamedPtr then releases its own pointer to the value, which
+	/// may or may not trigger deletion there.
 	template <class Return, class... Arguments>
 	NamedPtr<Return, Arguments...>::Value::Value(Ptr&& ret_ptr, const Key &key, const MapPtr &map_rep) :
 		m_ret_ptr(ret_ptr),
@@ -67,6 +79,8 @@ namespace crucible {
 	{
 	}
 
+	/// Destroy a Value wrapper: remove a dead Key from the map, then let the member destructors
+	/// do the rest.  The Key might be in the map and not dead, so leave it alone in that case.
 	template <class Return, class... Arguments>
 	NamedPtr<Return, Arguments...>::Value::~Value()
 	{
@@ -88,6 +102,8 @@ namespace crucible {
 		}
 	}
 
+	/// Find a Return by key and fetch a strong Return pointer.
+	/// Ignore Keys that have expired weak pointers.
 	template <class Return, class... Arguments>
 	typename NamedPtr<Return, Arguments...>::Ptr
 	NamedPtr<Return, Arguments...>::lookup_item(const Key &k)
@@ -109,6 +125,11 @@ namespace crucible {
 		return Ptr();
 	}
 
+	/// Insert the Return value of calling Func(Arguments...).
+	/// If the value already exists in the map, return the existing value.
+	/// If another thread is already running Func(Arguments...) then this thread
+	/// will block until the other thread finishes inserting the Return in the
+	/// map, and both threads will return the same Return value.
 	template <class Return, class... Arguments>
 	typename NamedPtr<Return, Arguments...>::Ptr
 	NamedPtr<Return, Arguments...>::insert_item(Func fn, Arguments... args)
@@ -169,6 +190,7 @@ namespace crucible {
 		// Release map lock, then key lock
 	}
 
+	/// (Re)define a function to turn a name into a pointer.
 	template <class Return, class... Arguments>
 	void
 	NamedPtr<Return, Arguments...>::func(Func func)
@@ -177,6 +199,7 @@ namespace crucible {
 		m_fn = func;
 	}
 
+	/// Convert a name into a pointer using the configured function.
 	template<class Return, class... Arguments>
 	typename NamedPtr<Return, Arguments...>::Ptr
 	NamedPtr<Return, Arguments...>::operator()(Arguments... args)
@@ -184,6 +207,11 @@ namespace crucible {
 		return insert_item(m_fn, args...);
 	}
 
+	/// Insert a pointer that has already been created under the
+	/// given name.  Useful for inserting a pointer to a derived
+	/// class when the name doesn't contain all of the information
+	/// required for the object, or when the Return is already known by
+	/// some cheaper method than calling the function.
 	template<class Return, class... Arguments>
 	typename NamedPtr<Return, Arguments...>::Ptr
 	NamedPtr<Return, Arguments...>::insert(const Ptr &r, Arguments... args)
@@ -194,4 +222,4 @@ namespace crucible {
 
 }
 
-#endif // NAMEDPTR_H
+#endif // CRUCIBLE_NAMEDPTR_H
