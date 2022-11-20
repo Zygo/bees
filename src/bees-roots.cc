@@ -243,6 +243,18 @@ BeesFileCrawl::crawl_one_extent()
 {
 	BEESNOTE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
 	BEESTRACE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
+
+	// Only one thread can dedupe a file.  btrfs will lock others out.
+	// Inodes are usually full of shared extents, especially in the case of snapshots,
+	// so when we lock an inode, we'll lock the same inode number in all subvols at once.
+	auto inode_mutex = m_ctx->get_inode_mutex(m_bedf.objectid());
+	auto inode_lock = inode_mutex->try_lock(Task::current_task());
+	if (!inode_lock) {
+		BEESCOUNT(scanf_deferred_inode);
+		// Returning false here means we won't reschedule ourselves, but inode_mutex will do that
+		return false;
+	}
+
 	// If we hit an exception here we don't try to catch it.
 	// It will mean the file or subvol was deleted or there's metadata corruption,
 	// and we should stop trying to scan the inode in that case.

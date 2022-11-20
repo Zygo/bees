@@ -89,7 +89,6 @@ BeesContext::dump_status()
 		for (auto t : BeesNote::get_status()) {
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}
-
 #if 0
 		// Huge amount of data, not a lot of information (yet)
 		ofs << "WORKERS:\n";
@@ -678,7 +677,13 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	return bfr;
 }
 
-BeesFileRange
+shared_ptr<Exclusion>
+BeesContext::get_inode_mutex(const uint64_t inode)
+{
+	return m_inode_locks(inode);
+}
+
+void
 BeesContext::scan_forward(const BeesFileRange &bfr_in)
 {
 	BEESTRACE("scan_forward " << bfr_in);
@@ -689,7 +694,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	// Silently filter out blacklisted files
 	if (is_blacklisted(bfr_in.fid())) {
 		BEESCOUNT(scan_blacklisted);
-		return bfr_in;
+		return;
 	}
 
 	// Reconstitute FD
@@ -703,31 +708,36 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	if (!bfr.fd()) {
 		// BEESLOGINFO("No FD in " << root_path() << " for " << bfr);
 		BEESCOUNT(scan_no_fd);
-		return bfr;
+		return;
 	}
 
 	// Sanity check
 	if (bfr.begin() >= bfr.file_size()) {
 		BEESLOGWARN("past EOF: " << bfr);
 		BEESCOUNT(scan_eof);
-		return bfr;
+		return;
 	}
 
 	BtrfsExtentWalker ew(bfr.fd(), bfr.begin(), root_fd());
 
-	BeesFileRange return_bfr(bfr);
-
 	Extent e;
+	bool start_over = false;
 	catch_all([&]() {
-		while (!stop_requested()) {
+		while (!stop_requested() && !start_over) {
 			e = ew.current();
 
 			catch_all([&]() {
 				uint64_t extent_bytenr = e.bytenr();
-				BEESNOTE("waiting for extent bytenr " << to_hex(extent_bytenr));
-				auto extent_lock = m_extent_lock_set.make_lock(extent_bytenr);
+				auto extent_mutex = m_extent_locks(extent_bytenr);
+				const auto extent_lock = extent_mutex->try_lock(Task::current_task());
+				if (!extent_lock) {
+					// BEESLOGDEBUG("Deferring extent bytenr " << to_hex(extent_bytenr) << " from " << bfr);
+					BEESCOUNT(scanf_deferred_extent);
+					start_over = true;
+					return;
+				}
 				Timer one_extent_timer;
-				return_bfr = scan_one_extent(bfr, e);
+				scan_one_extent(bfr, e);
 				BEESCOUNTADD(scanf_extent_ms, one_extent_timer.age() * 1000);
 				BEESCOUNT(scanf_extent);
 			});
@@ -745,7 +755,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	BEESCOUNTADD(scanf_total_ms, scan_timer.age() * 1000);
 	BEESCOUNT(scanf_total);
 
-	return return_bfr;
+	return;
 }
 
 BeesResolveAddrResult::BeesResolveAddrResult()
@@ -875,6 +885,15 @@ BeesContext::start()
 	BEESLOGNOTICE("Starting bees main loop...");
 	BEESNOTE("starting BeesContext");
 
+	m_extent_locks.func([](uint64_t bytenr) {
+		return make_shared<Exclusion>();
+		(void)bytenr;
+	});
+	m_inode_locks.func([](const uint64_t fid) {
+		return make_shared<Exclusion>();
+		(void)fid;
+	});
+	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_status_thread = make_shared<BeesThread>("status_report");
 	m_progress_thread->exec([=]() {

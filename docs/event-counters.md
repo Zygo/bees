@@ -363,6 +363,8 @@ scanf
 
 The `scanf` event group consists of operations related to `BeesContext::scan_forward`.  This is the entry point where `crawl` schedules new data for scanning.
 
+ * `scanf_deferred_extent`: Two tasks attempted to scan the same extent at the same time, so one was deferred.
+ * `scanf_deferred_inode`: Two tasks attempted to scan the same inode at the same time, so one was deferred.
  * `scanf_extent`: A btrfs extent item was scanned.
  * `scanf_extent_ms`: Total thread-seconds spent scanning btrfs extent items.
  * `scanf_total`: A logical byte range of a file was scanned.

@@ -726,7 +726,8 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 
 	Timer						m_total_timer;
 
-	LockSet<uint64_t>				m_extent_lock_set;
+	NamedPtr<Exclusion, uint64_t>			m_extent_locks;
+	NamedPtr<Exclusion, uint64_t>			m_inode_locks;
 
 	mutable mutex					m_stop_mutex;
 	condition_variable				m_stop_condvar;
@@ -751,7 +752,7 @@ public:
 	Fd home_fd();
 	string root_path() const { return m_root_path; }
 
-	BeesFileRange scan_forward(const BeesFileRange &bfr);
+	void scan_forward(const BeesFileRange &bfr);
 
 	bool is_root_ro(uint64_t root);
 	BeesRangePair dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile);
@@ -760,6 +761,8 @@ public:
 	void blacklist_insert(const BeesFileId &fid);
 	void blacklist_erase(const BeesFileId &fid);
 	bool is_blacklisted(const BeesFileId &fid) const;
+
+	shared_ptr<Exclusion> get_inode_mutex(uint64_t inode);
 
 	BeesResolveAddrResult resolve_addr(BeesAddress addr);
 	void invalidate_addr(BeesAddress addr);
@@ -777,7 +780,6 @@ public:
 	shared_ptr<BeesTempFile> tmpfile();
 
 	const Timer &total_timer() const { return m_total_timer; }
-	LockSet<uint64_t> &extent_lock_set() { return m_extent_lock_set; }
 };
 
 class BeesResolver {
