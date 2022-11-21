@@ -277,35 +277,31 @@ public:
 	bool is_same_file(const BeesFileRange &that) const;
 	bool overlaps(const BeesFileRange &that) const;
 
-	// If file ranges overlap, extends this to include that.
-	// Coalesce with empty bfr = non-empty bfr
-	bool coalesce(const BeesFileRange &that);
-
-	// Remove that from this, creating 0, 1, or 2 new objects
-	pair<BeesFileRange, BeesFileRange> subtract(const BeesFileRange &that) const;
-
 	off_t begin() const { return m_begin; }
 	off_t end() const { return m_end; }
 	off_t size() const;
 
-	// Lazy accessors
+	/// @{ Lazy accessors
 	off_t file_size() const;
 	BeesFileId fid() const;
+	/// @}
 
-	// Get the fd if there is one
+	/// Get the fd if there is one
 	Fd fd() const;
 
-	// Get the fd, opening it if necessary
+	/// Get the fd, opening it if necessary
 	Fd fd(const shared_ptr<BeesContext> &ctx);
 
+	/// Copy the BeesFileId but not the Fd
 	BeesFileRange copy_closed() const;
 
-	// Is it defined?
+	/// Is it defined?
 	operator bool() const { return !!m_fd || m_fid; }
 
-	// Make range larger
+	/// @{ Make range larger
 	off_t grow_end(off_t delta);
 	off_t grow_begin(off_t delta);
+	/// @}
 
 friend ostream & operator<<(ostream &os, const BeesFileRange &bfr);
 };

@@ -238,42 +238,6 @@ BeesFileRange::overlaps(const BeesFileRange &that) const
 	return false;
 }
 
-bool
-BeesFileRange::coalesce(const BeesFileRange &that)
-{
-	// Let's define coalesce-with-null as identity,
-	// and coalesce-null-with-null as coalesced
-	if (!*this) {
-		operator=(that);
-		return true;
-	}
-	if (!that) {
-		return true;
-	}
-
-	// Can't coalesce different files
-	if (!is_same_file(that)) return false;
-
-	pair<uint64_t, uint64_t> a(m_begin, m_end);
-	pair<uint64_t, uint64_t> b(that.m_begin, that.m_end);
-
-	// range a starts lower than or equal b
-	if (b.first < a.first) {
-		swap(a, b);
-	}
-
-	// if b starts within a, they overlap
-	// (and the intersecting region is b.first..min(a.second, b.second))
-	// (and the union region is a.first..max(a.second, b.second))
-	if (b.first >= a.first && b.first < a.second) {
-		m_begin = a.first;
-		m_end = max(a.second, b.second);
-		return true;
-	}
-
-	return false;
-}
-
 BeesFileRange::operator BeesBlockData() const
 {
 	BEESTRACE("operator BeesBlockData " << *this);
