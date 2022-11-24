@@ -98,6 +98,11 @@ namespace crucible {
 		/// affected (use set_thread_count(0) to wait for those
 		/// to complete).
 		static void cancel();
+
+		/// Stop running any new Tasks.  All existing
+		/// Consumer threads will exit.  Does not affect queue.
+		/// Does not wait for threads to exit.  Reversible.
+		static void pause(bool paused = true);
 	};
 
 	class BarrierState;
