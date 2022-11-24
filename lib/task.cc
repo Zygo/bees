@@ -259,6 +259,7 @@ namespace crucible {
 		for (auto &i : tq) {
 			i->clear();
 		}
+		tq.clear();
 	}
 
 	void
