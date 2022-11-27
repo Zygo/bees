@@ -723,8 +723,6 @@ struct BeesHalt : exception {
 };
 
 class BeesContext : public enable_shared_from_this<BeesContext> {
-	shared_ptr<BeesContext>				m_parent_ctx;
-
 	Fd						m_home_fd;
 
 	shared_ptr<BeesFdCache>				m_fd_cache;
@@ -765,7 +763,6 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	void rewrite_file_range(const BeesFileRange &bfr);
 
 public:
-	BeesContext() = default;
 
 	void set_root_path(string path);
 
