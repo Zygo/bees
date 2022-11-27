@@ -215,17 +215,6 @@ BeesTooLong::operator=(const func_type &f)
 }
 
 void
-bees_sync(int fd)
-{
-	Timer sync_timer;
-	BEESNOTE("syncing " << name_fd(fd));
-	BEESTOOLONG("syncing " << name_fd(fd));
-	DIE_IF_NON_ZERO(fsync(fd));
-	BEESCOUNT(sync_count);
-	BEESCOUNTADD(sync_ms, sync_timer.age() * 1000);
-}
-
-void
 bees_readahead(int const fd, off_t offset, size_t size)
 {
 	Timer readahead_timer;
@@ -481,7 +470,6 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 	auto src_p = src.begin();
 	auto dst_p = begin;
 
-	bool did_block_write = false;
 	while (dst_p < end) {
 		auto len = min(BLOCK_SIZE_CLONE, end - dst_p);
 		BeesBlockData bbd(src.fd(), src_p, len);
@@ -492,7 +480,6 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 			BEESNOTE("copying " << src << " to " << rv << "\n"
 				"\tpwrite " << bbd << " to " << name_fd(m_fd) << " offset " << to_hex(dst_p) << " len " << len);
 			pwrite_or_die(m_fd, bbd.data().data(), len, dst_p);
-			did_block_write = true;
 			BEESCOUNT(tmp_block);
 			BEESCOUNTADD(tmp_bytes, len);
 		}
@@ -500,16 +487,6 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 		dst_p += len;
 	}
 	BEESCOUNTADD(tmp_copy_ms, copy_timer.age() * 1000);
-
-	if (did_block_write) {
-#if 0
-		// There were a lot of kernel bugs leading to lockups.
-		// Most of them are fixed now.
-		// Unnecessary sync makes us slow, but maybe it has some robustness utility.
-		// TODO:  make this configurable.
-		bees_sync(m_fd);
-#endif
-	}
 
 	BEESCOUNT(tmp_copy);
 	return rv;
