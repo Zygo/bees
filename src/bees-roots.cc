@@ -120,27 +120,29 @@ BeesRoots::state_save()
 	// We don't have ofstreamat or ofdstream in C++11, so we're building a string and writing it with raw syscalls.
 	ostringstream ofs;
 
-	if (!m_crawl_dirty) {
+	if (m_crawl_clean == m_crawl_dirty) {
 		BEESLOGINFO("Nothing to save");
 		return;
 	}
 
 	state_to_stream(ofs);
+	const auto crawl_saved = m_crawl_dirty;
 
 	if (ofs.str().empty()) {
 		BEESLOGWARN("Crawl state empty!");
-		m_crawl_dirty = false;
+		m_crawl_clean = crawl_saved;
 		return;
 	}
 
 	lock.unlock();
 
+	// This may throw an exception, so we didn't save the state we thought we did.
 	m_crawl_state_file.write(ofs.str());
 
-	BEESNOTE("relocking crawl state");
+	BEESNOTE("relocking crawl state to update dirty/clean state");
 	lock.lock();
-	// Not really correct but probably close enough
-	m_crawl_dirty = false;
+	// This records the version of the crawl state we saved, which is not necessarily the current state
+	m_crawl_clean = crawl_saved;
 	BEESLOGINFO("Saved crawl state in " << save_time << "s");
 }
 
@@ -148,7 +150,7 @@ void
 BeesRoots::crawl_state_set_dirty()
 {
 	unique_lock<mutex> lock(m_mutex);
-	m_crawl_dirty = true;
+	++m_crawl_dirty;
 }
 
 void
@@ -164,7 +166,7 @@ BeesRoots::crawl_state_erase(const BeesCrawlState &bcs)
 
 	if (m_root_crawl_map.count(bcs.m_root)) {
 		m_root_crawl_map.erase(bcs.m_root);
-		m_crawl_dirty = true;
+		++m_crawl_dirty;
 	}
 }
 
@@ -442,7 +444,7 @@ void
 BeesRoots::writeback_thread()
 {
 	while (true) {
-		BEESNOTE("idle, " << (m_crawl_dirty ? "dirty" : "clean"));
+		BEESNOTE("idle, " << (m_crawl_clean != m_crawl_dirty ? "dirty" : "clean"));
 
 		catch_all([&]() {
 			BEESNOTE("saving crawler state");
@@ -470,7 +472,7 @@ BeesRoots::insert_root(const BeesCrawlState &new_bcs)
 		auto new_bcp = make_shared<BeesCrawl>(m_ctx, new_bcs);
 		auto new_pair = make_pair(new_bcs.m_root, new_bcp);
 		m_root_crawl_map.insert(new_pair);
-		m_crawl_dirty = true;
+		++m_crawl_dirty;
 	}
 	auto found = m_root_crawl_map.find(new_bcs.m_root);
 	THROW_CHECK0(runtime_error, found != m_root_crawl_map.end());

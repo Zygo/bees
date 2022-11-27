@@ -544,7 +544,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesStringFile				m_crawl_state_file;
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
-	bool					m_crawl_dirty = false;
+	uint64_t				m_crawl_dirty = 0;
+	uint64_t				m_crawl_clean = 0;
 	Timer					m_crawl_timer;
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
