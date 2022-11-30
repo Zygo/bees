@@ -707,12 +707,10 @@ BeesRoots::crawl_roots()
 		return true;
 	}
 
-	BEESNOTE("Crawl done");
 	BEESCOUNT(crawl_done);
 
-	auto want_transid = m_transid_re.count() + m_transid_factor;
-	auto ran_out_time = m_crawl_timer.lap();
-	BEESLOGINFO("Crawl more ran out of data after " << ran_out_time << "s, waiting about " << m_transid_re.seconds_until(want_transid) << "s for transid " << want_transid << "...");
+	const auto ran_out_time = m_crawl_timer.lap();
+	BEESLOGINFO("crawl_more ran out of data after " << ran_out_time << "s");
 
 	// Do not run again
 	return false;
@@ -748,7 +746,7 @@ BeesRoots::crawl_thread()
 
 	// Monitor transid_max and wake up roots when it changes
 	BEESNOTE("tracking transid");
-	auto last_transid = m_transid_re.count();
+	uint64_t last_transid = 0;
 	while (!m_stop_requested) {
 		BEESTRACE("Measure current transid");
 		catch_all([&]() {
@@ -771,9 +769,9 @@ BeesRoots::crawl_thread()
 		}
 		last_transid = new_transid;
 
-		auto poll_time = m_transid_re.seconds_for(m_transid_factor);
-		BEESLOGDEBUG("Polling " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
-		BEESNOTE("waiting " << poll_time << "s for next " << m_transid_factor << " transid " << m_transid_re);
+		const auto poll_time = max(BEES_TRANSID_POLL_INTERVAL, m_transid_re.seconds_for(1));
+		BEESLOGDEBUG("Polling " << poll_time << "s for next transid " << m_transid_re);
+		BEESNOTE("waiting " << poll_time << "s for next transid " << m_transid_re);
 		unique_lock<mutex> lock(m_stop_mutex);
 		if (m_stop_requested) {
 			BEESLOGDEBUG("Stop requested in crawl thread");

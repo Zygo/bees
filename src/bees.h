@@ -100,8 +100,8 @@ const size_t BEES_MAX_EXTENT_REF_COUNT = (16 * 1024 * 1024 / 24) - 1;
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
 
-// Wait this many transids between crawls
-const size_t BEES_TRANSID_FACTOR = 10;
+// Wait at least this long for a new transid
+const double BEES_TRANSID_POLL_INTERVAL = 30.0;
 
 // Workaround for silly dedupe / ineffective readahead behavior
 const size_t BEES_READAHEAD_SIZE = 1024 * 1024;
@@ -543,7 +543,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
 	RateEstimator				m_transid_re;
-	size_t					m_transid_factor = BEES_TRANSID_FACTOR;
 	bool					m_workaround_btrfs_send = false;
 
 	shared_ptr<BeesScanMode>		m_scanner;
