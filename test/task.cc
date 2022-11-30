@@ -157,7 +157,7 @@ void
 test_exclusion(size_t count)
 {
 	mutex only_one;
-	auto excl = make_shared<Exclusion>("test_excl");
+	auto excl = make_shared<Exclusion>();
 
 	mutex mtx;
 	condition_variable cv;
@@ -178,9 +178,8 @@ test_exclusion(size_t count)
 			[c, &only_one, excl, &lock_success_count, &lock_failure_count, &pings, &tasks_running, &cv, &mtx]() mutable {
 				// cerr << "Task #" << c << endl;
 				(void)c;
-				auto lock = excl->try_lock();
+				auto lock = excl->try_lock(Task::current_task());
 				if (!lock) {
-					excl->insert_task(Task::current_task());
 					++lock_failure_count;
 					return;
 				}
@@ -200,7 +199,7 @@ test_exclusion(size_t count)
 		t.run();
 	}
 
-	// excl.reset();
+	excl.reset();
 
 	unique_lock<mutex> lock(mtx);
 	while (tasks_running) {

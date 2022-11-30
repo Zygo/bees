@@ -827,110 +827,52 @@ namespace crucible {
 		m_barrier_state.reset();
 	}
 
-	class ExclusionState {
-		mutex		m_mutex;
-		bool		m_locked = false;
-		Task		m_task;
-
-	public:
-		ExclusionState(const string &title);
-		~ExclusionState();
-		void release();
-		bool try_lock();
-		void insert_task(Task t);
-	};
-
-	Exclusion::Exclusion(shared_ptr<ExclusionState> pbs) :
-		m_exclusion_state(pbs)
-	{
-	}
-
-	Exclusion::Exclusion(const string &title) :
-		m_exclusion_state(make_shared<ExclusionState>(title))
-	{
-	}
-
-	ExclusionState::ExclusionState(const string &title) :
-		m_task(title, [](){})
-	{
-	}
-
-	void
-	ExclusionState::release()
-	{
-		unique_lock<mutex> lock(m_mutex);
-		m_locked = false;
-		m_task.run();
-	}
-
-	ExclusionState::~ExclusionState()
-	{
-		release();
-	}
-
-	ExclusionLock::ExclusionLock(shared_ptr<ExclusionState> pbs) :
-		m_exclusion_state(pbs)
+	ExclusionLock::ExclusionLock(shared_ptr<Task> owner) :
+		m_owner(owner)
 	{
 	}
 
 	void
 	ExclusionLock::release()
 	{
-		if (m_exclusion_state) {
-			m_exclusion_state->release();
-			m_exclusion_state.reset();
-		}
-	}
-
-	ExclusionLock::~ExclusionLock()
-	{
-		release();
+		m_owner.reset();
 	}
 
 	void
-	ExclusionState::insert_task(Task task)
+	Exclusion::insert_task(const Task &task)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		if (m_locked) {
+		const auto sp = m_owner.lock();
+		lock.unlock();
+		if (sp) {
 			// If Exclusion is locked then queue task for release;
-			m_task.append(task);
+			sp->append(task);
 		} else {
 			// otherwise, run the inserted task immediately
 			task.run();
 		}
 	}
 
-	bool
-	ExclusionState::try_lock()
+	ExclusionLock
+	Exclusion::try_lock(const Task &task)
 	{
 		unique_lock<mutex> lock(m_mutex);
-		if (m_locked) {
-			return false;
+		const auto sp = m_owner.lock();
+		if (sp) {
+			if (task) {
+				sp->append(task);
+			}
+			return ExclusionLock();
 		} else {
-			m_locked = true;
-			return true;
+			const auto rv = make_shared<Task>(task);
+			m_owner = rv;
+			return ExclusionLock(rv);
 		}
-	}
-
-	void
-	Exclusion::insert_task(Task t)
-	{
-		m_exclusion_state->insert_task(t);
 	}
 
 	ExclusionLock::operator bool() const
 	{
-		return !!m_exclusion_state;
+		return !!m_owner;
 	}
 
-	ExclusionLock
-	Exclusion::try_lock()
-	{
-		THROW_CHECK0(runtime_error, m_exclusion_state);
-		if (m_exclusion_state->try_lock()) {
-			return ExclusionLock(m_exclusion_state);
-		} else {
-			return ExclusionLock();
-		}
-	}
 }

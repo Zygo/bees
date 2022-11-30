@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 
@@ -121,50 +122,40 @@ namespace crucible {
 		void release();
 	};
 
-	// Exclusion provides exclusive access to a ExclusionLock.
-	// One Task will be able to obtain the ExclusionLock; other Tasks
-	// may schedule themselves for re-execution after the ExclusionLock
-	// is released.
-
-	class ExclusionState;
-	class Exclusion;
-
 	class ExclusionLock {
-		shared_ptr<ExclusionState> m_exclusion_state;
-		ExclusionLock(shared_ptr<ExclusionState> pes);
-		ExclusionLock() = default;
+		shared_ptr<Task> m_owner;
+		ExclusionLock(shared_ptr<Task> owner);
 	friend class Exclusion;
 	public:
-		// Calls release()
-		~ExclusionLock();
+		/// Explicit default constructor because we have other kinds
+		ExclusionLock() = default;
 
-		// Release this Lock immediately and permanently
+		/// Release this Lock immediately and permanently
 		void release();
 
-		// Test for locked state
+		/// Test for locked state
 		operator bool() const;
 	};
 
 	class Exclusion {
-		shared_ptr<ExclusionState> m_exclusion_state;
+		mutex m_mutex;
+		weak_ptr<Task> m_owner;
 
-		Exclusion(shared_ptr<ExclusionState> pes);
 	public:
-		Exclusion(const string &title);
+		/// Attempt to obtain a Lock.  If successful, current Task
+		/// owns the Lock until the ExclusionLock is released
+		/// (it is the ExclusionLock that owns the lock, so it can
+		/// be passed to other Tasks or threads, but this is not
+		/// recommended practice).
+		/// If not successful, current Task is appended to the
+		/// task that currently holds the lock.  Current task is
+		/// expected to release any other ExclusionLock
+		/// objects it holds, and exit its Task function.
+		ExclusionLock try_lock(const Task &task);
 
-		// Attempt to obtain a Lock.  If successful, current Task
-		// owns the Lock until the ExclusionLock is released
-		// (it is the ExclusionLock that owns the lock, so it can
-		// be passed to other Tasks or threads, but this is not
-		// recommended practice).
-		// If not successful, current Task is expected to call
-		// insert_task(current_task()), release any ExclusionLock
-		// objects it holds, and exit its Task function.
-		ExclusionLock try_lock();
-
-		// Execute Task when Exclusion is unlocked (possibly
-		// immediately).
-		void insert_task(Task t = Task::current_task());
+		/// Execute Task when Exclusion is unlocked (possibly
+		/// immediately).
+		void insert_task(const Task &t);
 	};
 
 
