@@ -20,7 +20,7 @@ namespace crucible {
 #define NTOA_TABLE_ENTRY_BITS(x) { .n = (x), .mask = (x), .a = (#x) }
 
 // Enumerations (entire value matches all bits)
-#define NTOA_TABLE_ENTRY_ENUM(x) { .n = (x), .mask = ~0UL,  .a = (#x) }
+#define NTOA_TABLE_ENTRY_ENUM(x) { .n = (x), .mask = ~0ULL,  .a = (#x) }
 
 // End of table (sorry, C++ didn't get C99's compound literals, so we have to write out all the member names)
 #define NTOA_TABLE_ENTRY_END() { .n = 0, .mask = 0, .a = nullptr }
