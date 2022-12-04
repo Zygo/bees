@@ -212,6 +212,7 @@ namespace crucible {
 
 	string btrfs_search_type_ntoa(unsigned type);
 	string btrfs_search_objectid_ntoa(uint64_t objectid);
+	string btrfs_compress_type_ntoa(uint8_t type);
 
 	uint64_t btrfs_get_root_id(int fd);
 	uint64_t btrfs_get_root_transid(int fd);

@@ -520,9 +520,10 @@ namespace crucible {
 	}
 
 	string
-	btrfs_ioctl_defrag_range_compress_type_ntoa(uint32_t compress_type)
+	btrfs_compress_type_ntoa(uint8_t compress_type)
 	{
 		static const bits_ntoa_table table[] = {
+			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_NONE),
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_ZLIB),
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_LZO),
 			NTOA_TABLE_ENTRY_ENUM(BTRFS_COMPRESS_ZSTD),
@@ -542,7 +543,7 @@ namespace crucible {
 		os << " .len = " << p->len;
 		os << " .flags = " << btrfs_ioctl_defrag_range_flags_ntoa(p->flags);
 		os << " .extent_thresh = " << p->extent_thresh;
-		os << " .compress_type = " << btrfs_ioctl_defrag_range_compress_type_ntoa(p->compress_type);
+		os << " .compress_type = " << btrfs_compress_type_ntoa(p->compress_type);
 		os << " .unused[4] = { " << p->unused[0] << ", " << p->unused[1] << ", " << p->unused[2] << ", " << p->unused[3] << "} }";
 		return os;
 	}
