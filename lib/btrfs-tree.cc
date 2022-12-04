@@ -77,14 +77,14 @@ namespace crucible {
 	uint64_t
 	BtrfsTreeItem::block_group_flags() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_BLOCK_GROUP_ITEM_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_BLOCK_GROUP_ITEM_KEY);
 		return btrfs_get_member(&btrfs_block_group_item::flags, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::block_group_used() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_BLOCK_GROUP_ITEM_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_BLOCK_GROUP_ITEM_KEY);
 		return btrfs_get_member(&btrfs_block_group_item::used, m_data);
 	}
 
@@ -105,28 +105,28 @@ namespace crucible {
 	uint64_t
 	BtrfsTreeItem::dev_extent_chunk_offset() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_DEV_EXTENT_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_DEV_EXTENT_KEY);
 		return btrfs_get_member(&btrfs_dev_extent::chunk_offset, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::dev_extent_length() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_DEV_EXTENT_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_DEV_EXTENT_KEY);
 		return btrfs_get_member(&btrfs_dev_extent::length, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::dev_item_total_bytes() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_DEV_ITEM_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_DEV_ITEM_KEY);
 		return btrfs_get_member(&btrfs_dev_item::total_bytes, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::dev_item_bytes_used() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_DEV_ITEM_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_DEV_ITEM_KEY);
 		return btrfs_get_member(&btrfs_dev_item::bytes_used, m_data);
 	}
 
@@ -134,14 +134,14 @@ namespace crucible {
 
 	BtrfsTreeItem::inode_size() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_INODE_ITEM_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_INODE_ITEM_KEY);
 		return btrfs_get_member(&btrfs_inode_item::size, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::file_extent_logical_bytes() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		const auto file_extent_item_type = btrfs_get_member(&btrfs_file_extent_item::type, m_data);
 		switch (file_extent_item_type) {
 			case BTRFS_FILE_EXTENT_INLINE:
@@ -157,7 +157,7 @@ namespace crucible {
 	uint64_t
 	BtrfsTreeItem::file_extent_offset() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		const auto file_extent_item_type = btrfs_get_member(&btrfs_file_extent_item::type, m_data);
 		switch (file_extent_item_type) {
 			case BTRFS_FILE_EXTENT_INLINE:
@@ -173,14 +173,14 @@ namespace crucible {
 	uint64_t
 	BtrfsTreeItem::file_extent_generation() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		return btrfs_get_member(&btrfs_file_extent_item::generation, m_data);
 	}
 
 	uint64_t
 	BtrfsTreeItem::file_extent_bytenr() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		auto file_extent_item_type = btrfs_get_member(&btrfs_file_extent_item::type, m_data);
 		switch (file_extent_item_type) {
 			case BTRFS_FILE_EXTENT_INLINE:
@@ -196,14 +196,14 @@ namespace crucible {
 	uint8_t
 	BtrfsTreeItem::file_extent_type() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		return btrfs_get_member(&btrfs_file_extent_item::type, m_data);
 	}
 
 	btrfs_compression_type
 	BtrfsTreeItem::file_extent_compression() const
 	{
-		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_EXTENT_DATA_KEY);
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);
 		return static_cast<btrfs_compression_type>(btrfs_get_member(&btrfs_file_extent_item::compression, m_data));
 	}
 
