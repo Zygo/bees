@@ -499,17 +499,13 @@ namespace crucible {
 
 		m_prev_loadavg = loadavg;
 
-		// Change the thread target based on the
-		// difference between current and desired load
-		// but don't get too close all at once due to rounding and sample error.
-		// If m_load_target < 1.0 then we are just doing PWM with one thread.
-
-		if (m_load_target <= 1.0) {
-			m_thread_target = 1.0;
-		} else if (m_load_target - current_load >= 1.0) {
-			m_thread_target += (m_load_target - current_load - 1.0) / 2.0;
-		} else if (m_load_target < current_load) {
-			m_thread_target += m_load_target - current_load;
+		const double load_deficit = m_load_target - loadavg;
+		if (load_deficit > 0) {
+			// Load is too low, solve by adding another worker
+			m_thread_target += load_deficit / 3;
+		} else if (load_deficit < 0) {
+			// Load is too high, solve by removing all known excess tasks
+			m_thread_target += load_deficit;
 		}
 
 		m_load_stats = TaskMaster::LoadStats {
