@@ -93,6 +93,17 @@ namespace crucible {
 		/// Gets the current number of active workers
 		static size_t get_thread_count();
 
+		/// Gets the current load tracking statistics
+		struct LoadStats {
+			/// Current load extracted from last two 5-second load average samples
+			double current_load;
+			/// Target thread count computed from previous thread count and current load
+			double thread_target;
+			/// Load average for last 60 seconds
+			double loadavg;
+		};
+		static LoadStats get_current_load();
+
 		/// Drop the current queue and discard new Tasks without
 		/// running them.  Currently executing tasks are not
 		/// affected (use set_thread_count(0) to wait for those

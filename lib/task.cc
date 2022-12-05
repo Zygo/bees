@@ -139,6 +139,7 @@ namespace crucible {
 		double					m_thread_target;
 		bool					m_cancelled = false;
 		bool					m_paused = false;
+		TaskMaster::LoadStats			m_load_stats;
 
 	friend class TaskConsumer;
 	friend class TaskMaster;
@@ -165,6 +166,7 @@ namespace crucible {
 		static void push_front(TaskQueue &queue);
 		size_t get_queue_count();
 		size_t get_thread_count();
+		static TaskMaster::LoadStats get_current_load();
 	};
 
 	class TaskConsumer : public enable_shared_from_this<TaskConsumer> {
@@ -348,7 +350,8 @@ namespace crucible {
 	TaskMasterState::TaskMasterState(size_t thread_max) :
 		m_thread_max(thread_max),
 		m_configured_thread_max(thread_max),
-		m_thread_target(thread_max)
+		m_thread_target(thread_max),
+		m_load_stats(TaskMaster::LoadStats { 0 })
 	{
 	}
 
@@ -420,6 +423,13 @@ namespace crucible {
 	{
 		unique_lock<mutex> lock(s_tms->m_mutex);
 		return s_tms->m_threads.size();
+	}
+
+	TaskMaster::LoadStats
+	TaskMaster::get_current_load()
+	{
+		unique_lock<mutex> lock(s_tms->m_mutex);
+		return s_tms->m_load_stats;
 	}
 
 	ostream &
@@ -501,6 +511,12 @@ namespace crucible {
 		} else if (m_load_target < current_load) {
 			m_thread_target += m_load_target - current_load;
 		}
+
+		m_load_stats = TaskMaster::LoadStats {
+			.current_load = current_load,
+			.thread_target = m_thread_target,
+			.loadavg = loadavg,
+		};
 
 		// Cannot exceed configured maximum thread count or less than zero
 		m_thread_target = min(max(0.0, m_thread_target), double(m_configured_thread_max));
