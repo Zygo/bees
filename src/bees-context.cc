@@ -84,7 +84,8 @@ BeesContext::dump_status()
 		ofs << "RATES:\n";
 		ofs << "\t" << avg_rates << "\n";
 
-		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " of " << Task::instance_count() << " tasks, " << TaskMaster::get_thread_count() << " workers):\n";
+		const auto load_stats = TaskMaster::get_current_load();
+		ofs << "THREADS (work queue " << TaskMaster::get_queue_count() << " of " << Task::instance_count() << " tasks, " << TaskMaster::get_thread_count() << " workers, load: current " << load_stats.current_load << " target " << load_stats.thread_target << " average " << load_stats.loadavg << "):\n";
 		for (auto t : BeesNote::get_status()) {
 			ofs << "\ttid " << t.first << ": " << t.second << "\n";
 		}
@@ -152,8 +153,8 @@ BeesContext::show_progress()
 		BEESLOGINFO("\t" << deltaRates);
 
 		BEESNOTE("logging current thread status");
-		BEESLOGINFO("THREADS:");
-
+		const auto load_stats = TaskMaster::get_current_load();
+		BEESLOGINFO("THREADS (work queue " << TaskMaster::get_queue_count() << " of " << Task::instance_count() << " tasks, " << TaskMaster::get_thread_count() << " workers, load: current " << load_stats.current_load << " target " << load_stats.thread_target << " average " << load_stats.loadavg << "):");
 		for (auto t : BeesNote::get_status()) {
 			BEESLOGINFO("\ttid " << t.first << ": " << t.second);
 		}
