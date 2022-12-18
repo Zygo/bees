@@ -55,8 +55,8 @@ namespace crucible {
 		/// Tasks to be executed after the current task is executed
 		list<TaskStatePtr>			m_post_exec_queue;
 
-		/// Incremented by run() and append().  Decremented by exec().
-		size_t					m_run_count = 0;
+		/// Set by run() and append().  Cleared by exec().
+		bool					m_run_now = false;
 
 		/// Set when task starts execution by exec().
 		/// Cleared when exec() ends.
@@ -221,6 +221,9 @@ namespace crucible {
 	TaskState::~TaskState()
 	{
 		--s_instance_count;
+		unique_lock<mutex> lock(m_mutex);
+		// If any dependent Tasks were appended since the last exec, run them now
+		TaskState::rescue_queue(m_post_exec_queue);
 	}
 
 	TaskState::TaskState(string title, function<void()> exec_fn) :
@@ -275,8 +278,8 @@ namespace crucible {
 	{
 		THROW_CHECK0(invalid_argument, task);
 		PairLock lock(m_mutex, task->m_mutex);
-		if (!task->m_run_count) {
-			++task->m_run_count;
+		if (!task->m_run_now) {
+			task->m_run_now = true;
 			append_nolock(task);
 		}
 	}
@@ -292,7 +295,7 @@ namespace crucible {
 			append_nolock(shared_from_this());
 			return;
 		} else {
-			--m_run_count;
+			m_run_now = false;
 			m_is_running = true;
 		}
 
@@ -335,10 +338,10 @@ namespace crucible {
 	TaskState::run()
 	{
 		unique_lock<mutex> lock(m_mutex);
-		if (m_run_count) {
+		if (m_run_now) {
 			return;
 		}
-		++m_run_count;
+		m_run_now = true;
 		TaskMasterState::push_back(shared_from_this());
 	}
 
