@@ -323,7 +323,11 @@ BeesScanModeRecent::next_transid(const CrawlMap &crawl_map)
 		if (this_range) {
 			const auto state_end = this_crawl->get_state_end();
 			const auto min_transid = state_end.m_min_transid;
-			const auto max_transid = state_end.m_max_transid;
+			// Should we use max_transid or only min_transid?
+			// Using max_transid here would make it more like sequential,
+			// and sequential is bad.
+			// const auto max_transid = state_end.m_max_transid;
+			const auto max_transid = 0;
 			const SortKey key { .min_transid = min_transid, .max_transid = max_transid };
 			sorted[key].push_back(this_crawl);
 		}
