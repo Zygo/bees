@@ -155,7 +155,6 @@ a larger hash table to maintain dedupe hit rate.
 
 Scan mode 3, "recent", scans the subvols with the highest `min_transid`
 value first (i.e. the ones that were most recently completely scanned),
-then the highest `max_transid` (i.e. the ones that were created later),
 then falls back to "independent" mode to break ties.  This interrupts
 long scans of old subvols to give a rapid dedupe response to new data,
 then returns to the old subvols after the new data is scanned.  It is
