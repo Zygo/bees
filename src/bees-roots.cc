@@ -626,19 +626,17 @@ BeesFileCrawl::crawl_one_extent()
 					// It might be corrupted data, the file might have been deleted or truncated,
 					// or we might hit some other recoverable error.  We'll try again with
 					// the next extent.
-					bool scanned_ok = false;
+					bool scan_again = false;
 					catch_all([&]() {
 						BEESNOTE("scan_forward " << bfr);
 						// BEESLOGDEBUG("scan_forward #" << Task::current_task().id() << " " << bfr);
-						scanned_ok = m_ctx->scan_forward(bfr);
+						scan_again = m_ctx->scan_forward(bfr);
 						// BEESLOGDEBUG("done_forward #" << Task::current_task().id() << " " << bfr);
 					} );
-					if (scanned_ok) {
+					if (!scan_again) {
 						m_hold = new_holder;
 					} else {
-						BEESLOGDEBUG("retrying lock for extent at " << bfr);
-						BEESCOUNT(crawl_restart);
-						return true;
+						BEESCOUNT(crawl_again);
 					}
 				}
 			} else {
