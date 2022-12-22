@@ -217,10 +217,11 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 	THROW_CHECK1(invalid_argument, brp, brp.first.size() == brp.second.size());
 
 	BEESCOUNT(dedup_try);
-	Timer dedup_timer;
 
 	BEESNOTE("waiting to dedup " << brp);
 	const auto lock = MultiLocker::get_lock("dedupe");
+
+	Timer dedup_timer;
 
 	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
 		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
