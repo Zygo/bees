@@ -182,7 +182,7 @@ BeesContext::home_fd()
 }
 
 bool
-BeesContext::is_root_ro(uint64_t root)
+BeesContext::is_root_ro(uint64_t const root)
 {
 	return roots()->is_root_ro(root);
 }

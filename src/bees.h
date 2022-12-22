@@ -561,11 +561,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	bool					m_stop_requested = false;
 
 	void insert_new_crawl();
-	void insert_root(const BeesCrawlState &bcs);
 	Fd open_root_nocache(uint64_t root);
 	Fd open_root_ino_nocache(uint64_t root, uint64_t ino);
-	uint64_t transid_min();
-	uint64_t transid_max();
 	uint64_t transid_max_nocache();
 	void state_load();
 	ostream &state_to_stream(ostream &os);
@@ -581,6 +578,9 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	RateEstimator& transid_re();
 	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
+
+friend class BeesScanModeExtent;
+	shared_ptr<BeesCrawl> insert_root(const BeesCrawlState &bcs);
 
 friend class BeesCrawl;
 friend class BeesFdCache;
@@ -600,17 +600,20 @@ public:
 	Fd open_root_ino(const BeesFileId &bfi) { return open_root_ino(bfi.root(), bfi.ino()); }
 	bool is_root_ro(uint64_t root);
 
-	// TODO:  do extent-tree scans instead
 	enum ScanMode {
 		SCAN_MODE_LOCKSTEP,
 		SCAN_MODE_INDEPENDENT,
 		SCAN_MODE_SEQUENTIAL,
 		SCAN_MODE_RECENT,
+		SCAN_MODE_EXTENT,
 		SCAN_MODE_COUNT, // must be last
 	};
 
 	void set_scan_mode(ScanMode new_mode);
 	void set_workaround_btrfs_send(bool do_avoid);
+
+	uint64_t transid_min();
+	uint64_t transid_max();
 };
 
 struct BeesHash {
