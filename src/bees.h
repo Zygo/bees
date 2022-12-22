@@ -751,7 +751,7 @@ public:
 	Fd home_fd();
 	string root_path() const { return m_root_path; }
 
-	void scan_forward(const BeesFileRange &bfr);
+	bool scan_forward(const BeesFileRange &bfr);
 
 	bool is_root_ro(uint64_t root);
 	BeesRangePair dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile);

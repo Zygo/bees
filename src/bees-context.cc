@@ -678,7 +678,7 @@ BeesContext::get_inode_mutex(const uint64_t inode)
 	return m_inode_locks(inode);
 }
 
-void
+bool
 BeesContext::scan_forward(const BeesFileRange &bfr_in)
 {
 	BEESTRACE("scan_forward " << bfr_in);
@@ -689,7 +689,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	// Silently filter out blacklisted files
 	if (is_blacklisted(bfr_in.fid())) {
 		BEESCOUNT(scan_blacklisted);
-		return;
+		return false;
 	}
 
 	// Reconstitute FD
@@ -703,14 +703,14 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	if (!bfr.fd()) {
 		// BEESLOGINFO("No FD in " << root_path() << " for " << bfr);
 		BEESCOUNT(scan_no_fd);
-		return;
+		return false;
 	}
 
 	// Sanity check
 	if (bfr.begin() >= bfr.file_size()) {
 		BEESLOGWARN("past EOF: " << bfr);
 		BEESCOUNT(scan_eof);
-		return;
+		return false;
 	}
 
 	BtrfsExtentWalker ew(bfr.fd(), bfr.begin(), root_fd());
@@ -729,7 +729,6 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 					// BEESLOGDEBUG("Deferring extent bytenr " << to_hex(extent_bytenr) << " from " << bfr);
 					BEESCOUNT(scanf_deferred_extent);
 					start_over = true;
-					return;
 				}
 				Timer one_extent_timer;
 				scan_one_extent(bfr, e);
@@ -750,7 +749,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	BEESCOUNTADD(scanf_total_ms, scan_timer.age() * 1000);
 	BEESCOUNT(scanf_total);
 
-	return;
+	return start_over;
 }
 
 BeesResolveAddrResult::BeesResolveAddrResult()
