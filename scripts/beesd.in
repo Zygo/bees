@@ -128,7 +128,7 @@ fi
     fi
     if (( "$OLD_SIZE" != "$NEW_SIZE" )); then
         INFO "Resize db: $OLD_SIZE -> $NEW_SIZE"
-        [ -f "$BEESHOME/beescrawl.$UUID.dat" ] && rm "$BEESHOME/beescrawl.$UUID.dat"
+        rm -f "$BEESHOME/beescrawl.dat"
         truncate -s $NEW_SIZE $DB_PATH
     fi
     chmod 700 "$DB_PATH"
