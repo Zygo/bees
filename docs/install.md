@@ -80,7 +80,7 @@ within a temporary runtime directory.
 Packaging
 ---------
 
-See 'Dependencies' below. Package maintainers can pick ideas for building and
+See 'Dependencies' above. Package maintainers can pick ideas for building and
 configuring the source package from the Gentoo ebuild:
 
 <https://github.com/gentoo/gentoo/tree/master/sys-fs/bees>
