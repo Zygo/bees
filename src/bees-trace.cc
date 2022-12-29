@@ -111,9 +111,7 @@ void
 BeesNote::set_name(const string &name)
 {
 	tl_name = name;
-	catch_all([&]() {
-		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), name.c_str()));
-	});
+	pthread_setname(name);
 }
 
 string
@@ -134,19 +132,12 @@ BeesNote::get_name()
 	}
 
 	// OK try the pthread name next.
-	char buf[24];
-	memset(buf, '\0', sizeof(buf));
-	int err = pthread_getname_np(pthread_self(), buf, sizeof(buf));
-	if (err) {
-		return string("pthread_getname_np: ") + strerror(err);
-	}
-	buf[sizeof(buf) - 1] = '\0';
 
 	// thread_getname_np returns process name
 	// ...by default?  ...for the main thread?
 	// ...except during exception handling?
 	// ...randomly?
-	return buf;
+	return pthread_getname();
 }
 
 BeesNote::ThreadStatusMap
