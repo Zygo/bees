@@ -118,6 +118,7 @@ crawl
 
 The `crawl` event group consists of operations related to scanning btrfs trees to find new extent refs to scan for dedupe.
 
+ * `crawl_again`: An inode crawl was restarted because the extent was already locked by another running crawl.
  * `crawl_blacklisted`: An extent was not scanned because it belongs to a blacklisted file.
  * `crawl_create`: A new subvol crawler was created.
  * `crawl_done`: One pass over all subvols on the filesystem was completed.
@@ -133,7 +134,6 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
  * `crawl_nondata`: An item in the search results is not data.
  * `crawl_prealloc`: An extent item in the search results refers to a `PREALLOC` extent.
  * `crawl_push`: An extent item in the search results is suitable for scanning and deduplication.
- * `crawl_restart`: A subvol crawl was restarted with a new `min_transid..max_transid` range.
  * `crawl_scan`: An extent item in the search results is submitted to `BeesContext::scan_forward` for scanning and deduplication.
  * `crawl_search`: A `TREE_SEARCH_V2` ioctl call was successful.
  * `crawl_unknown`: An extent item in the search results has an unrecognized type.
