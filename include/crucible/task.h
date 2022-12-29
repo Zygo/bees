@@ -174,7 +174,11 @@ namespace crucible {
 		void insert_task(const Task &t);
 	};
 
+	/// Wrapper around pthread_setname_np which handles length limits
+	void pthread_setname(const string &name);
 
+	/// Wrapper around pthread_getname_np for symmetry
+	string pthread_getname();
 }
 
 #endif // CRUCIBLE_TASK_H

@@ -18,6 +18,27 @@
 namespace crucible {
 	using namespace std;
 
+	static const size_t thread_name_length = 15; // TASK_COMM_LEN on Linux
+
+	void
+	pthread_setname(const string &name)
+	{
+		auto name_copy = name.substr(0, thread_name_length);
+		// Don't care if a debugging facility fails
+		pthread_setname_np(pthread_self(), name_copy.c_str());
+	}
+
+	string
+	pthread_getname()
+	{
+		char buf[thread_name_length + 1] = { 0 };
+		// We'll get an empty name if this fails...
+		pthread_getname_np(pthread_self(), buf, sizeof(buf));
+		// ...or at least null-terminated garbage
+		buf[thread_name_length] = '\0';
+		return buf;
+	}
+
 	class TaskState;
 	using TaskStatePtr = shared_ptr<TaskState>;
 	using TaskStateWeak = weak_ptr<TaskState>;
@@ -305,15 +326,14 @@ namespace crucible {
 		swap(this_task, tl_current_task);
 		lock.unlock();
 
-		char buf[64] = { 0 };
-		DIE_IF_MINUS_ERRNO(pthread_getname_np(pthread_self(), buf, sizeof(buf)));
-		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), m_title.c_str()));
+		const auto old_thread_name = pthread_getname();
+		pthread_setname(m_title);
 
 		catch_all([&]() {
 			m_exec_fn();
 		});
 
-		pthread_setname_np(pthread_self(), buf);
+		pthread_setname(old_thread_name);
 
 		lock.lock();
 		swap(this_task, tl_current_task);
@@ -608,7 +628,7 @@ namespace crucible {
 	void
 	TaskMasterState::loadavg_thread_fn()
 	{
-		pthread_setname_np(pthread_self(), "load_tracker");
+		pthread_setname("load_tracker");
 		while (!m_cancelled) {
 			adjust_thread_count();
 			nanosleep(5.0);
@@ -734,7 +754,7 @@ namespace crucible {
 		m_thread->detach();
 
 		// Set thread name so it isn't empty or the name of some other thread
-		DIE_IF_MINUS_ERRNO(pthread_setname_np(pthread_self(), "task_consumer"));
+		pthread_setname("task_consumer");
 
 		// It is now safe to access our own shared_ptr
 		TaskConsumerPtr this_consumer = shared_from_this();
