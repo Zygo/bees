@@ -215,7 +215,7 @@ BeesTooLong::operator=(const func_type &f)
 }
 
 void
-bees_readahead(int const fd, off_t offset, size_t size)
+bees_readahead(int const fd, const off_t offset, const size_t size)
 {
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
@@ -230,18 +230,20 @@ bees_readahead(int const fd, off_t offset, size_t size)
 	// and might discard the readahead request entirely,
 	// so it's maybe, *maybe*, worth doing both.
 	BEESNOTE("emulating readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
-	while (size) {
+	auto working_size = size;
+	auto working_offset = offset;
+	while (working_size) {
 		// don't care about multithreaded writes to this buffer--it is garbage anyway
 		static uint8_t dummy[BEES_READAHEAD_SIZE];
-		size_t this_read_size = min(size, sizeof(dummy));
+		const size_t this_read_size = min(working_size, sizeof(dummy));
 		// Ignore errors and short reads.  It turns out our size
 		// parameter isn't all that accurate, so we can't use
 		// the pread_or_die template.
-		(void)!pread(fd, dummy, this_read_size, offset);
+		(void)!pread(fd, dummy, this_read_size, working_offset);
 		BEESCOUNT(readahead_count);
 		BEESCOUNTADD(readahead_bytes, this_read_size);
-		offset += this_read_size;
-		size -= this_read_size;
+		working_offset += this_read_size;
+		working_size -= this_read_size;
 	}
 #endif
 	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
