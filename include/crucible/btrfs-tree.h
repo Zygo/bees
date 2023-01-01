@@ -33,6 +33,11 @@ namespace crucible {
 		uint64_t block_group_used() const;
 		/// @}
 
+		/// @{ Chunk items
+		uint64_t chunk_length() const;
+		uint64_t chunk_type() const;
+		/// @}
+
 		/// @{ Dev extent items (physical byte ranges)
 		uint64_t dev_extent_chunk_offset() const;
 		uint64_t dev_extent_length() const;

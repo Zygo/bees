@@ -89,6 +89,20 @@ namespace crucible {
 	}
 
 	uint64_t
+	BtrfsTreeItem::chunk_length() const
+	{
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_CHUNK_ITEM_KEY);
+		return btrfs_get_member(&btrfs_chunk::length, m_data);
+	}
+
+	uint64_t
+	BtrfsTreeItem::chunk_type() const
+	{
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_CHUNK_ITEM_KEY);
+		return btrfs_get_member(&btrfs_chunk::type, m_data);
+	}
+
+	uint64_t
 	BtrfsTreeItem::dev_extent_chunk_offset() const
 	{
 		THROW_CHECK1(invalid_argument, m_type, m_type == BTRFS_DEV_EXTENT_KEY);
