@@ -774,8 +774,8 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	int rv = 1;
-	catch_and_explain([&]() {
+	int rv = EXIT_FAILURE;
+	catch_all([&]() {
 		rv = bees_main(argc, argv);
 	});
 	BEESLOGNOTICE("Exiting with status " << rv << " " << (rv ? "(failure)" : "(success)"));
