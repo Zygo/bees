@@ -40,7 +40,7 @@
 
 * `--scan-mode MODE` or `-m`
 
- Specify extent scanning algorithm.  Default `MODE` is 3.
+ Specify extent scanning algorithm.
  **EXPERIMENTAL** feature that may go away.
 
   * Mode 0: lockstep
@@ -48,8 +48,8 @@
   * Mode 2: sequential
   * Mode 3: recent
 
- For details of the different scanning modes, see
- [bees configuration](docs/config.md).
+ For details of the different scanning modes and the default value of
+ this option, see [bees configuration](docs/config.md).
 
 ## Workarounds
 
