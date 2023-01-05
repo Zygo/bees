@@ -47,6 +47,7 @@
   * Mode 1: independent
   * Mode 2: sequential
   * Mode 3: recent
+  * Mode 4: extent
 
  For details of the different scanning modes and the default value of
  this option, see [bees configuration](config.md).

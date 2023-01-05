@@ -98,27 +98,72 @@ code files over and over, so it will need a smaller hash table than a
 backup server which has to refer to the oldest data on the filesystem
 every time a new client machine's data is added to the server.
 
-Scanning modes for multiple subvols
------------------------------------
+Scanning modes
+--------------
 
-The `--scan-mode` option affects how bees schedules worker threads
-between subvolumes.  Scan modes are an experimental feature and will
-likely be deprecated in favor of a better solution.
+The `--scan-mode` option affects how bees iterates over the filesystem,
+schedules extents for scanning, and tracks progress.
 
-Scan mode can be changed at any time by restarting bees with a different
-mode option.  Scan state tracking is the same for all of the currently
-implemented modes.  The difference between the modes is the order in
-which subvols are selected.
+There are now two kinds of scan mode:  the legacy **subvol** scan modes,
+and the new **extent** scan mode.
 
-If a filesystem has only one subvolume with data in it, then the
-`--scan-mode` option has no effect.  In this case, there is only one
-subvolume to scan, so worker threads will all scan that one.
+Scan mode can be changed by restarting bees with a different scan mode
+option.
 
-Within a subvol, there is a single optimal scan order:  files are scanned
-in ascending numerical inode order.  Each worker will scan a different
-inode to avoid having the threads contend with each other for locks.
-File data is read sequentially and in order, but old blocks from earlier
-scans are skipped.
+Extent scan mode:
+
+ * Works with 4.15 and later kernels.
+ * Can estimate progress and provide an ETA.
+ * Can optimize scanning order to dedupe large extents first.
+ * Cannot avoid modifying read-only subvols.
+ * Can keep up with frequent creation and deletion of snapshots.
+
+Subvol scan modes:
+
+ * Work with 4.14 and earlier kernels.
+ * Cannot estimate or report progress.
+ * Cannot optimize scanning order by extent size.
+ * Can avoid modifying read-only subvols (for `btrfs send` workaround).
+ * Have problems keeping up with snapshots created during a scan.
+
+The default scan mode is 1, "independent".
+
+If you are using bees for the first time on a filesystem with many
+existing snapshots, you should read about [snapshot gotchas](gotchas.md).
+
+Subvol scan modes
+-----------------
+
+Subvol scan modes are maintained for compatibility with existing
+installations, but will not be developed further.  New installations
+should use extent scan mode instead.
+
+The _quantity_ of text below detailing the shortcomings of each subvol
+scan mode should be informative all by itself.
+
+Subvol scan modes work on any kernel version supported by bees.  They
+are the only scan modes usable on kernel 4.14 and earlier.
+
+The difference between the subvol scan modes is the order in which the
+files from different subvols are fed into the scanner.  They all scan
+files in inode number order, from low to high offset within each inode,
+the same way that a program like `cat` would read files (but skipping
+over old data from earlier btrfs transactions).
+
+If a filesystem has only one subvolume with data in it, then all of
+the subvol scan modes are equivalent.  In this case, there is only one
+subvolume to scan, so every possible ordering of subvols is the same.
+
+The `--workaround-btrfs-send` option pauses scanning subvols that are
+read-only.  If the subvol is made read-write (e.g. with `btrfs prop set
+$subvol ro false`), or if the `--workaround-btrfs-send` option is removed,
+then the scan of that subvol is unpaused and dedupe proceeds normally.
+Space will only be recovered when the last read-only subvol is deleted.
+
+Subvol scan modes cannot efficiently or accurately calculate an ETA for
+completion or estimate progress through the data.  They simply request
+"the next new inode" from btrfs, and they are completed when btrfs says
+there is no next new inode.
 
 Between subvols, there are several scheduling algorithms with different
 trade-offs:
@@ -126,53 +171,99 @@ trade-offs:
 Scan mode 0, "lockstep", scans the same inode number in each subvol at
 close to the same time.  This is useful if the subvols are snapshots
 with a common ancestor, since the same inode number in each subvol will
-have similar or identical contents.  This maximizes the likelihood
-that all of the references to a snapshot of a file are scanned at
-close to the same time, improving dedupe hit rate and possibly taking
-advantage of VFS caching in the Linux kernel.  If the subvols are
-unrelated (i.e. not snapshots of a single subvol) then this mode does
-not provide significant benefit over random selection.  This mode uses
-smaller amounts of temporary space for shorter periods of time when most
-subvols are snapshots.  When a new snapshot is created, this mode will
-stop scanning other subvols and scan the new snapshot until the same
-inode number is reached in each subvol, which will effectively stop
-dedupe temporarily as this data has already been scanned and deduped
-in the other snapshots.
+have similar or identical contents.  This maximizes the likelihood that
+all of the references to a snapshot of a file are scanned at close to
+the same time, improving dedupe hit rate.  If the subvols are unrelated
+(i.e. not snapshots of a single subvol) then this mode does not provide
+any significant advantage.  This mode uses smaller amounts of temporary
+space for shorter periods of time when most subvols are snapshots.  When a
+new snapshot is created, this mode will stop scanning other subvols and
+scan the new snapshot until the same inode number is reached in each
+subvol, which will effectively stop dedupe temporarily as this data has
+already been scanned and deduped in the other snapshots.
 
-Scan mode 1, "independent", scans the next inode with new data in each
-subvol.  Each subvol's scanner shares inodes uniformly with all other
-subvol scanners until the subvol has no new inodes left.  This mode makes
-continuous forward progress across the filesystem and provides average
-performance across a variety of workloads, but is slow to respond to new
-data, and may spend a lot of time deduping short-lived subvols that will
-soon be deleted when it is preferable to dedupe long-lived subvols that
-will be the origin of future snapshots.  When a new snapshot is created,
-previous subvol scans continue as before, but the time is now divided
-among one more subvol.
+Scan mode 1, "independent", scans the next inode with new data in
+each subvol.  There is no coordination between the subvols, other than
+round-robin distribution of files from each subvol to each worker thread.
+This mode makes continuous forward progress in all subvols.  When a new
+snapshot is created, previous subvol scans continue as before, but the
+worker threads are now divided among one more subvol.
 
 Scan mode 2, "sequential", scans one subvol at a time, in numerical subvol
-ID order, processing each subvol completely before proceeding to the
-next subvol.  This avoids spending time scanning short-lived snapshots
-that will be deleted before they can be fully deduped (e.g. those used
-for `btrfs send`).  Scanning is concentrated on older subvols that are
-more likely to be origin subvols for future snapshots, eliminating the
-need to dedupe future snapshots separately.  This mode uses the largest
-amount of temporary space for the longest time, and typically requires
-a larger hash table to maintain dedupe hit rate.
+ID order, processing each subvol completely before proceeding to the next
+subvol.  This avoids spending time scanning short-lived snapshots that
+will be deleted before they can be fully deduped (e.g. those used for
+`btrfs send`).  Scanning starts on older subvols that are more likely
+to be origin subvols for future snapshots, eliminating the need to
+dedupe future snapshots separately.  This mode uses the largest amount
+of temporary space for the longest time, and typically requires a larger
+hash table to maintain dedupe hit rate.
 
 Scan mode 3, "recent", scans the subvols with the highest `min_transid`
 value first (i.e. the ones that were most recently completely scanned),
 then falls back to "independent" mode to break ties.  This interrupts
-long scans of old subvols to give a rapid dedupe response to new data,
-then returns to the old subvols after the new data is scanned.  It is
-useful for large filesystems with multiple active subvols and rotating
-snapshots, where the first-pass scan can take months, but new duplicate
-data appears every day.
+long scans of old subvols to give a rapid dedupe response to new data
+in previously scanned subvols, then returns to the old subvols after
+the new data is scanned.
 
-The default scan mode is 1, "independent".
+Extent scan mode
+----------------
 
-If you are using bees for the first time on a filesystem with many
-existing snapshots, you should read about [snapshot gotchas](gotchas.md).
+Scan mode 4, "extent", scans the extent tree instead of the subvol trees.
+Extent scan mode reads each extent once, regardless of the number of
+reflinks or snapshots.  It adapts to the creation of new snapshots
+immediately, without having to revisit old data.
+
+In the extent scan mode, extents are separated into multiple size tiers
+to prioritize large extents over small ones.  Deduping large extents
+keeps the metadata update cost low per block saved, resulting in faster
+dedupe at the start of a scan cycle.  This is important for maximizing
+performance in use cases where bees runs for a limited time, such as
+during an overnight maintenance window.
+
+Once the larger size tiers are completed, dedupe space recovery speeds
+slow down significantly.  It may be desirable to stop bees running once
+the larger size tiers are finished, then start bees running some time
+later after new data has appeared.
+
+Each extent is mapped in physical address order, and all extent references
+are submitted to the scanner at the same time, resulting in much better
+cache behavior and dedupe performance compared to the subvol scan modes.
+
+The "extent" scan mode is not usable on kernels before 4.15 because
+it relies on the `LOGICAL_INO_V2` ioctl added in that kernel release.
+When using bees with an older kernel, only subvol scan modes will work.
+
+Extents are divided into virtual subvols by size, using reserved btrfs
+subvol IDs 250..255.  The size tier groups are:
+ * 250: 32M+1 and larger
+ * 251: 8M+1..32M
+ * 252: 2M+1..8M
+ * 253: 512K+1..2M
+ * 254: 128K+1..512K
+ * 255: 128K and smaller (includes all compressed extents)
+
+Extent scan mode can efficiently calculate dedupe progress within
+the filesystem and estimate an ETA for completion within each size
+tier; however, the accuracy of the ETA can be questionable due to the
+non-uniform distribution of block addresses in a typical user filesystem.
+
+Older versions of bees do not recognize the virtual subvols, so running
+an old bees version after running a new bees version will reset the
+"extent" scan mode's progress in `beescrawl.dat` to the beginning.
+This may change in future bees releases, i.e. extent scans will store
+their checkpoint data somewhere else.
+
+The `--workaround-btrfs-send` option behaves differently in extent
+scan modes:  In extent scan mode, dedupe proceeds on all subvols that are
+read-write, but all subvols that are read-only are excluded from dedupe.
+Space will only be recovered when the last read-only subvol is deleted.
+
+During `btrfs send` all duplicate extents in the sent subvol will not be
+removed (the kernel will reject dedupe commands while send is active,
+and bees currently will not re-issue them after the send is complete).
+It may be preferable to terminate the bees process while running `btrfs
+send` in extent scan mode, and restart bees after the `send` is complete.
 
 Threads and load management
 ---------------------------
