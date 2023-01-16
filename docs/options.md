@@ -49,7 +49,7 @@
   * Mode 3: recent
 
  For details of the different scanning modes and the default value of
- this option, see [bees configuration](docs/config.md).
+ this option, see [bees configuration](config.md).
 
 ## Workarounds
 
