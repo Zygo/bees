@@ -106,12 +106,6 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 	BEESNOTE("flushing extent #" << extent_index << " of " << m_extents << " extents");
 
 	auto lock = lock_extent_by_index(extent_index);
-
-	// Not dirty, nothing to do
-	if (!m_extent_metadata.at(extent_index).m_dirty) {
-		return false;
-	}
-
 	bool wrote_extent = false;
 
 	catch_all([&]() {
@@ -125,9 +119,6 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 		// Copy the extent because we might be stuck writing for a while
 		ByteVector extent_copy(dirty_extent, dirty_extent_end);
 
-		// Mark extent non-dirty while we still hold the lock
-		m_extent_metadata.at(extent_index).m_dirty = false;
-
 		// Release the lock
 		lock.unlock();
 
@@ -138,6 +129,10 @@ BeesHashTable::flush_dirty_extent(uint64_t extent_index)
 		// Nope, this causes a _dramatic_ loss of performance.
 		// const size_t dirty_extent_size   = dirty_extent_end - dirty_extent;
 		// bees_unreadahead(m_fd, dirty_extent_offset, dirty_extent_size);
+
+		// Mark extent clean if write was successful
+		lock.lock();
+		m_extent_metadata.at(extent_index).m_dirty = false;
 
 		wrote_extent = true;
 	});
@@ -152,6 +147,13 @@ BeesHashTable::flush_dirty_extents(bool slowly)
 
 	uint64_t wrote_extents = 0;
 	for (size_t extent_index = 0; extent_index < m_extents; ++extent_index) {
+		// Skip the clean ones
+		auto lock = lock_extent_by_index(extent_index);
+		if (!m_extent_metadata.at(extent_index).m_dirty) {
+			continue;
+		}
+		lock.unlock();
+
 		if (flush_dirty_extent(extent_index)) {
 			++wrote_extents;
 			if (slowly) {

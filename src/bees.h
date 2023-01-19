@@ -415,6 +415,7 @@ public:
 	bool		push_random_hash_addr(HashType hash, AddrType addr);
 	void		erase_hash_addr(HashType hash, AddrType addr);
 	bool		push_front_hash_addr(HashType hash, AddrType addr);
+	bool            flush_dirty_extent(uint64_t extent_index);
 
 private:
 	string		m_filename;
@@ -474,7 +475,6 @@ private:
 	void fetch_missing_extent_by_index(uint64_t extent_index);
 	void set_extent_dirty_locked(uint64_t extent_index);
 	size_t flush_dirty_extents(bool slowly);
-	bool flush_dirty_extent(uint64_t extent_index);
 
 	size_t			hash_to_extent_index(HashType ht);
 	unique_lock<mutex>	lock_extent_by_hash(HashType ht);
