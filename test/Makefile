@@ -21,17 +21,10 @@ include ../makeflags
 LIBS = -lcrucible -lpthread
 BEES_LDFLAGS = -L../lib $(LDFLAGS)
 
-.depends:
-	mkdir -p $@
-
-.depends/%.dep: %.cc tests.h Makefile | .depends
+%.dep: %.cc tests.h Makefile
 	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
-depends.mk: $(PROGRAMS:%=.depends/%.dep)
-	cat $^ > $@.new
-	mv -f $@.new $@
-
-include depends.mk
+include $(PROGRAMS:%=%.dep)
 
 $(PROGRAMS:%=%.o): %.o: %.cc ../makeflags Makefile
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
