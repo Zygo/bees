@@ -20,9 +20,9 @@ BEES_OBJS = \
 
 ALL_OBJS = $(BEES_OBJS) $(PROGRAM_OBJS)
 
-bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile
-	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.new.c
-	mv -f bees-version.new.c bees-version.c
+bees-version.c: bees.h $(BEES_OBJS:.o=.cc) Makefile ../lib/libcrucible.a
+	echo "const char *BEES_VERSION = \"$(BEES_VERSION)\";" > bees-version.c.new
+	if ! [ -e "$@" ] || ! cmp -s "$@.new" "$@"; then mv -fv $@.new $@; fi
 
 bees-usage.c: bees-usage.txt Makefile
 	(echo 'const char *BEES_USAGE = '; sed -r 's/^(.*)$$/"\1\\n"/' < bees-usage.txt; echo ';') > bees-usage.new.c
