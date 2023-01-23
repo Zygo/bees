@@ -28,17 +28,10 @@ bees-usage.c: bees-usage.txt Makefile
 	(echo 'const char *BEES_USAGE = '; sed -r 's/^(.*)$$/"\1\\n"/' < bees-usage.txt; echo ';') > bees-usage.new.c
 	mv -f bees-usage.new.c bees-usage.c
 
-.depends:
-	mkdir -p $@
-
-.depends/%.dep: %.cc Makefile | .depends
+%.dep: %.cc Makefile
 	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
-depends.mk: $(ALL_OBJS:%.o=.depends/%.dep)
-	cat $^ > $@.new
-	mv -f $@.new $@
-
-include depends.mk
+include $(ALL_OBJS:%.o=%.dep)
 
 %.o: %.c ../makeflags
 	$(CC) $(BEES_CFLAGS) -o $@ -c $<
