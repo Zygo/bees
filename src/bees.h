@@ -61,8 +61,9 @@ const off_t BLOCK_SIZE_HASHTAB_BUCKET = BLOCK_SIZE_MMAP;
 // Extent size for hash table (since the nocow file attribute does not seem to be working today)
 const off_t BLOCK_SIZE_HASHTAB_EXTENT = BLOCK_SIZE_MAX_COMPRESSED_EXTENT;
 
-// Bytes per second we want to flush (8GB every two hours)
-const double BEES_FLUSH_RATE = 8.0 * 1024 * 1024 * 1024 / 7200.0;
+// Bytes per second we want to flush from hash table
+// Optimistic sustained write rate for SD cards
+const double BEES_FLUSH_RATE = 128 * 1024;
 
 // Interval between writing crawl state to disk
 const int BEES_WRITEBACK_INTERVAL = 900;
