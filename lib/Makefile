@@ -32,21 +32,14 @@ BEES_LDFLAGS = $(LDFLAGS)
 configure.h: configure.h.in
 	$(TEMPLATE_COMPILER)
 
-.depends:
-	mkdir -p $@
-
-.depends/%.dep: %.cc configure.h Makefile | .depends
+%.dep: %.cc configure.h Makefile
 	$(CXX) $(BEES_CXXFLAGS) -M -MF $@ -MT $(<:.cc=.o) $<
 
-depends.mk: $(CRUCIBLE_OBJS:%.o=.depends/%.dep)
-	cat $^ > $@.new
-	mv -f $@.new $@
+include $(CRUCIBLE_OBJS:%.o=%.dep)
 
 .version.cc: configure.h Makefile ../makeflags $(CRUCIBLE_OBJS:.o=.cc) ../include/crucible/*.h
 	echo "namespace crucible { const char *VERSION = \"$(TAG)\"; }" > $@.new
 	if ! cmp "$@.new" "$@"; then mv -fv $@.new $@; fi
-
-include depends.mk
 
 %.o: %.cc ../makeflags
 	$(CXX) $(BEES_CXXFLAGS) -o $@ -c $<
