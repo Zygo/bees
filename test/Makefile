@@ -8,6 +8,7 @@ PROGRAMS = \
 	process \
 	progress \
 	seeker \
+	table \
 	task \
 
 all: test

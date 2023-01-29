@@ -17,6 +17,7 @@ CRUCIBLE_OBJS = \
 	path.o \
 	process.o \
 	string.o \
+	table.o \
 	task.o \
 	time.o \
 	uname.o \
