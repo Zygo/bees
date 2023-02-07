@@ -515,7 +515,12 @@ BeesRoots::transid_max_nocache()
 uint64_t
 BeesRoots::transid_max()
 {
-	return m_transid_re.count();
+	const auto rv = m_transid_re.count();
+	// transid must be greater than zero, or we did something very wrong
+	THROW_CHECK1(runtime_error, rv, rv > 0);
+	// transid must be less than max, or we did something very wrong
+	THROW_CHECK1(runtime_error, rv, rv < numeric_limits<uint64_t>::max());
+	return rv;
 }
 
 struct BeesFileCrawl {
