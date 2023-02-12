@@ -28,7 +28,7 @@ static bool test_fails = false;
 
 static
 void
-seeker_test(const vector<uint64_t> &vec, size_t target)
+seeker_test(const vector<uint64_t> &vec, uint64_t const target)
 {
 	cerr << "Find " << target << " in {";
 	for (auto i : vec) {
@@ -42,7 +42,7 @@ seeker_test(const vector<uint64_t> &vec, size_t target)
 			return seeker_finder(vec, lower, upper);
 		});
 		cerr << found;
-		size_t my_found = 0;
+		uint64_t my_found = 0;
 		for (auto i : vec) {
 			if (i <= target) {
 				my_found = i;
