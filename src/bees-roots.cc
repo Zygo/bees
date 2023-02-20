@@ -500,7 +500,8 @@ BeesRoots::transid_max_nocache()
 
 	// We look for the root of the extent tree and read its transid.
 	// Should run in O(1) time and be fairly reliable.
-	const auto bti = m_root_fetcher.root(BTRFS_EXTENT_TREE_OBJECTID);
+	BtrfsRootFetcher root_fetcher(m_ctx->root_fd());
+	const auto bti = root_fetcher.root(BTRFS_EXTENT_TREE_OBJECTID);
 	BEESTRACE("extracting transid from " << bti);
 	const auto rv = bti.transid();
 
@@ -927,7 +928,6 @@ BeesRoots::state_load()
 
 BeesRoots::BeesRoots(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx),
-	m_root_fetcher(ctx->root_fd()),
 	m_crawl_state_file(ctx->home_fd(), crawl_state_filename()),
 	m_crawl_thread("crawl_transid"),
 	m_writeback_thread("crawl_writeback")
@@ -1101,7 +1101,8 @@ BeesRoots::is_root_ro(uint64_t root)
 
 	BEESTRACE("checking subvol flags on root " << root);
 
-	const auto item = m_root_fetcher.root(root);
+	BtrfsRootFetcher root_fetcher(m_ctx->root_fd());
+	const auto item = root_fetcher.root(root);
 	// If we can't access the subvol's root item...guess it's ro?
 	if (!item || item.root_flags() & BTRFS_ROOT_SUBVOL_RDONLY) {
 		return true;

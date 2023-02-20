@@ -534,7 +534,6 @@ class BeesScanMode;
 class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
-	BtrfsRootFetcher			m_root_fetcher;
 	BeesStringFile				m_crawl_state_file;
 	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
 	mutex					m_mutex;
