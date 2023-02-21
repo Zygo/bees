@@ -714,6 +714,7 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	shared_ptr<BeesHashTable>			m_hash_table;
 	shared_ptr<BeesRoots>				m_roots;
 	Pool<BeesTempFile>				m_tmpfile_pool;
+	Pool<BtrfsIoctlLogicalInoArgs>			m_logical_ino_pool;
 
 	LRUCache<BeesResolveAddrResult, BeesAddress>	m_resolve_cache;
 
@@ -752,6 +753,8 @@ public:
 	string root_path() const { return m_root_path; }
 
 	bool scan_forward(const BeesFileRange &bfr);
+
+	shared_ptr<BtrfsIoctlLogicalInoArgs> logical_ino(uint64_t bytenr, bool all_refs);
 
 	bool is_root_ro(uint64_t root);
 	BeesRangePair dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile);

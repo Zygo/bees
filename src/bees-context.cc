@@ -757,6 +757,15 @@ BeesResolveAddrResult::BeesResolveAddrResult()
 {
 }
 
+shared_ptr<BtrfsIoctlLogicalInoArgs>
+BeesContext::logical_ino(const uint64_t logical, const bool all_refs)
+{
+	const auto rv = m_logical_ino_pool();
+	rv->set_logical(logical);
+	rv->set_flags(all_refs ? BTRFS_LOGICAL_INO_ARGS_IGNORE_OFFSET : 0);
+	return rv;
+}
+
 BeesResolveAddrResult
 BeesContext::resolve_addr_uncached(BeesAddress addr)
 {
@@ -768,7 +777,8 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	// transaction latency, competing threads, and freeze/SIGSTOP
 	// pausing the bees process.
 
-        BtrfsIoctlLogicalInoArgs log_ino(addr.get_physical_or_zero());
+	const auto log_ino_ptr = logical_ino(addr.get_physical_or_zero(), false);
+	auto &log_ino = *log_ino_ptr;
 
 	// Time how long this takes
 	Timer resolve_timer;
@@ -909,6 +919,9 @@ BeesContext::start()
 	// Set up temporary file pool
 	m_tmpfile_pool.generator([=]() -> shared_ptr<BeesTempFile> {
 		return make_shared<BeesTempFile>(shared_from_this());
+	});
+	m_logical_ino_pool.generator([]() {
+		return make_shared<BtrfsIoctlLogicalInoArgs>(0);
 	});
 	m_tmpfile_pool.checkin([](const shared_ptr<BeesTempFile> &btf) {
 		catch_all([&](){
