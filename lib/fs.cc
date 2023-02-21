@@ -315,6 +315,18 @@ namespace crucible {
 		return m_flags;
 	}
 
+	void
+	BtrfsIoctlLogicalInoArgs::set_logical(uint64_t new_logical)
+	{
+		m_logical = new_logical;
+	}
+
+	void
+	BtrfsIoctlLogicalInoArgs::set_size(uint64_t new_size)
+	{
+		m_container_size = new_size;
+	}
+
 	bool
 	BtrfsIoctlLogicalInoArgs::do_ioctl_nothrow(int fd)
 	{

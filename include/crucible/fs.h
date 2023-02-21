@@ -69,9 +69,11 @@ namespace crucible {
 
 		uint64_t get_flags() const;
 		void set_flags(uint64_t new_flags);
+		void set_logical(uint64_t new_logical);
+		void set_size(uint64_t new_size);
 
-		virtual void do_ioctl(int fd);
-		virtual bool do_ioctl_nothrow(int fd);
+		void do_ioctl(int fd);
+		bool do_ioctl_nothrow(int fd);
 
 		struct BtrfsInodeOffsetRootSpan {
 			using iterator = BtrfsInodeOffsetRoot*;
