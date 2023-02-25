@@ -8,10 +8,12 @@ bees uses checkpoints for persistence to eliminate the IO overhead of a
 transactional data store.  On restart, bees will dedupe any data that
 was added to the filesystem since the last checkpoint.  Checkpoints
 occur every 15 minutes for scan progress, stored in `beescrawl.dat`.
-The hash table trickle-writes to disk at 4GB/hour to `beeshash.dat`.
-An hourly performance report is written to `beesstats.txt`.  There are
-no special requirements for bees hash table storage--`.beeshome` could
-be stored on a different btrfs filesystem, ext4, or even CIFS.
+The hash table trickle-writes to disk at 128KiB/s to `beeshash.dat`,
+but will flush immediately if bees is terminated by SIGTERM.
+
+There are no special requirements for bees hash table storage--`.beeshome`
+could be stored on a different btrfs filesystem, ext4, or even CIFS (but
+not MS-DOS--beeshome does need filenames longer than 8.3).
 
 bees uses a persistent dedupe hash table with a fixed size configured
 by the user.  Any size of hash table can be dedicated to dedupe.  If a
@@ -20,7 +22,7 @@ small as 128KB.
 
 The bees hash table is loaded into RAM at startup and `mlock`ed so it
 will not be swapped out by the kernel (if swap is permitted, performance
-degrades to nearly zero).
+degrades to nearly zero, for both bees and the swap device).
 
 bees scans the filesystem in a single pass which removes duplicate
 extents immediately after they are detected.  There are no distinct
@@ -83,12 +85,12 @@ of these functions in userspace, at the expense of encountering [some
 kernel bugs in `LOGICAL_INO` performance](btrfs-kernel.md).
 
 bees uses only the data-safe `FILE_EXTENT_SAME` (aka `FIDEDUPERANGE`)
-kernel operations to manipulate user data, so it can dedupe live data
-(e.g. build servers, sqlite databases, VM disk images).  It does not
-modify file attributes or timestamps.
+kernel ioctl to manipulate user data, so it can dedupe live data
+(e.g. build servers, sqlite databases, VM disk images).  bees does not
+modify file attributes or timestamps in deduplicated files.
 
-When bees has scanned all of the data, bees will pause until 10
-transactions have been completed in the btrfs filesystem.  bees tracks
+When bees has scanned all of the data, bees will pause until a new
+transaction has completed in the btrfs filesystem.  bees tracks
 the current btrfs transaction ID over time so that it polls less often
 on quiescent filesystems and more often on busy filesystems.
 
