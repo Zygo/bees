@@ -6,10 +6,11 @@ Best-Effort Extent-Same, a btrfs deduplication agent.
 About bees
 ----------
 
-bees is a block-oriented userspace deduplication agent designed for large
-btrfs filesystems.  It is an offline dedupe combined with an incremental
-data scan capability to minimize time data spends on disk from write
-to dedupe.
+bees is a block-oriented userspace deduplication agent designed to scale
+up to large btrfs filesystems.  It is a daemon that performs offline
+dedupe automatically as required.  It uses an incremental data scan
+capability to minimize memory usage and dedupe new data soon after it
+appears in the filesystem.
 
 Strengths
 ---------
@@ -17,23 +18,23 @@ Strengths
  * Space-efficient hash table and matching algorithms - can use as little as 1 GB hash table per 10 TB unique data (0.1GB/TB)
  * Daemon incrementally dedupes new data using btrfs tree search
  * Works with btrfs compression - dedupe any combination of compressed and uncompressed files
- * **NEW** [Works around `btrfs send` problems with dedupe and incremental parent snapshots](options.md)
- * Works around btrfs filesystem structure to free more disk space
- * Persistent hash table for rapid restart after shutdown
+ * Works around btrfs filesystem structure issues to free more disk space than generic dedupe tools
+ * Persistent hash table and checkpoint for rapid restart after shutdown
  * Whole-filesystem dedupe - including snapshots
  * Constant hash table size - no increased RAM usage if data set becomes larger
  * Works on live data - no scheduled downtime required
  * Automatic self-throttling based on system load
+ * Low memory footprint (excluding the hash table)
 
 Weaknesses
 ----------
 
- * Whole-filesystem dedupe - has no include/exclude filters, does not accept file lists
- * Requires root privilege (or `CAP_SYS_ADMIN`)
+ * Whole-filesystem dedupe - has no include/exclude filters, does not accept file lists, terminates only when explicitly requested
+ * Requires root privilege (or `CAP_SYS_ADMIN`) to work
  * First run may require temporary disk space for extent reorganization
  * [First run may increase metadata space usage if many snapshots exist](gotchas.md)
  * Constant hash table size - no decreased RAM usage if data set becomes smaller
- * btrfs only
+ * btrfs only (bcachefs and xfs are missing various features)
 
 Installation and Usage
 ----------------------
@@ -70,6 +71,6 @@ You can also use Github:
 Copyright & License
 -------------------
 
-Copyright 2015-2022 Zygo Blaxell <bees@furryterror.org>.
+Copyright 2015-2023 Zygo Blaxell <bees@furryterror.org>.
 
 GPL (version 3 or later).
