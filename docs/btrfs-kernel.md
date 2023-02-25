@@ -7,23 +7,24 @@ First, a warning that is not specific to bees:
 severe regression that can lead to fatal metadata corruption.**
 This issue is fixed in kernel 5.4.14 and later.
 
-**Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, or 5.12,
-with recent LTS and -stable updates.**  The latest released kernel as
-of this writing is 5.18.18.
+**Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, 5.15,
+6.0, or 6.1, with recent LTS and -stable updates.**  The latest released
+kernel as of this writing is 6.2.0.
 
-4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with
-some issues.  Older kernels will be slower (a little slower or a lot
-slower depending on which issues are triggered).  Not all fixes are
-backported.
+4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with some
+issues.  Older kernels will be slower (a little slower or a lot slower
+depending on which issues are triggered).  Not all fixes are backported.
 
 Obsolete non-LTS kernels have a variety of unfixed issues and should
 not be used with btrfs.  For details see the table below.
 
 bees requires btrfs kernel API version 4.2 or higher, and does not work
-on older kernels.
+at all on older kernels.
 
-bees will detect and use btrfs kernel API up to version 4.15 if present.
-In some future bees release, this API version may become mandatory.
+Some bees features rely on kernel 4.15 to work, and these features will
+not be available on older kernels.  Currently, bees is still usable on
+older kernels with degraded performance or with options disabled, but
+support for older kernels may be removed.
 
 
 
@@ -65,7 +66,8 @@ These bugs are particularly popular among bees users, though not all are specifi
 | - | 5.17 | crash during device removal can make filesystem unmountable | 5.15.54, 5.16.20, 5.17.3, 5.18 and later | bbac58698a55 btrfs: remove device item and update super block in the same transaction
 | - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3, 5.19 and later | d201238ccd2f btrfs: repair super block num_devices automatically
 | 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.18.18, 5.19.2, 6.0 and later | 723df2bcc9e1 btrfs: join running log transaction when logging new name
-| 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl | - | workaround: reduce bees thread count to 1 with `-c1`
+| 5.12 | 6.0 | space cache corruption and potential double allocations | 5.15.65, 5.19.6, 6.0 and later | ced8ecf026fd btrfs: fix space cache corruption and potential double allocations
+| 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl on the same extent | - | workaround: avoid doing that
 
 "Last bad kernel" refers to that version's last stable update from
 kernel.org.  Distro kernels may backport additional fixes.  Consult
@@ -80,21 +82,45 @@ through 5.4.13 inclusive.
 A "-" for "first bad kernel" indicates the bug has been present since
 the relevant feature first appeared in btrfs.
 
-A "-" for "last bad kernel" indicates the bug has not yet been fixed as
-of 5.18.18.
+A "-" for "last bad kernel" indicates the bug has not yet been fixed in
+current kernels (see top of this page for which kernel version that is).
 
 In cases where issues are fixed by commits spread out over multiple
 kernel versions, "fixed kernel version" refers to the version that
-contains all components of the fix.
+contains the last committed component of the fix.
 
 
 Workarounds for known kernel bugs
 ---------------------------------
 
-* **Hangs with high worker thread counts**:  On kernels newer than
-  5.4, multiple threads running `LOGICAL_INO` and dedupe ioctls
-  at the same time can lead to a kernel hang.  The workaround is
-  to reduce the thread count to 1 with `-c1`.
+* **Hangs with concurrent `LOGICAL_INO` and dedupe**:  on all
+  kernel versions so far, multiple threads running `LOGICAL_INO`
+  and dedupe ioctls at the same time on the same inodes or extents
+  can lead to a kernel hang.  The kernel enters an infinite loop in
+  `add_all_parents`, where `count` is 0, `ref->count` is 1, and
+  `btrfs_next_item` or `btrfs_next_old_item` never find a matching ref).
+
+  bees has two workarounds for this bug: 1. schedule work so that multiple
+  threads do not simultaneously access the same inode or the same extent,
+  and 2. use a brute-force global lock within bees that prevents any
+  thread from running `LOGICAL_INO` while any other thread is running
+  dedupe.
+
+  Workaround #1 isn't really a workaround, since we want to do the same
+  thing for unrelated performance reasons.  If multiple threads try to
+  perform dedupe operations on the same extent or inode, btrfs will make
+  all the threads wait for the same locks anyway, so it's better to have
+  bees find some other inode or extent to work on while waiting for btrfs
+  to finish.
+
+  Workaround #2 doesn't seem to be needed after implementing workaround
+  #1, but it's better to be slightly slower than to hang one CPU core
+  and the filesystem until the kernel is rebooted.
+
+  It is still theoretically possible to trigger the kernel bug when
+  running bees at the same time as other dedupers, or other programs
+  that use `LOGICAL_INO` like `btdu`; however, it's extremely difficult
+  to reproduce the bug without closely cooperating threads.
 
 * **Slow backrefs** (aka toxic extents):  Under certain conditions,
   if the number of references to a single shared extent grows too
@@ -110,8 +136,8 @@ Workarounds for known kernel bugs
   at this time of writing only bees has a workaround for this bug.
 
   This workaround is less necessary for kernels 5.4.96, 5.7 and later,
-  though it can still take 2 ms of CPU to resolve each extent ref on a
-  fast machine on a large, heavily fragmented file.
+  though the bees workaround can still be triggered on newer kernels
+  by changes in btrfs since kernel version 5.1.
 
 * **dedupe breaks `btrfs send` in old kernels**.  The bees option
   `--workaround-btrfs-send` prevents any modification of read-only subvols
@@ -126,8 +152,6 @@ Workarounds for known kernel bugs
 
 Unfixed kernel bugs
 -------------------
-
-As of 5.18.18:
 
 * **The kernel does not permit `btrfs send` and dedupe to run at the
   same time**.  Recent kernels no longer crash, but now refuse one
