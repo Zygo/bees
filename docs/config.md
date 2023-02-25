@@ -8,9 +8,10 @@ are reasonable in most cases.
 Hash Table Sizing
 -----------------
 
-Hash table entries are 16 bytes per data block.  The hash table stores
-the most recently read unique hashes.  Once the hash table is full,
-each new entry in the table evicts an old entry.
+Hash table entries are 16 bytes per data block.  The hash table stores the
+most recently read unique hashes.  Once the hash table is full, each new
+entry added to the table evicts an old entry.  This makes the hash table
+a sliding window over the most recently scanned data from the filesystem.
 
 Here are some numbers to estimate appropriate hash table sizes:
 
@@ -25,9 +26,11 @@ Here are some numbers to estimate appropriate hash table sizes:
 Notes:
 
  * If the hash table is too large, no extra dedupe efficiency is
-obtained, and the extra space just wastes RAM.  Extra space can also slow
-bees down by preventing old data from being evicted, so bees wastes time
-looking for matching data that is no longer present on the filesystem.
+obtained, and the extra space wastes RAM.  If the hash table contains
+more block records than there are blocks in the filesystem, the extra
+space can slow bees down.  A table that is too large prevents obsolete
+data from being evicted, so bees wastes time looking for matching data
+that is no longer present on the filesystem.
 
  * If the hash table is too small, bees extrapolates from matching
 blocks to find matching adjacent blocks in the filesystem that have been
@@ -35,6 +38,10 @@ evicted from the hash table.  In other words, bees only needs to find
 one block in common between two extents in order to be able to dedupe
 the entire extents.  This provides significantly more dedupe hit rate
 per hash table byte than other dedupe tools.
+
+ * There is a fairly wide range of usable hash sizes, and performances
+degrades according to a smooth probabilistic curve in both directions.
+Double or half the optimium size usually works just as well.
 
  * When counting unique data in compressed data blocks to estimate
 optimum hash table size, count the *uncompressed* size of the data.
@@ -66,11 +73,11 @@ data on an uncompressed filesystem.  Dedupe efficiency falls dramatically
 with hash tables smaller than 128MB/TB as the average dedupe extent size
 is larger than the largest possible compressed extent size (128KB).
 
-* **Short writes** also shorten the average extent length and increase
-optimum hash table size.  If a database writes to files randomly using
-4K page writes, all of these extents will be 4K in length, and the hash
-table size must be increased to retain each one (or the user must accept
-a lower dedupe hit rate).
+* **Short writes or fragmentation** also shorten the average extent
+length and increase optimum hash table size.  If a database writes to
+files randomly using 4K page writes, all of these extents will be 4K
+in length, and the hash table size must be increased to retain each one
+(or the user must accept a lower dedupe hit rate).
 
    Defragmenting files that have had many short writes increases the
 extent length and therefore reduces the optimum hash table size.
