@@ -4,7 +4,7 @@ Building bees
 Dependencies
 ------------
 
-* C++11 compiler (tested with GCC 4.9, 6.3.0, 8.1.0)
+* C++11 compiler (tested with GCC 8.1.0, 12.2.0)
 
   Sorry.  I really like closures and shared_ptr, so support
   for earlier compiler versions is unlikely.
@@ -19,7 +19,7 @@ Dependencies
 
 * [Linux kernel version](btrfs-kernel.md) gets its own page.
 
-* markdown for documentation
+* markdown to build the documentation
 
 * util-linux version that provides `blkid` command for the helper
   script `scripts/beesd` to work
