@@ -2,8 +2,8 @@ Features You Might Expect That bees Doesn't Have
 ------------------------------------------------
 
 * There's no configuration file (patches welcome!).  There are
-some tunables hardcoded in the source that could eventually become
-configuration options.  There's also an incomplete option parser
+some tunables hardcoded in the source (`src/bees.h`) that could eventually
+become configuration options.  There's also an incomplete option parser
 (patches welcome!).
 
 * The bees process doesn't fork and writes its log to stdout/stderr.
@@ -43,3 +43,6 @@ compression method or not compress the data (patches welcome!).
 * It is theoretically possible to resize the hash table without starting
 over with a new full-filesystem scan; however, this feature has not been
 implemented yet.
+
+* btrfs maintains csums of data blocks which bees could use to improve
+scan speeds, but bees doesn't use them yet.
