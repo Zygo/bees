@@ -85,10 +85,6 @@ The shutdown procedure performs these steps:
 Balances
 --------
 
-First, read [`LOGICAL_INO` and btrfs balance WARNING](btrfs-kernel.md).
-bees will suspend operations during a btrfs balance to work around
-kernel bugs.
-
 A btrfs balance relocates data on disk by making a new copy of the
 data, replacing all references to the old data with references to the
 new copy, and deleting the old copy.  To bees, this is the same as any
@@ -138,7 +134,9 @@ the beginning.
 
 Each time bees dedupes an extent that is referenced by a snapshot,
 the entire metadata page in the snapshot subvol (16KB by default) must
-be CoWed in btrfs.  This can result in a substantial increase in btrfs
+be CoWed in btrfs.  Since all references must be removed at the same
+time, this CoW operation is repeated in every snapshot containing the
+duplicate data.  This can result in a substantial increase in btrfs
 metadata size if there are many snapshots on a filesystem.
 
 Normally, metadata is small (less than 1% of the filesystem) and dedupe
@@ -215,17 +213,18 @@ Other Gotchas
   filesystem while `LOGICAL_INO` is running.  Generally the CPU spends
   most of the runtime of the `LOGICAL_INO` ioctl running the kernel,
   so on a single-core CPU the entire system can freeze up for a second
-  during operations on toxic extents.
+  during operations on toxic extents.  Note this only occurs on older
+  kernels.  See [the slow backrefs kernel bug section](btrfs-kernel.md).
 
 * If a process holds a directory FD open, the subvol containing the
   directory cannot be deleted (`btrfs sub del` will start the deletion
   process, but it will not proceed past the first open directory FD).
   `btrfs-cleaner` will simply skip over the directory *and all of its
   children* until the FD is closed.  bees avoids this gotcha by closing
-  all of the FDs in its directory FD cache every 10 btrfs transactions.
+  all of the FDs in its directory FD cache every btrfs transaction.
 
 * If a file is deleted while bees is caching an open FD to the file,
   bees continues to scan the file.  For very large files (e.g. VM
   images), the deletion of the file can be delayed indefinitely.
   To limit this delay, bees closes all FDs in its file FD cache every
-  10 btrfs transactions.
+  btrfs transaction.
