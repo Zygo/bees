@@ -17,7 +17,6 @@ Strengths
  * Space-efficient hash table and matching algorithms - can use as little as 1 GB hash table per 10 TB unique data (0.1GB/TB)
  * Daemon incrementally dedupes new data using btrfs tree search
  * Works with btrfs compression - dedupe any combination of compressed and uncompressed files
- * **NEW** [Works around `btrfs send` problems with dedupe and incremental parent snapshots](docs/options.md)
  * Works around btrfs filesystem structure to free more disk space
  * Persistent hash table for rapid restart after shutdown
  * Whole-filesystem dedupe - including snapshots
@@ -70,6 +69,6 @@ You can also use Github:
 Copyright & License
 -------------------
 
-Copyright 2015-2022 Zygo Blaxell <bees@furryterror.org>.
+Copyright 2015-2023 Zygo Blaxell <bees@furryterror.org>.
 
 GPL (version 3 or later).
