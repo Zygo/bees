@@ -821,6 +821,10 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 
 	// Avoid performance problems - pretend resolve failed if there are too many refs
 	const size_t rv_count = log_ino.m_iors.size();
+	if (!rv_count) {
+		BEESLOGDEBUG("LOGICAL_INO returned 0 refs at " << to_hex(addr));
+		BEESCOUNT(resolve_empty);
+	}
 	if (rv_count < BEES_MAX_EXTENT_REF_COUNT) {
 		rv.m_biors = vector<BtrfsInodeOffsetRoot>(log_ino.m_iors.begin(), log_ino.m_iors.end());
 	} else {

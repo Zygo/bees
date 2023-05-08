@@ -296,6 +296,7 @@ resolve
 
 The `resolve` event group consists of operations related to translating a btrfs virtual block address (i.e. physical block address) to a `(root, inode, offset)` tuple (i.e. locating and opening the file containing a matching block).  `resolve` is the top level, `chase` and `adjust` are the lower two levels.
 
+ * `resolve_empty`: The `LOGICAL_INO` ioctl returned successfully with an empty reference list (0 items).
  * `resolve_fail`: The `LOGICAL_INO` ioctl returned an error.
  * `resolve_large`: The `LOGICAL_INO` ioctl returned more than 2730 results (the limit of the v1 ioctl).
  * `resolve_ms`: Total time spent in the `LOGICAL_INO` ioctl (i.e. wallclock time, not kernel CPU time).
