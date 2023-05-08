@@ -548,7 +548,7 @@ namespace crucible {
 	#endif
 		const uint64_t logical_end = logical + count * block_size();
 		BtrfsTreeItem bti = rlower_bound(logical);
-		size_t loops = 0;
+		size_t __attribute__((unused)) loops = 0;
 		BCTFGS_DEBUG("get_sums " << to_hex(logical) << ".." << to_hex(logical_end) << endl);
 		while (!!bti) {
 			BCTFGS_DEBUG("get_sums[" << loops << "]: " << bti << endl);
