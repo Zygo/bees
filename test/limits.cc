@@ -3,6 +3,7 @@
 #include "crucible/limits.h"
 
 #include <cassert>
+#include <cstdint>
 
 using namespace crucible;
 
