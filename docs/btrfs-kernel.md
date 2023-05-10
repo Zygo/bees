@@ -67,6 +67,7 @@ These bugs are particularly popular among bees users, though not all are specifi
 | - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3, 5.19 and later | d201238ccd2f btrfs: repair super block num_devices automatically
 | 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.18.18, 5.19.2, 6.0 and later | 723df2bcc9e1 btrfs: join running log transaction when logging new name
 | 5.12 | 6.0 | space cache corruption and potential double allocations | 5.15.65, 5.19.6, 6.0 and later | ced8ecf026fd btrfs: fix space cache corruption and potential double allocations
+| 6.2 | 6.3 | `IGNORE_OFFSET` flag ignored in `LOGICAL_INO` ioctl | 6.2.16, 6.3.3, 6.4 and later | 0cad8f14d70c btrfs: fix backref walking not returning all inode refs
 | 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl on the same extent | - | workaround: avoid doing that
 
 "Last bad kernel" refers to that version's last stable update from
