@@ -832,7 +832,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	if (sys_usage_delta < BEES_TOXIC_SYS_DURATION) {
 		rv.m_is_toxic = false;
 	} else {
-		BEESLOGNOTICE("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << rv_count);
+		BEESLOGDEBUG("WORKAROUND: toxic address: addr = " << addr << ", sys_usage_delta = " << round(sys_usage_delta* 1000.0) / 1000.0 << ", user_usage_delta = " << round(user_usage_delta * 1000.0) / 1000.0 << ", rt_age = " << rt_age << ", refs " << rv_count);
 		BEESCOUNT(resolve_toxic);
 		rv.m_is_toxic = true;
 	}
