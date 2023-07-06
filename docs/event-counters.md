@@ -120,10 +120,12 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
 
  * `crawl_again`: An inode crawl was restarted because the extent was already locked by another running crawl.
  * `crawl_blacklisted`: An extent was not scanned because it belongs to a blacklisted file.
- * `crawl_create`: A new subvol crawler was created.
+ * `crawl_create`: A new subvol or extent crawler was created.
  * `crawl_deferred_inode`: Two tasks attempted to scan the same inode at the same time, so one was deferred.
- * `crawl_done`: One pass over all subvols on the filesystem was completed.
+ * `crawl_done`: One pass over a subvol was completed.
+ * `crawl_discard`: An extent that didn't match the crawler's size tier was discarded.
  * `crawl_empty`: A `TREE_SEARCH_V2` ioctl call failed or returned an empty set (usually because all data in the subvol was scanned).
+ * `crawl_extent`: The extent crawler queued all references to an extent for processing.
  * `crawl_fail`: A `TREE_SEARCH_V2` ioctl call failed.
  * `crawl_gen_high`: An extent item in the search results refers to an extent that is newer than the current crawl's `max_transid` allows.
  * `crawl_gen_low`: An extent item in the search results refers to an extent that is older than the current crawl's `min_transid` allows.
@@ -137,7 +139,10 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
  * `crawl_push`: An extent item in the search results is suitable for scanning and deduplication.
  * `crawl_scan`: An extent item in the search results is submitted to `BeesContext::scan_forward` for scanning and deduplication.
  * `crawl_search`: A `TREE_SEARCH_V2` ioctl call was successful.
+ * `crawl_throttled`: Extent scan created too many work queue items and was prevented from creating any more.
+ * `crawl_tree_block`: Extent scan found and skipped a metadata tree block.
  * `crawl_unknown`: An extent item in the search results has an unrecognized type.
+ * `crawl_unthrottled`: Extent scan allowed to create work queue items again.
 
 dedup
 -----
@@ -162,6 +167,25 @@ The `exception` event group consists of C++ exceptions.  C++ exceptions are thro
 
  * `exception_caught`: Total number of C++ exceptions thrown and caught by a generic exception handler.
  * `exception_caught_silent`: Total number of "silent" C++ exceptions thrown and caught by a generic exception handler.  These are exceptions which are part of the correct and normal operation of bees.  The exceptions are logged at a lower log level.
+
+extent
+------
+
+The `extent` event group consists of events that occur within the extent scanner.
+
+ * `extent_deferred_inode`: A lock conflict was detected when two worker threads attempted to manipulate the same inode at the same time.
+ * `extent_empty`: A complete list of references to an extent was created but the list was empty, e.g. because all refs are in deleted inodes or snapshots.
+ * `extent_fail`: An ioctl call to `LOGICAL_INO` failed.
+ * `extent_forward`: An extent reference was submitted for scanning.
+ * `extent_mapped`: A complete map of references to an extent was created and added to the crawl queue.
+ * `extent_ok`: An ioctl call to `LOGICAL_INO` completed successfully.
+ * `extent_overflow`: A complete map of references to an extent exceeded `BEES_MAX_EXTENT_REF_COUNT`, so the extent was dropped.
+ * `extent_ref_missing`: An extent reference reported by `LOGICAL_INO` was not found by later `TREE_SEARCH_V2` calls.
+ * `extent_ref_ok`: One extent reference was queued for scanning.
+ * `extent_restart`: An extent reference was requeued to be scanned again after an active extent lock is released.
+ * `extent_retry`: An extent reference was requeued to be scanned again after an active inode lock is released.
+ * `extent_skip`: A 4K extent with more than 1000 refs was skipped.
+ * `extent_zero`: An ioctl call to `LOGICAL_INO` succeeded, but reported an empty list of extents.
 
 hash
 ----
@@ -241,6 +265,18 @@ The `pairforward` event group consists of events related to extending matching b
  * `pairforward_toxic_hash`: A pair of matching block ranges was abandoned because the extended range would include a data block with a toxic hash.
  * `pairforward_try`: Started extending a pair of matching block ranges forward.
  * `pairforward_zero`: A pair of matching block ranges could not be extended backward by one block because the src block contained all zeros and was not compressed.
+
+progress
+--------
+
+The `progress` event group consists of events related to progress estimation.
+
+ * `progress_no_data_bg`: Failed to retrieve any data block groups from the filesystem.
+ * `progress_not_created`: A crawler for one size tier had not been created for the extent scanner.
+ * `progress_complete`: A crawler for one size tier has completed a scan.
+ * `progress_not_found`: The extent position for a crawler does not correspond to any block group.
+ * `progress_out_of_bg`: The extent position for a crawler does not correspond to any data block group.
+ * `progress_ok`: Table of progress and ETA created successfully.
 
 readahead
 ---------
