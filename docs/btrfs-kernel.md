@@ -9,7 +9,7 @@ This issue is fixed in kernel 5.4.14 and later.
 
 **Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, 5.15,
 6.0, or 6.1, with recent LTS and -stable updates.**  The latest released
-kernel as of this writing is 6.2.0.
+kernel as of this writing is 6.4.1.
 
 4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with some
 issues.  Older kernels will be slower (a little slower or a lot slower
@@ -67,6 +67,7 @@ These bugs are particularly popular among bees users, though not all are specifi
 | - | 5.18 | wrong superblock num_devices makes filesystem unmountable | 4.14.283, 4.19.247, 5.4.198, 5.10.121, 5.15.46, 5.17.14, 5.18.3, 5.19 and later | d201238ccd2f btrfs: repair super block num_devices automatically
 | 5.18 | 5.19 | parent transid verify failed during log tree replay after a crash during a rename operation | 5.18.18, 5.19.2, 6.0 and later | 723df2bcc9e1 btrfs: join running log transaction when logging new name
 | 5.12 | 6.0 | space cache corruption and potential double allocations | 5.15.65, 5.19.6, 6.0 and later | ced8ecf026fd btrfs: fix space cache corruption and potential double allocations
+| 6.3, backported to 5.15.107, 6.1.24, 6.2.11 | 6.3 | vmalloc error, failed to allocate pages | 6.3.10, 6.4 and later.  Bug (f349b15e183d "mm: vmalloc: avoid warn_alloc noise caused by fatal signal" in v6.3-rc6) backported to 6.1.24, 6.2.11, and 5.15.107. | 95a301eefa82 mm/vmalloc: do not output a spurious warning when huge vmalloc() fails
 | 6.2 | 6.3 | `IGNORE_OFFSET` flag ignored in `LOGICAL_INO` ioctl | 6.2.16, 6.3.3, 6.4 and later | 0cad8f14d70c btrfs: fix backref walking not returning all inode refs
 | 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl on the same extent | - | workaround: avoid doing that
 
