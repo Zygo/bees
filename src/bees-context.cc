@@ -925,7 +925,8 @@ BeesContext::start()
 		return make_shared<BeesTempFile>(shared_from_this());
 	});
 	m_logical_ino_pool.generator([]() {
-		return make_shared<BtrfsIoctlLogicalInoArgs>(0);
+		const auto extent_ref_size = sizeof(uint64_t) * 3;
+		return make_shared<BtrfsIoctlLogicalInoArgs>(0, BEES_MAX_EXTENT_REF_COUNT * extent_ref_size + sizeof(btrfs_data_container));
 	});
 	m_tmpfile_pool.checkin([](const shared_ptr<BeesTempFile> &btf) {
 		catch_all([&](){
