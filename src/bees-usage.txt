@@ -14,7 +14,7 @@ Load management options:
     -g, --loadavg-target  Target load average for worker threads (default none)
 
 Filesystem tree traversal options:
-    -m, --scan-mode       Scanning mode (0..2, default 1)
+    -m, --scan-mode       Scanning mode (0..3, default 3)
 
 Workarounds:
     -a, --workaround-btrfs-send    Workaround for btrfs send
