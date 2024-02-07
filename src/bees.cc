@@ -693,7 +693,10 @@ bees_main(int argc, char *argv[])
 				break;
 
 			case 'h':
+				do_cmd_help(argv);
+				return EXIT_SUCCESS;
 			default:
+				BEESLOGNOTICE("Error in command line arguments.");
 				do_cmd_help(argv);
 				return EXIT_FAILURE;
 		}
