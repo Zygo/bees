@@ -333,7 +333,7 @@ namespace crucible {
 		btrfs_ioctl_logical_ino_args args = (btrfs_ioctl_logical_ino_args) {
 			.logical = m_logical,
 			.size = m_container_size,
-			.inodes = reinterpret_cast<uint64_t>(m_container.prepare(m_container_size)),
+			.inodes = reinterpret_cast<uintptr_t>(m_container.prepare(m_container_size)),
 		};
 		// We are still supporting building with old headers that don't have .flags yet
 		*(&args.reserved[0] + 3) = m_flags;
@@ -416,7 +416,7 @@ namespace crucible {
 	{
 		btrfs_ioctl_ino_path_args *p = static_cast<btrfs_ioctl_ino_path_args *>(this);
 		BtrfsDataContainer container(m_container_size);
-		fspath = reinterpret_cast<uint64_t>(container.prepare(m_container_size));
+		fspath = reinterpret_cast<uintptr_t>(container.prepare(m_container_size));
 		size = container.get_size();
 
 		m_paths.clear();
