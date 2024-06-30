@@ -471,7 +471,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 
 			// Hash is toxic
 			if (found_addr.is_toxic()) {
-				BEESLOGWARN("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr << " matching bbd " << bbd);
+				BEESLOGDEBUG("WORKAROUND: abandoned toxic match for hash " << hash << " addr " << found_addr << " matching bbd " << bbd);
 				// Don't push these back in because we'll never delete them.
 				// Extents may become non-toxic so give them a chance to expire.
 				// hash_table->push_front_hash_addr(hash, found_addr);
