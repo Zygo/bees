@@ -159,12 +159,13 @@ namespace crucible {
 	{
 		THROW_CHECK1(invalid_argument, src_length, src_length > 0);
 		while (src_length > 0) {
-			off_t length = min(off_t(BTRFS_MAX_DEDUPE_LEN), src_length);
-			BtrfsExtentSame bes(src_fd, src_offset, length);
+			BtrfsExtentSame bes(src_fd, src_offset, src_length);
 			bes.add(dst_fd, dst_offset);
 			bes.do_ioctl();
-			auto status = bes.m_info.at(0).status;
+			const auto status = bes.m_info.at(0).status;
 			if (status == 0) {
+				const off_t length = bes.m_info.at(0).bytes_deduped;
+				THROW_CHECK0(invalid_argument, length > 0);
 				src_offset += length;
 				dst_offset += length;
 				src_length -= length;
