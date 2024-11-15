@@ -868,6 +868,7 @@ extern const char *BEES_VERSION;
 extern thread_local default_random_engine bees_generator;
 string pretty(double d);
 void bees_readahead(int fd, off_t offset, size_t size);
+void bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2);
 void bees_unreadahead(int fd, off_t offset, size_t size);
 string format_time(time_t t);
 

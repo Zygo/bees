@@ -214,8 +214,9 @@ BeesTooLong::operator=(const func_type &f)
 	return *this;
 }
 
+static
 void
-bees_readahead(int const fd, const off_t offset, const size_t size)
+bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 {
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
@@ -225,10 +226,8 @@ bees_readahead(int const fd, const off_t offset, const size_t size)
 	DIE_IF_NON_ZERO(readahead(fd, offset, size));
 #else
 	// Make sure this data is in page cache by brute force
-	// This isn't necessary and it might even be slower,
-	// but the btrfs kernel code does readahead with lower ioprio
-	// and might discard the readahead request entirely,
-	// so it's maybe, *maybe*, worth doing both.
+	// The btrfs kernel code does readahead with lower ioprio
+	// and might discard the readahead request entirely.
 	BEESNOTE("emulating readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	auto working_size = size;
 	auto working_offset = offset;
@@ -247,6 +246,26 @@ bees_readahead(int const fd, const off_t offset, const size_t size)
 	}
 #endif
 	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
+}
+
+void
+bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2)
+{
+	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size)
+		<< ", " << name_fd(fd2) << " offset " << to_hex(offset2) << " len " << pretty(size2));
+	static mutex only_one;
+	unique_lock<mutex> m_lock(only_one);
+	bees_readahead_nolock(fd, offset, size);
+	bees_readahead_nolock(fd2, offset2, size2);
+}
+
+void
+bees_readahead(int const fd, const off_t offset, const size_t size)
+{
+	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
+	static mutex only_one;
+	unique_lock<mutex> m_lock(only_one);
+	bees_readahead_nolock(fd, offset, size);
 }
 
 void

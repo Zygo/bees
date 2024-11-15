@@ -349,8 +349,8 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 	BEESTRACE("e_second " << e_second);
 
 	// Preread entire extent
-	bees_readahead(second.fd(), e_second.begin(), e_second.size());
-	bees_readahead(first.fd(), e_second.begin() + first.begin() - second.begin(), e_second.size());
+	bees_readahead_pair(second.fd(), e_second.begin(), e_second.size(),
+			    first.fd(), e_second.begin() + first.begin() - second.begin(), e_second.size());
 
 	auto hash_table = ctx->hash_table();
 
