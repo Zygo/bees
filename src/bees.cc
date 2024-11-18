@@ -215,9 +215,34 @@ BeesTooLong::operator=(const func_type &f)
 }
 
 static
+bool
+bees_readahead_check(int const fd, off_t const offset, size_t const size)
+{
+	// FIXME: the rest of the code calls this function more often than necessary,
+	// usually back-to-back calls on the same range in a loop.
+	// Simply discard requests that are identical to recent requests from the same thread.
+	const Stat stat_rv(fd);
+	auto tup = make_tuple(offset, size, stat_rv.st_dev, stat_rv.st_ino);
+	static mutex s_recent_mutex;
+	static set<decltype(tup)> s_recent;
+	unique_lock<mutex> lock(s_recent_mutex);
+	if (s_recent.size() > BEES_MAX_EXTENT_REF_COUNT) {
+		s_recent.clear();
+		BEESCOUNT(readahead_clear);
+	}
+	const auto rv = s_recent.insert(tup);
+	// If we recently did this readahead, we're done here
+	if (!rv.second) {
+		BEESCOUNT(readahead_skip);
+	}
+	return rv.second;
+}
+
+static
 void
 bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 {
+	if (!bees_readahead_check(fd, size, offset)) return;
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
@@ -248,13 +273,15 @@ bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
 }
 
+static mutex s_only_one;
+
 void
 bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2)
 {
-	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size)
-		<< ", " << name_fd(fd2) << " offset " << to_hex(offset2) << " len " << pretty(size2));
-	static mutex only_one;
-	unique_lock<mutex> m_lock(only_one);
+	if (!bees_readahead_check(fd, size, offset) && !bees_readahead_check(fd2, offset2, size2)) return;
+	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size) << ","
+		<< "\n\t" << name_fd(fd2) << " offset " << to_hex(offset2) << " len " << pretty(size2));
+	unique_lock<mutex> m_lock(s_only_one);
 	bees_readahead_nolock(fd, offset, size);
 	bees_readahead_nolock(fd2, offset2, size2);
 }
@@ -262,9 +289,9 @@ bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, s
 void
 bees_readahead(int const fd, const off_t offset, const size_t size)
 {
+	if (!bees_readahead_check(fd, size, offset)) return;
 	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
-	static mutex only_one;
-	unique_lock<mutex> m_lock(only_one);
+	unique_lock<mutex> m_lock(s_only_one);
 	bees_readahead_nolock(fd, offset, size);
 }
 
