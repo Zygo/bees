@@ -163,9 +163,9 @@ namespace crucible {
 		/// (it is the ExclusionLock that owns the lock, so it can
 		/// be passed to other Tasks or threads, but this is not
 		/// recommended practice).
-		/// If not successful, current Task is appended to the
+		/// If not successful, the argument Task is appended to the
 		/// task that currently holds the lock.  Current task is
-		/// expected to release any other ExclusionLock
+		/// expected to immediately release any other ExclusionLock
 		/// objects it holds, and exit its Task function.
 		ExclusionLock try_lock(const Task &task);
 
