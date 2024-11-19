@@ -721,6 +721,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 					// BEESLOGDEBUG("Deferring extent bytenr " << to_hex(extent_bytenr) << " from " << bfr);
 					BEESCOUNT(scanf_deferred_extent);
 					start_over = true;
+					return; // from closure
 				}
 				Timer one_extent_timer;
 				scan_one_extent(bfr, e);
