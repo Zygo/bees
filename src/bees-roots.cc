@@ -552,7 +552,7 @@ BeesFileCrawl::crawl_one_extent()
 	auto inode_mutex = m_ctx->get_inode_mutex(m_bedf.objectid());
 	auto inode_lock = inode_mutex->try_lock(Task::current_task());
 	if (!inode_lock) {
-		BEESCOUNT(scanf_deferred_inode);
+		BEESCOUNT(crawl_deferred_inode);
 		// Returning false here means we won't reschedule ourselves, but inode_mutex will do that
 		return false;
 	}

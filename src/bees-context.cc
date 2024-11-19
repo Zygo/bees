@@ -694,14 +694,14 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 	// No FD?  Well, that was quick.
 	if (!bfr.fd()) {
 		// BEESLOGINFO("No FD in " << root_path() << " for " << bfr);
-		BEESCOUNT(scan_no_fd);
+		BEESCOUNT(scanf_no_fd);
 		return false;
 	}
 
 	// Sanity check
 	if (bfr.begin() >= bfr.file_size()) {
 		BEESLOGWARN("past EOF: " << bfr);
-		BEESCOUNT(scan_eof);
+		BEESCOUNT(scanf_eof);
 		return false;
 	}
 
