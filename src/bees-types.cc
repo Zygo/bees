@@ -183,6 +183,24 @@ BeesFileRange::grow_begin(off_t delta)
 	return m_begin;
 }
 
+off_t
+BeesFileRange::shrink_begin(off_t delta)
+{
+	THROW_CHECK1(invalid_argument, delta, delta > 0);
+	THROW_CHECK3(invalid_argument, delta, m_begin, m_end, delta + m_begin < m_end);
+	m_begin += delta;
+	return m_begin;
+}
+
+off_t
+BeesFileRange::shrink_end(off_t delta)
+{
+	THROW_CHECK1(invalid_argument, delta, delta > 0);
+	THROW_CHECK2(invalid_argument, delta, m_end, m_end >= delta);
+	m_end -= delta;
+	return m_end;
+}
+
 BeesFileRange::BeesFileRange(const BeesBlockData &bbd) :
 	m_fd(bbd.fd()),
 	m_begin(bbd.begin()),
@@ -587,6 +605,22 @@ BeesRangePair
 BeesRangePair::copy_closed() const
 {
 	return BeesRangePair(first.copy_closed(), second.copy_closed());
+}
+
+void
+BeesRangePair::shrink_begin(off_t const delta)
+{
+	first.shrink_begin(delta);
+	second.shrink_begin(delta);
+	THROW_CHECK2(runtime_error, first.size(), second.size(), first.size() == second.size());
+}
+
+void
+BeesRangePair::shrink_end(off_t const delta)
+{
+	first.shrink_end(delta);
+	second.shrink_end(delta);
+	THROW_CHECK2(runtime_error, first.size(), second.size(), first.size() == second.size());
 }
 
 ostream &

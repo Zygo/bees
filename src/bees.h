@@ -300,6 +300,11 @@ public:
 	off_t grow_begin(off_t delta);
 	/// @}
 
+	/// @{ Make range smaller
+	off_t shrink_end(off_t delta);
+	off_t shrink_begin(off_t delta);
+	/// @}
+
 friend ostream & operator<<(ostream &os, const BeesFileRange &bfr);
 };
 
@@ -665,6 +670,8 @@ class BeesRangePair : public pair<BeesFileRange, BeesFileRange> {
 public:
 	BeesRangePair(const BeesFileRange &src, const BeesFileRange &dst);
 	bool grow(shared_ptr<BeesContext> ctx, bool constrained);
+	void shrink_begin(const off_t delta);
+	void shrink_end(const off_t delta);
 	BeesRangePair copy_closed() const;
 	bool operator<(const BeesRangePair &that) const;
 friend ostream & operator<<(ostream &os, const BeesRangePair &brp);
