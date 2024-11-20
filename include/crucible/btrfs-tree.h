@@ -110,7 +110,9 @@ namespace crucible {
 		virtual ~BtrfsTreeFetcher() = default;
 		BtrfsTreeFetcher(Fd new_fd);
 		void type(uint8_t type);
+		uint8_t type();
 		void tree(uint64_t tree);
+		uint64_t tree();
 		void transid(uint64_t min_transid, uint64_t max_transid = numeric_limits<uint64_t>::max());
 		/// Block size (sectorsize) of filesystem
 		uint64_t block_size() const;

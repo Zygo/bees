@@ -283,10 +283,22 @@ namespace crucible {
 		m_type = type;
 	}
 
+	uint8_t
+	BtrfsTreeFetcher::type()
+	{
+		return m_type;
+	}
+
 	void
 	BtrfsTreeFetcher::tree(uint64_t tree)
 	{
 		m_tree = tree;
+	}
+
+	uint64_t
+	BtrfsTreeFetcher::tree()
+	{
+		return m_tree;
 	}
 
 	void
