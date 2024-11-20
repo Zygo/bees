@@ -23,6 +23,13 @@ namespace crucible {
 	}
 
 	uint64_t
+	BtrfsTreeItem::extent_flags() const
+	{
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_ITEM_KEY);
+		return btrfs_get_member(&btrfs_extent_item::flags, m_data);
+	}
+
+	uint64_t
 	BtrfsTreeItem::extent_generation() const
 	{
 		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_ITEM_KEY);
@@ -59,6 +66,13 @@ namespace crucible {
 	{
 		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_ROOT_ITEM_KEY);
 		return btrfs_get_member(&btrfs_root_item::flags, m_data);
+	}
+
+	uint64_t
+	BtrfsTreeItem::root_refs() const
+	{
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_ROOT_ITEM_KEY);
+		return btrfs_get_member(&btrfs_root_item::refs, m_data);
 	}
 
 	ostream &

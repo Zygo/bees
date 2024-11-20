@@ -64,11 +64,13 @@ namespace crucible {
 		/// @{ Extent items (EXTENT_ITEM)
 		uint64_t extent_begin() const;
 		uint64_t extent_end() const;
+		uint64_t extent_flags() const;
 		uint64_t extent_generation() const;
 		/// @}
 
 		/// @{ Root items
 		uint64_t root_flags() const;
+		uint64_t root_refs() const;
 		/// @}
 
 		/// @{ Root backref items.
