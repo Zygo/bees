@@ -14,6 +14,7 @@ namespace crucible {
 		mutex m_mutex;
 		condition_variable m_cv;
 		map<string, size_t> m_counters;
+		bool m_do_locking = true;
 
 		class LockHandle {
 			const string m_type;
@@ -33,6 +34,7 @@ namespace crucible {
 		shared_ptr<LockHandle> get_lock_private(const string &type);
 	public:
 		static shared_ptr<LockHandle> get_lock(const string &type);
+		static void enable_locking(bool enabled);
 	};
 
 }

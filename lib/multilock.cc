@@ -62,11 +62,22 @@ namespace crucible {
 		return rv;
 	}
 
+	static MultiLocker s_process_instance;
+
 	shared_ptr<MultiLocker::LockHandle>
 	MultiLocker::get_lock(const string &type)
 	{
-		static MultiLocker s_process_instance;
-		return s_process_instance.get_lock_private(type);
+		if (s_process_instance.m_do_locking) {
+			return s_process_instance.get_lock_private(type);
+		} else {
+			return shared_ptr<MultiLocker::LockHandle>();
+		}
+	}
+
+	void
+	MultiLocker::enable_locking(const bool enabled)
+	{
+		s_process_instance.m_do_locking = enabled;
 	}
 
 }
