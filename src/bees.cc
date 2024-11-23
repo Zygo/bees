@@ -797,6 +797,13 @@ bees_main(int argc, char *argv[])
 	// Set root scan mode
 	bc->roots()->set_scan_mode(root_scan_mode);
 
+	if (root_scan_mode == BeesRoots::SCAN_MODE_EXTENT) {
+		MultiLocker::enable_locking(false);
+	} else {
+		// Workaround for a kernel bug that the subvol-based crawlers keep triggering
+		MultiLocker::enable_locking(true);
+	}
+
 	// Start crawlers
 	bc->start();
 
