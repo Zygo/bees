@@ -749,7 +749,7 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
 
-	BeesFileRange scan_one_extent(const BeesFileRange &bfr, const Extent &e);
+	void scan_one_extent(const BeesFileRange &bfr, const Extent &e);
 	void rewrite_file_range(const BeesFileRange &bfr);
 
 public:
@@ -842,7 +842,7 @@ public:
 	BeesFileRange find_one_match(BeesHash hash);
 
 	void replace_src(const BeesFileRange &src_bfr);
-	BeesFileRange replace_dst(const BeesFileRange &dst_bfr);
+	BeesRangePair replace_dst(const BeesFileRange &dst_bfr);
 
 	bool found_addr() const { return m_found_addr; }
 	bool found_data() const { return m_found_data; }

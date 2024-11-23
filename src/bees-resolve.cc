@@ -384,7 +384,7 @@ BeesResolver::for_each_extent_ref(BeesBlockData bbd, function<bool(const BeesFil
 	return stop_now;
 }
 
-BeesFileRange
+BeesRangePair
 BeesResolver::replace_dst(const BeesFileRange &dst_bfr_in)
 {
 	BEESTRACE("replace_dst dst_bfr " << dst_bfr_in);
@@ -400,6 +400,7 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr_in)
 	BEESTRACE("overlap_bfr " << overlap_bfr);
 
 	BeesBlockData bbd(dst_bfr);
+	BeesRangePair rv = { BeesFileRange(), BeesFileRange() };
 
 	for_each_extent_ref(bbd, [&](const BeesFileRange &src_bfr_in) -> bool {
 		// Open src
@@ -436,21 +437,12 @@ BeesResolver::replace_dst(const BeesFileRange &dst_bfr_in)
 			BEESCOUNT(replacedst_grown);
 		}
 
-		// Dedup
-		BEESNOTE("dedup " << brp);
-		if (m_ctx->dedup(brp)) {
-			BEESCOUNT(replacedst_dedup_hit);
-			m_found_dup = true;
-			overlap_bfr = brp.second;
-			// FIXME:  find best range first, then dedupe that
-			return true; // i.e. break
-		} else {
-			BEESCOUNT(replacedst_dedup_miss);
-			return false; // i.e. continue
-		}
+		rv = brp;
+		m_found_dup = true;
+		return true;
 	});
 	// BEESLOG("overlap_bfr after " << overlap_bfr);
-	return overlap_bfr.copy_closed();
+	return rv;
 }
 
 BeesFileRange
