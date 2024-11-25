@@ -446,8 +446,8 @@ BeesHashTable::fetch_missing_extent_by_index(uint64_t extent_index)
 
 		// If we are in prefetch, give the kernel a hint about the next extent
 		if (m_prefetch_running) {
-			// XXX: don't call this if bees_readahead is implemented by pread()
-			bees_readahead(m_fd, dirty_extent_offset + dirty_extent_size, dirty_extent_size);
+			// Use the kernel readahead here, because it might work for this use case
+			readahead(m_fd, dirty_extent_offset + dirty_extent_size, dirty_extent_size);
 		}
 	});
 }
