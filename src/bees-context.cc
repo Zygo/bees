@@ -300,15 +300,6 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	BEESTRACE("scan extent " << e);
 	BEESCOUNT(scan_extent);
 
-	// EXPERIMENT:  Don't bother with tiny extents unless they are the entire file.
-	// We'll take a tiny extent at BOF or EOF but not in between.
-	if (e.begin() && e.size() < 128 * 1024 && e.end() != Stat(bfr.fd()).st_size) {
-		BEESCOUNT(scan_extent_tiny);
-		// This doesn't work properly with the current architecture,
-		// so we don't do an early return here.
-		// return bfr;
-	}
-
 	// We keep moving this method around
 	auto m_ctx = shared_from_this();
 
