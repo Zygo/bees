@@ -439,6 +439,13 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& ma
 		Timer m_age;
 	};
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& todo);
+	struct ExtentSizeCount {
+		uint64_t m_bytes = 0;
+	};
+	struct ExtentSizeMap {
+		map<uint64_t, ExtentSizeCount> m_map;
+		uint64_t m_total = 0;
+	} m_extent_size;
 
 	void init_tasks();
 	void scan() override;
@@ -737,6 +744,7 @@ BeesScanModeExtent::init_tasks()
 				bec->map_next_extent(subvol);
 			})));
 		}
+		m_extent_size.m_map.insert(make_pair(subvol, ExtentSizeCount {}));
 	}
 }
 
@@ -796,11 +804,23 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 			break;
 		}
 
+		// Calculate average proportion of each extent size
+		const uint64_t this_range_size = this_range.size();
+		unique_lock<mutex> lock(m_mutex);
+		for (auto &i : m_extent_size.m_map) {
+			const auto &svm = s_magic_crawl_map.at(i.first);
+			if (this_range_size >= svm.m_min_size && this_range_size <= svm.m_max_size) {
+				i.second.m_bytes += this_range_size;
+				break;
+			}
+		}
+		m_extent_size.m_total += this_range_size;
+		lock.unlock();
+
 		// Check extent length against size range
 		const auto &subvol_magic = s_magic_crawl_map.at(subvol);
 		const uint64_t lower_size_bound = subvol_magic.m_min_size;
 		const uint64_t upper_size_bound = subvol_magic.m_max_size;
-		const uint64_t this_range_size = this_range.size();
 
 		// If this extent is out of range, move on to the next
 		if (this_range_size < lower_size_bound || this_range_size > upper_size_bound) {
@@ -842,10 +862,10 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 		}
 
 		const auto bytenr = this_range.fid().ino();
+		const auto bti = beif.at(bytenr);
 
 		// Check extent item generation is in range
 		// FIXME: we already had this in crawl state, and we threw it away
-		const auto bti = beif.at(bytenr);
 		const auto gen = bti.extent_generation();
 		if (gen < this_state.m_min_transid) {
 			BEESCOUNT(crawl_gen_low);
@@ -859,7 +879,7 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 		}
 
 		// Map this extent here to regulate task creation
-		create_extent_map(bytenr, this_crawl->hold_state(this_state), bti.offset());
+		create_extent_map(bytenr, this_crawl->hold_state(this_state), this_range_size);
 
 		BEESCOUNT(crawl_extent);
 		const auto search_calls = BtrfsIoctlSearchKey::s_calls - init_s_calls;
@@ -892,10 +912,13 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 	init_tasks();
 
 	// insert_root does this for non-magic subvols, we have to do it ourselves
+	map<uint64_t,pair<bool,bool>> deferred_map;
 	for (const auto &i : s_magic_crawl_map) {
 		const auto subvol = i.first;
 		const auto found = crawl_map.find(subvol);
 		if (found != crawl_map.end()) {
+			// Have to save these for the progress table
+			deferred_map.insert(make_pair(subvol, make_pair(found->second->deferred(), found->second->finished())));
 			found->second->deferred(false);
 		}
 	}
@@ -949,6 +972,19 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 		return;
 	}
 
+	// Grab a copy of the extent size statistics so we can use it without it changing under us
+	lock.lock();
+	const auto mes = m_extent_size;
+
+	// Decay the extent size map averages
+	static const double decay = .99;
+	for (auto &i : m_extent_size.m_map) {
+		i.second.m_bytes *= decay;
+	}
+	m_extent_size.m_total *= decay;
+	lock.unlock();
+	const bool mes_sample_size_ok = mes.m_total > fs_size * .001;
+
 	// Report on progress using extent bytenr map
 	Table::Table eta;
 	for (const auto &i : s_magic_crawl_map) {
@@ -965,14 +1001,10 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 		const auto this_crawl = found->second;
 		THROW_CHECK1(runtime_error, subvol, this_crawl);
 
-		const auto this_range = this_crawl->peek_front();
-		if (!this_range) {
-			BEESLOGDEBUG("PROGRESS: completed crawl " << magic);
-			BEESCOUNT(progress_complete);
-			continue;
-		}
+		// Get the last _completed_ state
+		const auto this_state = this_crawl->get_state_begin();
 
-		const auto bytenr = this_range.fid().ino();
+		auto bytenr = this_state.m_objectid;
 		const auto bg_found = bg_info_map.lower_bound(bytenr);
 		if (bg_found == bg_info_map.end()) {
 			BEESLOGDEBUG("PROGRESS: bytenr " << to_hex(bytenr) << " not found in a block group for " << magic);
@@ -980,6 +1012,10 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 			continue;
 		}
 		const auto &bi = bg_found->second;
+		if (!bytenr) {
+			// Zero bytenr means we have just started a crawl.  Point to the first defined bytenr instead
+			bytenr = bi.first_bytenr;
+		}
 		const auto bi_last_bytenr = bg_found->first;
 		if (bytenr > bi_last_bytenr || bytenr < bi.first_bytenr) {
 			// This can happen if the crawler happens to be in a metadata block group,
@@ -989,12 +1025,12 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 		}
 		const auto bytenr_offset = min(bi_last_bytenr, max(bytenr, bi.first_bytenr)) - bi.first_bytenr + bi.first_total;
 		const auto bytenr_percent = bytenr_offset / (0.01 * fs_size);
-		const auto this_state = this_crawl->get_state_end();
 		const auto now = time(NULL);
 		const auto time_so_far = now - min(now, this_state.m_started);
 		string eta_stamp = "-";
 		string eta_pretty = "-";
-		if (time_so_far > 1 && bytenr_percent > 0) {
+		const bool finished = deferred_map.at(subvol).second;
+		if (time_so_far > 1 && bytenr_percent > 0 && !finished) {
 			const time_t eta_duration = time_so_far / (bytenr_percent / 100);
 			const time_t eta_time = eta_duration + now;
 			struct tm ltm = { 0 };
@@ -1005,10 +1041,15 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 			eta_stamp = string(buf);
 			eta_pretty = pretty_seconds(eta_duration);
 		}
+		const auto &mma = mes.m_map.at(subvol);
+		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
+		const auto pos_text = Table::Text(deferred_map.at(subvol).first ? "deferred" : pretty(bytenr_offset * mma_ratio));
+		const auto pct_text = Table::Text(finished ? "finished" : astringprintf("%.4f%%", bytenr_percent));
+		const auto size_text = Table::Text( mes_sample_size_ok ? pretty(fs_size * mma_ratio) : "-");
 		eta.insert_row(Table::endpos, vector<Table::Content> {
-			Table::Text(pretty(bytenr_offset)),
-			Table::Text(pretty(fs_size)),
-			Table::Text(astringprintf("%.4f%%", bytenr_percent)),
+			pos_text,
+			size_text,
+			pct_text,
 			Table::Number(subvol),
 			Table::Text(pretty(magic.m_min_size & ~BLOCK_MASK_CLONE)),
 			Table::Text(pretty(magic.m_max_size)),
@@ -1025,7 +1066,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 	eta.right("");
 	eta.insert_row(0, vector<Table::Content> {
 		Table::Text("done"),
-		Table::Text("total"),
+		Table::Text(pretty(fs_size)),
 		Table::Text("%done"),
 		Table::Text("sub"),
 		Table::Text("szmn"),
@@ -2202,4 +2243,16 @@ BeesCrawl::deferred(bool def_setting)
 {
 	unique_lock<mutex> lock(m_state_mutex);
 	m_deferred = def_setting;
+}
+
+bool
+BeesCrawl::deferred() const
+{
+	return m_deferred;
+}
+
+bool
+BeesCrawl::finished() const
+{
+	return m_finished;
 }

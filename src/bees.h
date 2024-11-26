@@ -533,6 +533,8 @@ public:
 	BeesCrawlState get_state_end() const;
 	void set_state(const BeesCrawlState &bcs);
 	void deferred(bool def_setting);
+	bool deferred() const;
+	bool finished() const;
 };
 
 class BeesScanMode;
