@@ -264,7 +264,9 @@ readahead
 
 The `readahead` event group consists of events related to calls to `posix_fadvise`.
 
- * `readahead_ms`: Total time spent running `posix_fadvise(..., POSIX_FADV_WILLNEED)` aka `readahead()`.
+ * `readahead_clear`: Number of times the duplicate read cache was cleared.
+ * `readahead_skip`: Number of times a duplicate read was identified in the cache and skipped.
+ * `readahead_ms`: Total time spent emulating readahead in user-space (kernel readahead is not measured).
  * `readahead_unread_ms`: Total time spent running `posix_fadvise(..., POSIX_FADV_DONTNEED)`.
 
 replacedst
