@@ -447,7 +447,7 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& tod
 	void init_tasks();
 	void run_tasks();
 	void map_next_extent(uint64_t subvol);
-	void crawl_one_extent(const ExtentRef &bior);
+	bool crawl_one_extent(const ExtentRef &bior);
 	void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len);
 
 public:
@@ -551,14 +551,14 @@ should_throttle()
 	return s_throttled;
 }
 
-void
+bool
 BeesScanModeExtent::crawl_one_extent(const BeesScanModeExtent::ExtentRef &bior)
 {
 	auto inode_mutex = m_ctx->get_inode_mutex(bior.m_inum);
 	auto inode_lock = inode_mutex->try_lock(Task::current_task());
 	if (!inode_lock) {
 		BEESCOUNT(extent_deferred_inode);
-		return;
+		return true;
 	}
 
 	BEESNOTE("scanning root " << bior.m_root << " ino " << bior.m_inum << " offset " << to_hex(bior.m_offset) << " length " << pretty(bior.m_length));
@@ -571,7 +571,11 @@ BeesScanModeExtent::crawl_one_extent(const BeesScanModeExtent::ExtentRef &bior)
 	);
 
 	BEESCOUNT(extent_forward);
-	m_ctx->scan_forward(bfr);
+	const bool restart_task = m_ctx->scan_forward(bfr);
+	if (restart_task) {
+		BEESCOUNT(extent_restart);
+	}
+	return restart_task;
 }
 
 void
@@ -628,7 +632,7 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 	// chained after the first task created, then run the first one.
 	// This prevents other threads from starting to process an
 	// extent until we have all of its refs in the queue.
-	Task first_task;
+	const auto refs_list = make_shared<list<ExtentRef>>();
 	for (const auto &i : log_ino.m_iors) {
 		catch_all([&](){
 			BEESTRACE("mapping extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum << " offset " << to_hex(i.m_offset));
@@ -643,7 +647,6 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 				return;
 			}
 
-			const auto bec = dynamic_pointer_cast<BeesScanModeExtent>(shared_from_this());
 			const auto length = bti.file_extent_logical_bytes();
 			const ExtentRef extref = {
 				.m_root = i.m_root,
@@ -652,28 +655,60 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 				.m_length = length,
 				.m_hold = hold,
 			};
-			ostringstream oss;
-			oss << "R" << i.m_root << "_" << i.m_inum << "_" << pretty(i.m_offset) << "_" << pretty(length);
-			Task crawl_one(oss.str(), [bec, extref]() {
-				bec->crawl_one_extent(extref);
-			});
-			if (!first_task) {
-				first_task = crawl_one;
-			} else {
-				first_task.append(crawl_one);
-			}
+
+			refs_list->push_back(extref);
 			BEESCOUNT(extent_ref_ok);
 		});
 	}
-	if (first_task) {
-		// first_task.append(Task::current_task());
-		first_task.run();
+	BEESCOUNT(extent_mapped);
+
+	// Don't need to do anything if we found no refs
+	if (refs_list->empty()) {
+		BEESCOUNT(extent_empty);
+		return;
 	}
 
-	// Go back for more tasks if the current task isn't already appended
-	Task::current_task().run();
+	// Sort list in sane read/search order
+	refs_list->sort([](const ExtentRef &a, const ExtentRef &b) {
+		// Sort by inode first to avoid thrashing inode locks
+		if (a.m_inum < b.m_inum) return -1;
+		if (a.m_inum > b.m_inum) return 1;
+		// Do all the reflinks on one subvol at a time so that we don't have a lot of open trees
+		if (a.m_root < b.m_root) return -1;
+		if (a.m_root > b.m_root) return 1;
+		// Logically sequential read order because that's what both scan_one_extent and btrfs are optimized for
+		if (a.m_offset < b.m_offset) return -1;
+		if (a.m_offset > b.m_offset) return 1;
+		return 0;
+	});
 
-	BEESCOUNT(extent_mapped);
+	// Create task to scan all refs to this extent
+	ostringstream oss;
+	oss << "ref_" << hex << bytenr << "_" << pretty(len) << "_" << dec << refs_list->size();
+	const auto bec = dynamic_pointer_cast<BeesScanModeExtent>(shared_from_this());
+	const auto map_task = Task::current_task();
+	Task crawl_one(oss.str(), [bec, refs_list, map_task]() {
+		if (!refs_list->empty()) {
+			const auto extref = *(refs_list->begin());
+			refs_list->pop_front();
+			catch_all([&]() {
+				// Exceptions in crawl_one_extent make us forget about this ref
+				const bool restart_ref = bec->crawl_one_extent(extref);
+				if (restart_ref) {
+					refs_list->push_front(extref);
+				}
+			});
+		}
+		if (refs_list->empty()) {
+			// We might be throttled and we're about to exit a task, so restart our map task
+			if (!should_throttle()) {
+				map_task.idle();
+			}
+		} else {
+			Task::current_task().run();
+		}
+	});
+	crawl_one.run();
 }
 
 void
@@ -719,7 +754,7 @@ BeesScanModeExtent::run_tasks()
 	unique_lock<mutex> lock(m_mutex);
 	// Good to go, start everything running
 	for (const auto &i : m_task_map) {
-		i.second.run();
+		i.second.idle();
 	}
 }
 
@@ -840,7 +875,7 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 		}
 
 		// We did something!  Get in line to run again
-		Task::current_task().run();
+		Task::current_task().idle();
 		return;
 	}
 
@@ -1438,7 +1473,7 @@ BeesRoots::crawl_thread()
 	const auto crawl_task = Task("crawl_more", [shared_this]() {
 		BEESTRACE("crawl_more " << shared_this);
 		if (shared_this->crawl_roots()) {
-			Task::current_task().run();
+			Task::current_task().idle();
 		}
 	});
 	const auto crawl_new = Task("crawl_new", [shared_this, crawl_task]() {
@@ -1469,7 +1504,6 @@ BeesRoots::crawl_thread()
 			clear_caches();
 
 			// Insert new roots and restart crawl_more.
-			// Don't run this if we have no worker threads.
 			crawl_new.run();
 		}
 		last_transid = new_transid;
