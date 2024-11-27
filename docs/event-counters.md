@@ -121,6 +121,7 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
  * `crawl_again`: An inode crawl was restarted because the extent was already locked by another running crawl.
  * `crawl_blacklisted`: An extent was not scanned because it belongs to a blacklisted file.
  * `crawl_create`: A new subvol crawler was created.
+ * `crawl_deferred_inode`: Two tasks attempted to scan the same inode at the same time, so one was deferred.
  * `crawl_done`: One pass over all subvols on the filesystem was completed.
  * `crawl_empty`: A `TREE_SEARCH_V2` ioctl call failed or returned an empty set (usually because all data in the subvol was scanned).
  * `crawl_fail`: A `TREE_SEARCH_V2` ioctl call failed.
@@ -179,14 +180,6 @@ The `hash` event group consists of operations related to the bees hash table.
  * `hash_front_already`: A `(hash, address)` pair was pushed to the front of the list because it matched a duplicate block, but the pair was already at the front of the list so no change occurred.
  * `hash_insert`: A `(hash, address)` pair was inserted by `BeesHashTable::push_random_hash_addr`.
  * `hash_lookup`: The hash table was searched for `(hash, address)` pairs matching a given `hash`.
-
-inserted
---------
-
-The `inserted` event group consists of operations related to storing hash and address data in the hash table (i.e. the hash table client).
-
- * `inserted_block`: Total number of data block references scanned and inserted into the hash table.
- * `inserted_clobbered`: Total number of data block references scanned and eliminated from the filesystem.
 
 matched
 -------
@@ -331,34 +324,38 @@ The `scan` event group consists of operations related to scanning incoming data.
 
  * `scan_blacklisted`: A blacklisted extent was passed to `scan_forward` and dropped.
  * `scan_block`: A block of data was scanned.
- * `scan_bump`: After deduping a block range, the scan pointer had to be moved past the end of the deduped byte range.
- * `scan_dup_block`: Number of duplicate blocks deduped.
- * `scan_dup_hit`: A pair of duplicate block ranges was found and removed.
+ * `scan_compressed_no_dedup`: An extent that was compressed contained non-zero, non-duplicate data.
+ * `scan_dup_block`: Number of duplicate block references deduped.
+ * `scan_dup_hit`: A pair of duplicate block ranges was found.
  * `scan_dup_miss`: A pair of duplicate blocks was found in the hash table but not in the filesystem.
- * `scan_eof`: Scan past EOF was attempted.
- * `scan_erase_redundant`: Blocks in the hash table were removed because they were removed from the filesystem by dedupe.
  * `scan_extent`: An extent was scanned (`scan_one_extent`).
  * `scan_forward`: A logical byte range was scanned (`scan_forward`).
  * `scan_found`: An entry was found in the hash table matching a scanned block from the filesystem.
  * `scan_hash_hit`: A block was found on the filesystem corresponding to a block found in the hash table.
  * `scan_hash_miss`: A block was not found on the filesystem corresponding to a block found in the hash table.
- * `scan_hash_preinsert`: A block was prepared for insertion into the hash table.
+ * `scan_hash_preinsert`: A non-zero data block's hash was prepared for possible insertion into the hash table.
+ * `scan_hash_insert`: A non-zero data block's hash was inserted into the hash table.
  * `scan_hole`: A hole extent was found during scan and ignored.
  * `scan_interesting`: An extent had flags that were not recognized by bees and was ignored.
  * `scan_lookup`: A hash was looked up in the hash table.
  * `scan_malign`: A block being scanned matched a hash at EOF in the hash table, but the EOF was not aligned to a block boundary and the two blocks did not have the same length.
- * `scan_no_fd`: References to a block from the hash table were found, but a FD could not be opened.
- * `scan_no_rewrite`: All blocks in an extent were removed by dedupe (i.e. no copies).
  * `scan_push_front`: An entry in the hash table matched a duplicate block, so the entry was moved to the head of its LRU list.
  * `scan_reinsert`: A copied block's hash and block address was inserted into the hash table.
  * `scan_resolve_hit`: A block address in the hash table was successfully resolved to an open FD and offset pair.
  * `scan_resolve_zero`: A block address in the hash table was not resolved to any subvol/inode pair, so the corresponding hash table entry was removed.
  * `scan_rewrite`: A range of bytes in a file was copied, then the copy deduped over the original data.
+ * `scan_root_dead`: A deleted subvol was detected.
+ * `scan_seen_clear`: The list of recently scanned extents reached maximum size and was cleared.
+ * `scan_seen_erase`: An extent reference was modified by scan, so all future references to the extent must be scanned.
+ * `scan_seen_hit`: A scan was skipped because the same extent had recently been scanned.
+ * `scan_seen_insert`: An extent reference was not modified by scan and its hashes have been inserted into the hash table, so all future references to the extent can be ignored.
+ * `scan_seen_miss`: A scan was not skipped because the same extent had not recently been scanned (i.e. the extent was scanned normally).
+ * `scan_skip_bytes`: Nuisance dedupe or hole-punching would save less than half of the data in an extent.
+ * `scan_skip_ops`: Nuisance dedupe or hole-punching would require too many dedupe/copy/hole-punch operations in an extent.
  * `scan_toxic_hash`: A scanned block has the same hash as a hash table entry that is marked toxic.
  * `scan_toxic_match`: A hash table entry points to a block that is discovered to be toxic.
  * `scan_twice`: Two references to the same block have been found in the hash table.
- * `scan_zero_compressed`: An extent that was compressed and contained only zero bytes was found.
- * `scan_zero_uncompressed`: A block that contained only zero bytes was found in an uncompressed extent.
+ * `scan_zero`: A data block containing only zero bytes was detected.
 
 scanf
 -----
@@ -366,9 +363,10 @@ scanf
 The `scanf` event group consists of operations related to `BeesContext::scan_forward`.  This is the entry point where `crawl` schedules new data for scanning.
 
  * `scanf_deferred_extent`: Two tasks attempted to scan the same extent at the same time, so one was deferred.
- * `scanf_deferred_inode`: Two tasks attempted to scan the same inode at the same time, so one was deferred.
+ * `scanf_eof`: Scan past EOF was attempted.
  * `scanf_extent`: A btrfs extent item was scanned.
  * `scanf_extent_ms`: Total thread-seconds spent scanning btrfs extent items.
+ * `scanf_no_fd`: References to a block from the hash table were found, but a FD could not be opened.
  * `scanf_total`: A logical byte range of a file was scanned.
  * `scanf_total_ms`: Total thread-seconds spent scanning logical byte ranges.
 
