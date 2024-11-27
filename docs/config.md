@@ -126,7 +126,7 @@ Subvol scan modes:
  * Can avoid modifying read-only subvols (for `btrfs send` workaround).
  * Have problems keeping up with snapshots created during a scan.
 
-The default scan mode is 1, "independent".
+The default scan mode is 4, "extent".
 
 If you are using bees for the first time on a filesystem with many
 existing snapshots, you should read about [snapshot gotchas](gotchas.md).
