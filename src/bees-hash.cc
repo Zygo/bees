@@ -356,6 +356,8 @@ BeesHashTable::prefetch_loop()
 		auto avg_rates = thisStats / m_ctx->total_timer().age();
 		graph_blob << "\t" << avg_rates << "\n";
 
+		graph_blob << m_ctx->get_progress();
+
 		BEESLOGINFO(graph_blob.str());
 		catch_all([&]() {
 			m_stats_file.write(graph_blob.str());

@@ -749,6 +749,9 @@ class BeesContext : public enable_shared_from_this<BeesContext> {
 	shared_ptr<BeesThread>				m_progress_thread;
 	shared_ptr<BeesThread>				m_status_thread;
 
+	mutex						m_progress_mtx;
+	string						m_progress_str;
+
 	void set_root_fd(Fd fd);
 
 	BeesResolveAddrResult resolve_addr_uncached(BeesAddress addr);
@@ -784,6 +787,8 @@ public:
 
 	void dump_status();
 	void show_progress();
+	void set_progress(const string &str);
+	string get_progress();
 
 	void start();
 	void stop();

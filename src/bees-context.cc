@@ -98,6 +98,8 @@ BeesContext::dump_status()
 		TaskMaster::print_queue(ofs);
 #endif
 
+		ofs << get_progress();
+
 		ofs.close();
 
 		BEESNOTE("renaming status file '" << status_file << "'");
@@ -110,6 +112,20 @@ BeesContext::dump_status()
 		}
 		m_stop_condvar.wait_for(lock, chrono::duration<double>(BEES_STATUS_INTERVAL));
 	}
+}
+
+void
+BeesContext::set_progress(const string &str)
+{
+	unique_lock<mutex> lock(m_progress_mtx);
+	m_progress_str = str;
+}
+
+string
+BeesContext::get_progress()
+{
+	unique_lock<mutex> lock(m_progress_mtx);
+	return m_progress_str;
 }
 
 void
@@ -158,6 +174,8 @@ BeesContext::show_progress()
 		for (auto t : BeesNote::get_status()) {
 			BEESLOGINFO("\ttid " << t.first << ": " << t.second);
 		}
+
+		// No need to log progress here, it is logged when set
 
 		lastStats = thisStats;
 	}

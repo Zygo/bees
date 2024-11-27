@@ -1069,10 +1069,6 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		});
 		BEESCOUNT(progress_ok);
 	}
-	ostringstream oss;
-	eta.left("PROGRESS: ");
-	eta.mid(" ");
-	eta.right("");
 	eta.insert_row(0, vector<Table::Content> {
 		Table::Text("done"),
 		Table::Text(pretty(fs_size)),
@@ -1087,8 +1083,24 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 	});
 	const auto dash_fill = Table::Fill('-');
 	eta.insert_row(1, vector<Table::Content>(eta.cols().size(), dash_fill));
-	oss << eta;
-	BEESLOGDEBUG(oss.str());
+	eta.left("");
+	eta.mid(" ");
+	eta.right("");
+
+	// One for publication through beesstats.txt and $BEESSTATUS
+	{
+		ostringstream progress_oss;
+		progress_oss << eta;
+		m_ctx->set_progress(progress_oss.str());
+	}
+
+	// One for the debug log
+	{
+		eta.left("PROGRESS: ");
+		ostringstream log_oss;
+		log_oss << eta;
+		BEESLOGINFO(log_oss.str());
+	}
 }
 
 void
