@@ -205,7 +205,7 @@ Other Gotchas
 
 * bees avoids the [slow backrefs kernel bug](btrfs-kernel.md) by
   measuring the time required to perform `LOGICAL_INO` operations.
-  If an extent requires over 0.1 kernel CPU seconds to perform a
+  If an extent requires over 5.0 kernel CPU seconds to perform a
   `LOGICAL_INO` ioctl, then bees blacklists the extent and avoids
   referencing it in future operations.  In most cases, fewer than 0.1%
   of extents in a filesystem must be avoided this way.  This results
