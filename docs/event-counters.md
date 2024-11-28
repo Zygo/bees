@@ -181,16 +181,6 @@ The `hash` event group consists of operations related to the bees hash table.
  * `hash_insert`: A `(hash, address)` pair was inserted by `BeesHashTable::push_random_hash_addr`.
  * `hash_lookup`: The hash table was searched for `(hash, address)` pairs matching a given `hash`.
 
-matched
--------
-
-The `matched` event group consists of events related to matching incoming data blocks against existing hash table entries.
-
- * `matched_0`: A data block was scanned, hash table entries found, but no matching data blocks on the filesytem located.
- * `matched_1_or_more`: A data block was scanned, hash table entries found, and one or more matching data blocks on the filesystem located.
- * `matched_2_or_more`: A data block was scanned, hash table entries found, and two or more matching data blocks on the filesystem located.
- * `matched_3_or_more`: A data block was scanned, hash table entries found, and three or more matching data blocks on the filesystem located.
-
 open
 ----
 
