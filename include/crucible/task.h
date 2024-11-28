@@ -40,6 +40,9 @@ namespace crucible {
 		/// after the current instance exits.
 		void run() const;
 
+		/// Schedule task to run when no other Task is available.
+		void idle() const;
+
 		/// Schedule Task to run after this Task has run or
 		/// been destroyed.
 		void append(const Task &task) const;
