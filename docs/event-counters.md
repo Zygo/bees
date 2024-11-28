@@ -303,7 +303,7 @@ The `resolve` event group consists of operations related to translating a btrfs 
  * `resolve_large`: The `LOGICAL_INO` ioctl returned more than 2730 results (the limit of the v1 ioctl).
  * `resolve_ms`: Total time spent in the `LOGICAL_INO` ioctl (i.e. wallclock time, not kernel CPU time).
  * `resolve_ok`: The `LOGICAL_INO` ioctl returned success.
- * `resolve_overflow`: The `LOGICAL_INO` ioctl returned more than 655050 extents (the limit of the v2 ioctl).
+ * `resolve_overflow`: The `LOGICAL_INO` ioctl returned 9999 or more extents (the limit configured in `bees.h`).
  * `resolve_toxic`: The `LOGICAL_INO` ioctl took more than 0.1 seconds of kernel CPU time.
 
 root
