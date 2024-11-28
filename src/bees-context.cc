@@ -818,7 +818,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			(force_insert ? "skip" : "scan") << ": "
 			<< pretty(e.size()) << " "
 			<< dedupe_list.size() << "d" << copy_list.size() << "c"
-			<< ((bytes_zeroed + BLOCK_SIZE_SUMS - 1) / BLOCK_SIZE_SUMS) << "p {"
+			<< ((bytes_zeroed + BLOCK_SIZE_SUMS - 1) / BLOCK_SIZE_SUMS) << "p"
+			<< (extent_compressed ? "z {" : " {")
 			<< to_hex(e.bytenr()) << "+" << to_hex(e.offset()) << "} "
 			<< to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end())
 			<< ' ' << name_fd(bfr.fd())
