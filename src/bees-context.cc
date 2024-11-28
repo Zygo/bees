@@ -451,13 +451,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		const auto found = hash_table->find_cell(hash);
 		BEESCOUNT(scan_lookup);
 
-		set<BeesResolver> resolved_addrs;
 		set<BeesAddress> found_addrs;
-
-		// We know that there is at least one copy of the data and where it is,
-		// but we don't want to do expensive LOGICAL_INO operations unless there
-		// are at least two distinct addresses to look at.
-		found_addrs.insert(addr);
+		list<BeesAddress> ordered_addrs;
 
 		for (const auto &i : found) {
 			BEESTRACE("found (hash, address): " << i);
@@ -466,6 +461,9 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			// Hash has to match
 			THROW_CHECK2(runtime_error, i.e_hash, hash, i.e_hash == hash);
 
+			// We know that there is at least one copy of the data and where it is.
+			// Filter out anything that can't possibly match before we pull out the
+			// LOGICAL_INO hammer.
 			BeesAddress found_addr(i.e_addr);
 
 			// If address already in hash table, move on to next extent.
@@ -484,15 +482,16 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				return;
 			}
 
-			// Block must have matching EOF alignment
-			if (found_addr.is_unaligned_eof() != addr.is_unaligned_eof()) {
-				BEESCOUNT(scan_malign);
+			// Address is a duplicate.
+			// Check this early so we don't have duplicate counts.
+			if (!found_addrs.insert(found_addr).second) {
+				BEESCOUNT(scan_twice);
 				continue;
 			}
 
-			// Address is a duplicate
-			if (!found_addrs.insert(found_addr).second) {
-				BEESCOUNT(scan_twice);
+			// Block must have matching EOF alignment
+			if (found_addr.is_unaligned_eof() != addr.is_unaligned_eof()) {
+				BEESCOUNT(scan_malign);
 				continue;
 			}
 
@@ -506,104 +505,89 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 				return;
 			}
 
-			// Distinct address, go resolve it
-			bool abandon_extent = false;
-			catch_all([&]() {
-				BEESNOTE("resolving " << found_addr << " matched " << bbd);
-				BEESTRACE("resolving " << found_addr << " matched " << bbd);
-				BEESTRACE("BeesContext::scan_one_extent calling BeesResolver " << found_addr);
-				BeesResolver resolved(m_ctx, found_addr);
-				// Toxic extents are really toxic
-				if (resolved.is_toxic()) {
-					BEESLOGWARN("WORKAROUND: discovered toxic match at found_addr " << found_addr << " matching bbd " << bbd);
-					BEESCOUNT(scan_toxic_match);
-					// Make sure we never see this hash again.
-					// It has become toxic since it was inserted into the hash table.
-					found_addr.set_toxic();
-					hash_table->push_front_hash_addr(hash, found_addr);
-					abandon_extent = true;
-				} else if (!resolved.count()) {
-					BEESCOUNT(scan_resolve_zero);
-					// Didn't find a block at the table address, address is dead
-					BEESLOGDEBUG("Erasing stale addr " << addr << " hash " << hash);
-					hash_table->erase_hash_addr(hash, found_addr);
-				} else {
-					resolved_addrs.insert(resolved);
-					BEESCOUNT(scan_resolve_hit);
-				}
-			});
+			// Put this address in the list without changing hash table order
+			ordered_addrs.push_back(found_addr);
+		}
 
-			if (abandon_extent) {
+		// Cheap filtering is now out of the way, now for some heavy lifting
+		for (auto found_addr : ordered_addrs) {
+			// Hash table says there's a matching block on the filesystem.
+			// Go find refs to it.
+			BEESNOTE("resolving " << found_addr << " matched " << bbd);
+			BEESTRACE("resolving " << found_addr << " matched " << bbd);
+			BEESTRACE("BeesContext::scan_one_extent calling BeesResolver " << found_addr);
+			BeesResolver resolved(m_ctx, found_addr);
+			// Toxic extents are really toxic
+			if (resolved.is_toxic()) {
+				BEESLOGWARN("WORKAROUND: discovered toxic match at found_addr " << found_addr << " matching bbd " << bbd);
+				BEESCOUNT(scan_toxic_match);
+				// Make sure we never see this hash again.
+				// It has become toxic since it was inserted into the hash table.
+				found_addr.set_toxic();
+				hash_table->push_front_hash_addr(hash, found_addr);
 				return;
+			} else if (!resolved.count()) {
+				BEESCOUNT(scan_resolve_zero);
+				// Didn't find a block at the table address, address is dead
+				BEESLOGDEBUG("Erasing stale addr " << addr << " hash " << hash);
+				hash_table->erase_hash_addr(hash, found_addr);
+				continue;
+			} else {
+				BEESCOUNT(scan_resolve_hit);
 			}
-		}
 
-		// This shouldn't happen (often), so let's count it separately
-		if (resolved_addrs.size() > 2) {
-			BEESCOUNT(matched_3_or_more);
-		}
-		if (resolved_addrs.size() > 1) {
-			BEESCOUNT(matched_2_or_more);
-		}
-
-		// No need to do all this unless there are one or more distinct matches
-		if (!resolved_addrs.empty()) {
+			// `resolved` contains references to a block on the filesystem that still exists.
 			bar.at(bar_p) = 'M';
-			BEESCOUNT(matched_1_or_more);
-			BEESTRACE("resolved_addrs.size() = " << resolved_addrs.size());
-			BEESNOTE("resolving " << resolved_addrs.size() << " matches for hash " << hash);
 
-			BeesFileRange replaced_bfr;
+			BEESNOTE("finding one match (out of " << resolved.count() << ") at " << resolved.addr() << " for " << bbd);
+			BEESTRACE("finding one match (out of " << resolved.count() << ") at " << resolved.addr() << " for " << bbd);
+			auto replaced_brp = resolved.replace_dst(bbd);
+			BeesFileRange &replaced_bfr = replaced_brp.second;
+			BEESTRACE("next_p " << to_hex(next_p) << " -> replaced_bfr " << replaced_bfr);
 
-			for (auto it = resolved_addrs.begin(); it != resolved_addrs.end(); ++it) {
-				auto it_copy = *it;
-				BEESNOTE("finding one match (out of " << it_copy.count() << ") at " << it_copy.addr() << " for " << bbd);
-				BEESTRACE("finding one match (out of " << it_copy.count() << ") at " << it_copy.addr() << " for " << bbd);
-				// If we replaced extents containing the incoming addr,
-				// push the addr we kept to the front of the hash LRU.
-				auto replaced_brp = it_copy.replace_dst(bbd);
-				replaced_bfr = replaced_brp.second;
-				BEESTRACE("next_p " << to_hex(next_p) << " -> replaced_bfr " << replaced_bfr);
-
-				// If we did find a block, but not this hash, correct the hash table
-				if (it_copy.found_hash()) {
-					BEESCOUNT(scan_hash_hit);
-				} else {
-					BEESLOGDEBUG("Erasing stale hash " << hash << " addr " << it_copy.addr());
-					hash_table->erase_hash_addr(hash, it_copy.addr());
-					BEESCOUNT(scan_hash_miss);
-				}
-
-				if (it_copy.found_dup()) {
-					THROW_CHECK0(runtime_error, replaced_bfr);
-					BEESCOUNT(scan_dup_hit);
-
-					// Save this match.  If a better match is found later,
-					// it will be replaced.  (FIXME:  not really...)
-					dedupe_list.push_back(replaced_brp);
-
-					// Push matching block to front of LRU
-					front_hash_list.push_back(make_pair(hash, it_copy.addr()));
-
-					off_t bar_p = (p - e.begin()) / BLOCK_SIZE_SUMS;
-					bar.at(bar_p) = '=';
-
-					// Invalidate resolve cache so we can count refs correctly
-					invalidate_addr_list.push_back(it_copy.addr());
-					invalidate_addr_list.push_back(bbd.addr());
-
-					// next_p may be past EOF so check p only
-					THROW_CHECK2(runtime_error, p, replaced_bfr, p < replaced_bfr.end());
-
-					// We may find duplicate ranges of various lengths, so make sure
-					// we don't pick a smaller one
-					next_p = max(next_p, replaced_bfr.end());
-				} else {
-					BEESCOUNT(scan_dup_miss);
-				}
+			// If we did find a block, but not this hash, correct the hash table and move on
+			if (resolved.found_hash()) {
+				BEESCOUNT(scan_hash_hit);
+			} else {
+				BEESLOGDEBUG("Erasing stale hash " << hash << " addr " << resolved.addr());
+				hash_table->erase_hash_addr(hash, resolved.addr());
+				BEESCOUNT(scan_hash_miss);
+				continue;
 			}
-		} else {
-			BEESCOUNT(matched_0);
+
+			// We found a block and it was a duplicate
+			if (resolved.found_dup()) {
+				THROW_CHECK0(runtime_error, replaced_bfr);
+				BEESCOUNT(scan_dup_hit);
+
+				// Save this match.  If a better match is found later,
+				// it will be replaced.
+				dedupe_list.push_back(replaced_brp);
+
+				// Push matching block to front of LRU
+				front_hash_list.push_back(make_pair(hash, resolved.addr()));
+
+				// This is the block that matched in the replaced bfr
+				bar.at(bar_p) = '=';
+
+				// Invalidate resolve cache so we can count refs correctly
+				invalidate_addr_list.push_back(resolved.addr());
+				invalidate_addr_list.push_back(bbd.addr());
+
+				// next_p may be past EOF so check p only
+				THROW_CHECK2(runtime_error, p, replaced_bfr, p < replaced_bfr.end());
+
+				// We may find duplicate ranges of various lengths, so make sure
+				// we don't pick a smaller one
+				next_p = max(next_p, replaced_bfr.end());
+
+				// Stop after one dedupe is found.  If there's a longer matching range
+				// out there, we'll find a matching block after the end of this range,
+				// since the longer range is longer than this one.
+				break;
+			} else {
+				BEESCOUNT(scan_dup_miss);
+			}
 		}
 	}
 
