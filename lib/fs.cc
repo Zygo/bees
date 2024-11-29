@@ -774,6 +774,11 @@ namespace crucible {
 			ioctl_ptr->buf_size = buf_size;
 			// Don't bother supporting V1.  Kernels that old have other problems.
 			int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_arg.data());
+			if (rv != 0 && errno == ENOENT) {
+				// If we are searching a tree that is deleted or no longer exists, just return an empty list
+				nr_items = 0;
+				break;
+			}
 			if (rv != 0 && errno != EOVERFLOW) {
 				return false;
 			}
