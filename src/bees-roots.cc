@@ -1038,7 +1038,9 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		const auto time_so_far = now - min(now, this_state.m_started);
 		string eta_stamp = "-";
 		string eta_pretty = "-";
-		const bool finished = deferred_map.at(subvol).second;
+		const auto &deferred_finished = deferred_map.at(subvol);
+		const bool deferred = deferred_finished.first;
+		const bool finished = deferred_finished.second;
 		if (time_so_far > 1 && bytenr_percent > 0 && !finished) {
 			const time_t eta_duration = time_so_far / (bytenr_percent / 100);
 			const time_t eta_time = eta_duration + now;
@@ -1046,22 +1048,21 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 			DIE_IF_ZERO(localtime_r(&eta_time, &ltm));
 
 			char buf[1024] = { 0 };
-			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &ltm));
+			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &ltm));
 			eta_stamp = string(buf);
 			eta_pretty = pretty_seconds(eta_duration);
 		}
 		const auto &mma = mes.m_map.at(subvol);
 		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
-		const auto pos_text = Table::Text(deferred_map.at(subvol).first ? "deferred" : pretty(bytenr_offset * mma_ratio));
+		const auto pos_scaled_text = mes_sample_size_ok ? pretty(bytenr_offset * mma_ratio) : "-";
+		const auto pos_text = Table::Text(deferred ? "deferred" : pos_scaled_text);
 		const auto pct_text = Table::Text(finished ? "finished" : astringprintf("%.4f%%", bytenr_percent));
 		const auto size_text = Table::Text( mes_sample_size_ok ? pretty(fs_size * mma_ratio) : "-");
 		eta.insert_row(Table::endpos, vector<Table::Content> {
 			pos_text,
 			size_text,
 			pct_text,
-			Table::Number(subvol),
-			Table::Text(pretty(magic.m_min_size & ~BLOCK_MASK_CLONE)),
-			Table::Text(pretty(magic.m_max_size)),
+			Table::Text(magic.m_max_size == numeric_limits<uint64_t>::max() ? "max" : pretty(magic.m_max_size)),
 			Table::Number(this_state.m_min_transid),
 			Table::Number(this_state.m_max_transid),
 			Table::Text(eta_pretty),
@@ -1073,12 +1074,10 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		Table::Text("done"),
 		Table::Text(pretty(fs_size)),
 		Table::Text("%done"),
-		Table::Text("sub"),
-		Table::Text("szmn"),
-		Table::Text("szmx"),
+		Table::Text("size"),
 		Table::Text("transid"),
 		Table::Number(m_roots->transid_max()),
-		Table::Text("remain"),
+		Table::Text("todo"),
 		Table::Text("ETA"),
 	});
 	const auto dash_fill = Table::Fill('-');
