@@ -123,7 +123,7 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 #define BEESLOG(lv,x)   do { if (lv < bees_log_level) { Chatter __chatter(lv, BeesNote::get_name()); __chatter << x; } } while (0)
 #define BEESLOGTRACE(x) do { BEESLOG(LOG_DEBUG, x); BeesTracer::trace_now(); } while (0)
 
-#define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x);   })
+#define BEESTRACE(x)   BeesTracer  SRSLY_WTF_C(beesTracer_,  __LINE__) ([&]()                 { BEESLOG(LOG_ERR, x << " at " << __FILE__ << ":" << __LINE__);   })
 #define BEESTOOLONG(x) BeesTooLong SRSLY_WTF_C(beesTooLong_, __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 #define BEESNOTE(x)    BeesNote    SRSLY_WTF_C(beesNote_,    __LINE__) ([&](ostream &_btl_os) { _btl_os << x; })
 
