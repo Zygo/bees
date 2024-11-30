@@ -1320,7 +1320,7 @@ BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) 
 }
 
 bool
-BeesCrawl::next_transid()
+BeesCrawl::restart_crawl()
 {
 	const auto roots = m_ctx->roots();
 	const auto next_transid = roots->transid_max();
@@ -1365,7 +1365,7 @@ BeesCrawl::fetch_extents()
 
 	// We can't scan an empty transid interval.
 	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
-		return next_transid();
+		return restart_crawl();
 	}
 
 	// Check for btrfs send workaround: don't scan RO roots at all, pretend
@@ -1376,7 +1376,7 @@ BeesCrawl::fetch_extents()
 	if (m_ctx->is_root_ro(old_state.m_root)) {
 		BEESLOGDEBUG("WORKAROUND: skipping scan of RO root " << old_state.m_root);
 		BEESCOUNT(root_workaround_btrfs_send);
-		// We would call next_transid() here, but we want to do a few things differently.
+		// We would call restart_crawl() here, but we want to do a few things differently.
 		// We immediately defer further crawling on this subvol.
 		// We track max_transid if the subvol scan has never started.
 		// We postpone the started timestamp since we haven't started.
@@ -1418,7 +1418,7 @@ BeesCrawl::fetch_extents()
 	if (!m_next_extent_data) {
 		// Ran out of data in this subvol and transid.
 		// Try to restart immediately if more transids are available.
-		return next_transid();
+		return restart_crawl();
 	}
 	auto new_state = old_state;
 	new_state.m_objectid = max(m_next_extent_data.objectid() + 1, m_next_extent_data.objectid());

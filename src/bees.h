@@ -515,7 +515,7 @@ class BeesCrawl {
 
 	bool fetch_extents();
 	void fetch_extents_harder();
-	bool next_transid();
+	bool restart_crawl();
 	BeesFileRange bti_to_bfr(const BtrfsTreeItem &bti) const;
 
 public:
