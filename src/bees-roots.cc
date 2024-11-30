@@ -555,6 +555,8 @@ should_throttle()
 bool
 BeesScanModeExtent::crawl_one_extent(const BeesScanModeExtent::ExtentRef &bior)
 {
+	BEESTRACE("crawl_one_extent " << bior);
+
 	auto inode_mutex = m_ctx->get_inode_mutex(bior.m_inum);
 	auto inode_lock = inode_mutex->try_lock(Task::current_task());
 	if (!inode_lock) {
@@ -715,6 +717,8 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 void
 BeesScanModeExtent::init_tasks()
 {
+	BEESTRACE("init_tasks");
+
 	// Make sure all the magic crawlers are inserted in m_crawl_map,
 	// and each one has a Task
 	unique_lock<mutex> lock_insert_root(m_insert_root_mutex);
@@ -722,7 +726,7 @@ BeesScanModeExtent::init_tasks()
 	for (const auto &i : s_magic_crawl_map) {
 		const auto subvol = i.first;
 		const auto &magic = i.second;
-		auto found = m_crawl_map.find(subvol);
+		const auto found = m_crawl_map.find(subvol);
 		if (found == m_crawl_map.end()) {
 			lock.unlock();
 			BeesCrawlState new_bcs;
@@ -751,6 +755,8 @@ BeesScanModeExtent::init_tasks()
 void
 BeesScanModeExtent::scan()
 {
+	BEESTRACE("bsm scan");
+
 	if (should_throttle()) return;
 
 	unique_lock<mutex> lock(m_mutex);
@@ -779,7 +785,8 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 	Timer crawl_time;
 
 	unique_lock<mutex> lock(m_mutex);
-	auto found = m_crawl_map.find(subvol);
+	const auto found = m_crawl_map.find(subvol);
+	assert(found != m_crawl_map.end());
 	THROW_CHECK0(runtime_error, found != m_crawl_map.end());
 	CrawlMap::mapped_type this_crawl = found->second;
 	lock.unlock();
@@ -901,9 +908,12 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 }
 
 void
-BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
+BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 {
 	BEESTRACE("Extent next_transid");
+
+	// We maintain our own crawl map
+	(void)crawl_map_unused;
 
 	// Do the important parts first, the rest can return early or die with an exception
 
@@ -913,24 +923,21 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 
 	// insert_root does this for non-magic subvols, we have to do it ourselves
 	map<uint64_t,pair<bool,bool>> deferred_map;
-	for (const auto &i : s_magic_crawl_map) {
-		const auto subvol = i.first;
-		const auto found = crawl_map.find(subvol);
-		if (found != crawl_map.end()) {
-			// Have to save these for the progress table
-			deferred_map.insert(make_pair(subvol, make_pair(found->second->deferred(), found->second->finished())));
-			found->second->deferred(false);
+	{
+		unique_lock<mutex> lock(m_mutex);
+		for (const auto &i : s_magic_crawl_map) {
+			const auto subvol = i.first;
+			const auto found = m_crawl_map.find(subvol);
+			if (found != m_crawl_map.end()) {
+				// Have to save these for the progress table
+				deferred_map.insert(make_pair(subvol, make_pair(found->second->deferred(), found->second->finished())));
+				found->second->deferred(false);
+			}
 		}
 	}
 
 	// Kick off tasks if they aren't already running
 	start_scan();
-
-	// Swap in the new crawl map with freshly undeferred crawlers
-	auto crawl_map_copy = crawl_map;
-	unique_lock<mutex> lock(m_mutex);
-	swap(m_crawl_map, crawl_map_copy);
-	lock.unlock();
 
 	// Estimate progress by building a map of where the extent bytenrs are (they are sparse,
 	// no extents exist between block groups), and report the position within that map.
@@ -972,9 +979,10 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 		return;
 	}
 
-	// Grab a copy of the extent size statistics so we can use it without it changing under us
-	lock.lock();
+	// Grab a copy of members
+	unique_lock<mutex> lock(m_mutex);
 	const auto mes = m_extent_size;
+	const auto cmc = m_crawl_map;
 
 	// Decay the extent size map averages
 	static const double decay = .99;
@@ -991,8 +999,9 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 		const auto &subvol = i.first;
 		const auto &magic = i.second;
 
-		const auto found = crawl_map.find(subvol);
-		if (found == crawl_map.end()) {
+		const auto found = cmc.find(subvol);
+		THROW_CHECK1(runtime_error, subvol, found != cmc.end());
+		if (found == cmc.end()) {
 			// BEESLOGDEBUG("PROGRESS: crawler not yet created for " << magic);
 			BEESCOUNT(progress_not_created);
 			continue;
