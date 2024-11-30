@@ -99,12 +99,14 @@ class BeesScanMode : public enable_shared_from_this<BeesScanMode> {
 protected:
 	shared_ptr<BeesContext>	m_ctx;
 	shared_ptr<BeesRoots>	m_roots;
+	mutex m_scan_task_mutex;
+	Task m_scan_task;
 	bool crawl_batch(const shared_ptr<BeesCrawl>& crawl);
+	virtual void start_scan();
+	virtual void scan() = 0;
 public:
 	virtual ~BeesScanMode() {}
 	BeesScanMode(const shared_ptr<BeesRoots>& roots, const shared_ptr<BeesContext>& ctx);
-	virtual bool do_scan() = 0;
-	virtual bool scan() = 0;
 	using CrawlMap = decltype(BeesRoots::m_root_crawl_map);
 	virtual void next_transid(const CrawlMap &crawl_map) = 0;
 	virtual const char *ntoa() const = 0;
@@ -114,6 +116,21 @@ BeesScanMode::BeesScanMode(const shared_ptr<BeesRoots>& roots, const shared_ptr<
 	m_ctx(ctx),
 	m_roots(roots)
 {
+}
+
+void
+BeesScanMode::start_scan()
+{
+	unique_lock<mutex> lock(m_scan_task_mutex);
+	if (!m_scan_task) {
+		const auto st = shared_from_this();
+		ostringstream oss;
+		oss << "scan_" << ntoa();
+		m_scan_task = Task(oss.str(), [st] {
+			st->scan();
+		});
+	}
+	m_scan_task.idle();
 }
 
 bool
@@ -129,11 +146,10 @@ class BeesScanModeLockstep : public BeesScanMode {
 	using Map = map<SortKey, CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<Map> m_sorted;
+	void scan() override;
 public:
 	using BeesScanMode::BeesScanMode;
 	~BeesScanModeLockstep() override {}
-	bool do_scan() override;
-	bool scan() override;
 	void next_transid(const CrawlMap &crawl_map) override;
 	const char *ntoa() const override;
 };
@@ -144,13 +160,7 @@ BeesScanModeLockstep::ntoa() const
 	return "LOCKSTEP";
 }
 
-bool
-BeesScanModeLockstep::do_scan()
-{
-	return true;
-}
-
-bool
+void
 BeesScanModeLockstep::scan()
 {
 	unique_lock<mutex> lock(m_mutex);
@@ -158,7 +168,7 @@ BeesScanModeLockstep::scan()
 	lock.unlock();
 	if (!hold_sorted) {
 		BEESLOGINFO("called Lockstep scan without a sorted map");
-		return false;
+		return;
 	}
 	auto &sorted = *hold_sorted;
 	while (!sorted.empty()) {
@@ -173,10 +183,10 @@ BeesScanModeLockstep::scan()
 				const auto insert_rv = sorted.insert(new_value);
 				THROW_CHECK0(runtime_error, insert_rv.second);
 			}
-			return true;
+			Task::current_task().idle();
+			return;
 		}
 	}
-	return false;
 }
 
 void
@@ -196,6 +206,8 @@ BeesScanModeLockstep::next_transid(const CrawlMap &crawl_map)
 	}
 	unique_lock<mutex> lock(m_mutex);
 	swap(m_sorted, new_map);
+	lock.unlock();
+	start_scan();
 }
 
 /// Scan each subvol in round-robin with no synchronization.
@@ -204,11 +216,10 @@ class BeesScanModeIndependent : public BeesScanMode {
 	using List = list<CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<List> m_subvols;
+	void scan() override;
 public:
 	using BeesScanMode::BeesScanMode;
 	~BeesScanModeIndependent() override {}
-	bool do_scan() override;
-	bool scan() override;
 	void next_transid(const CrawlMap &crawl_map) override;
 	const char *ntoa() const override;
 };
@@ -219,13 +230,7 @@ BeesScanModeIndependent::ntoa() const
 	return "INDEPENDENT";
 }
 
-bool
-BeesScanModeIndependent::do_scan()
-{
-	return true;
-}
-
-bool
+void
 BeesScanModeIndependent::scan()
 {
 	unique_lock<mutex> lock(m_mutex);
@@ -233,7 +238,7 @@ BeesScanModeIndependent::scan()
 	lock.unlock();
 	if (!hold_subvols) {
 		BEESLOGINFO("called Independent scan without a subvol list");
-		return false;
+		return;
 	}
 	auto &subvols = *hold_subvols;
 	while (!subvols.empty()) {
@@ -242,10 +247,10 @@ BeesScanModeIndependent::scan()
 		const bool rv = crawl_batch(this_crawl);
 		if (rv) {
 			subvols.push_back(this_crawl);
-			return true;
+			Task::current_task().idle();
+			return;
 		}
 	}
-	return false;
 }
 
 void
@@ -262,6 +267,8 @@ BeesScanModeIndependent::next_transid(const CrawlMap &crawl_map)
 	}
 	unique_lock<mutex> lock(m_mutex);
 	swap(m_subvols, new_subvols);
+	lock.unlock();
+	start_scan();
 }
 
 /// Scan each subvol completely, in numerical order, before moving on to the next.
@@ -272,11 +279,10 @@ class BeesScanModeSequential : public BeesScanMode {
 	using Map = map<SortKey, CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<Map> m_sorted;
+	void scan() override;
 public:
 	using BeesScanMode::BeesScanMode;
 	~BeesScanModeSequential() override {}
-	bool do_scan() override;
-	bool scan() override;
 	void next_transid(const CrawlMap &crawl_map) override;
 	const char *ntoa() const override;
 };
@@ -287,13 +293,7 @@ BeesScanModeSequential::ntoa() const
 	return "SEQUENTIAL";
 }
 
-bool
-BeesScanModeSequential::do_scan()
-{
-	return true;
-}
-
-bool
+void
 BeesScanModeSequential::scan()
 {
 	unique_lock<mutex> lock(m_mutex);
@@ -301,19 +301,19 @@ BeesScanModeSequential::scan()
 	lock.unlock();
 	if (!hold_sorted) {
 		BEESLOGINFO("called Sequential scan without a sorted map");
-		return false;
+		return;
 	}
 	auto &sorted = *hold_sorted;
 	while (!sorted.empty()) {
 		const auto this_crawl = sorted.begin()->second;
 		const bool rv = crawl_batch(this_crawl);
 		if (rv) {
-			return true;
+			Task::current_task().idle();
+			return;
 		} else {
 			sorted.erase(sorted.begin());
 		}
 	}
-	return false;
 }
 
 void
@@ -333,6 +333,8 @@ BeesScanModeSequential::next_transid(const CrawlMap &crawl_map)
 	}
 	unique_lock<mutex> lock(m_mutex);
 	swap(m_sorted, new_map);
+	lock.unlock();
+	start_scan();
 }
 
 /// Scan the most recently completely scanned subvols first.  Keeps recently added data
@@ -347,11 +349,10 @@ class BeesScanModeRecent : public BeesScanMode {
 	using Map = map<SortKey, list<CrawlMap::mapped_type>>;
 	mutex m_mutex;
 	shared_ptr<Map> m_sorted;
+	void scan() override;
 public:
 	using BeesScanMode::BeesScanMode;
 	~BeesScanModeRecent() override {}
-	bool do_scan() override;
-	bool scan() override;
 	void next_transid(const CrawlMap &crawl_map) override;
 	const char *ntoa() const override;
 };
@@ -362,13 +363,7 @@ BeesScanModeRecent::ntoa() const
 	return "RECENT";
 }
 
-bool
-BeesScanModeRecent::do_scan()
-{
-	return true;
-}
-
-bool
+void
 BeesScanModeRecent::scan()
 {
 	unique_lock<mutex> lock(m_mutex);
@@ -376,7 +371,7 @@ BeesScanModeRecent::scan()
 	lock.unlock();
 	if (!hold_sorted) {
 		BEESLOGINFO("called Recent scan without a sorted map");
-		return false;
+		return;
 	}
 	auto &sorted = *hold_sorted;
 	while (!sorted.empty()) {
@@ -389,11 +384,11 @@ BeesScanModeRecent::scan()
 			const bool rv = crawl_batch(this_crawl);
 			if (rv) {
 				this_list.push_back(this_crawl);
-				return true;
+				Task::current_task().idle();
+				return;
 			}
 		}
 	}
-	return false;
 }
 
 void
@@ -419,6 +414,7 @@ BeesScanModeRecent::next_transid(const CrawlMap &crawl_map)
 	}
 	unique_lock<mutex> lock(m_mutex);
 	swap(m_sorted, new_map);
+	start_scan();
 }
 
 /// Scan the extent tree and submit each extent's references in a single batch.
@@ -445,7 +441,7 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& ma
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& todo);
 
 	void init_tasks();
-	void run_tasks();
+	void scan() override;
 	void map_next_extent(uint64_t subvol);
 	bool crawl_one_extent(const ExtentRef &bior);
 	void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len);
@@ -453,8 +449,6 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& tod
 public:
 	BeesScanModeExtent(const shared_ptr<BeesRoots>& roots, const shared_ptr<BeesContext>& ctx);
 	~BeesScanModeExtent() override {}
-	bool do_scan() override;
-	bool scan() override;
 	void next_transid(const CrawlMap &crawl_map) override;
 	const char *ntoa() const override;
 };
@@ -747,13 +741,16 @@ BeesScanModeExtent::init_tasks()
 }
 
 void
-BeesScanModeExtent::run_tasks()
+BeesScanModeExtent::scan()
 {
 	if (should_throttle()) return;
 
 	unique_lock<mutex> lock(m_mutex);
+	const auto task_map_copy = m_task_map;
+	lock.unlock();
+
 	// Good to go, start everything running
-	for (const auto &i : m_task_map) {
+	for (const auto &i : task_map_copy) {
 		i.second.idle();
 	}
 }
@@ -883,19 +880,6 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 	BEESCOUNT(crawl_done);
 }
 
-bool
-BeesScanModeExtent::do_scan()
-{
-	return false;
-}
-
-bool
-BeesScanModeExtent::scan()
-{
-	// This is now driven directly from next_transid
-	return false;
-}
-
 void
 BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 {
@@ -917,7 +901,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map)
 	}
 
 	// Kick off tasks if they aren't already running
-	run_tasks();
+	start_scan();
 
 	// Swap in the new crawl map with freshly undeferred crawlers
 	auto crawl_map_copy = crawl_map;
@@ -1424,38 +1408,6 @@ BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 	return true;
 }
 
-bool
-BeesRoots::crawl_roots()
-{
-	BEESNOTE("Crawling roots");
-	BEESTRACE("Crawling roots");
-
-	unique_lock<mutex> lock(m_mutex);
-	const auto hold_scanner = m_scanner;
-	lock.unlock();
-
-	THROW_CHECK0(runtime_error, hold_scanner);
-
-	BEESNOTE("Scanning roots in " << hold_scanner->ntoa() << " mode");
-	BEESTRACE("scanning roots in " << hold_scanner->ntoa() << " mode");
-
-	// Clumsy adapter for legacy scan modes
-	if (!hold_scanner->do_scan()) {
-		return false;
-	}
-	if (hold_scanner->scan()) {
-		return true;
-	}
-
-	BEESCOUNT(crawl_done);
-
-	const auto ran_out_time = m_crawl_timer.lap();
-	BEESLOGINFO("crawl_more ran out of data after " << ran_out_time << "s");
-
-	// Do not run again
-	return false;
-}
-
 void
 BeesRoots::clear_caches()
 {
@@ -1470,18 +1422,11 @@ BeesRoots::crawl_thread()
 
 	// Create the Task that does the crawling
 	const auto shared_this = shared_from_this();
-	const auto crawl_task = Task("crawl_more", [shared_this]() {
-		BEESTRACE("crawl_more " << shared_this);
-		if (shared_this->crawl_roots()) {
-			Task::current_task().idle();
-		}
-	});
-	const auto crawl_new = Task("crawl_new", [shared_this, crawl_task]() {
+	const auto crawl_new = Task("crawl_new", [shared_this]() {
 		BEESTRACE("crawl_new " << shared_this);
 		catch_all([&]() {
 			shared_this->insert_new_crawl();
 		});
-		crawl_task.run();
 	});
 
 	// Monitor transid_max and wake up roots when it changes

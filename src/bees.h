@@ -567,7 +567,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	void state_load();
 	ostream &state_to_stream(ostream &os);
 	void state_save();
-	bool crawl_roots();
 	string crawl_state_filename() const;
 	void crawl_state_set_dirty();
 	void crawl_state_erase(const BeesCrawlState &bcs);
