@@ -839,8 +839,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	}
 	lock_seen.unlock();
 
-	// Still hurts benchmarks...or does it?
-	bees_unreadahead(bfr.fd(), bfr.begin(), bfr.size());
+	// Now causes 75% loss of performance in benchmarks
+	// bees_unreadahead(bfr.fd(), bfr.begin(), bfr.size());
 }
 
 shared_ptr<Exclusion>
