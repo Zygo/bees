@@ -127,7 +127,7 @@ BeesContext::get_progress()
 {
 	unique_lock<mutex> lock(m_progress_mtx);
 	if (m_progress_str.empty()) {
-		return "[No progess estimate available]\n";
+		return "[No progress estimate available]\n";
 	}
 	return m_progress_str;
 }
