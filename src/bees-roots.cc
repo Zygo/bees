@@ -1303,8 +1303,6 @@ struct BeesFileCrawl {
 	BeesCrawlState					m_state;
 	/// Currently processed offset in file
 	off_t						m_offset;
-	/// Btrfs file fetcher
-	BtrfsExtentDataFetcher				m_bedf;
 
 	/// Method that does one unit of work for the Task
 	bool crawl_one_extent();
@@ -1316,10 +1314,15 @@ BeesFileCrawl::crawl_one_extent()
 	BEESNOTE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
 	BEESTRACE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
 
+	BtrfsExtentDataFetcher bedf(m_ctx->root_fd());
+	bedf.tree(m_state.m_root);
+	bedf.objectid(m_state.m_objectid);
+	bedf.transid(m_state.m_min_transid);
+
 	// Only one thread can dedupe a file.  btrfs will lock others out.
 	// Inodes are usually full of shared extents, especially in the case of snapshots,
 	// so when we lock an inode, we'll lock the same inode number in all subvols at once.
-	auto inode_mutex = m_ctx->get_inode_mutex(m_bedf.objectid());
+	auto inode_mutex = m_ctx->get_inode_mutex(bedf.objectid());
 	auto inode_lock = inode_mutex->try_lock(Task::current_task());
 	if (!inode_lock) {
 		BEESCOUNT(crawl_deferred_inode);
@@ -1331,12 +1334,12 @@ BeesFileCrawl::crawl_one_extent()
 	// It will mean the file or subvol was deleted or there's metadata corruption,
 	// and we should stop trying to scan the inode in that case.
 	// The calling Task will be aborted.
-	const auto bti = m_bedf.lower_bound(m_offset);
+	const auto bti = bedf.lower_bound(m_offset);
 	if (!bti) {
 		return false;
 	}
 	// Make sure we advance
-	m_offset = max(bti.offset() + m_bedf.block_size(), bti.offset());
+	m_offset = max(bti.offset() + bedf.block_size(), bti.offset());
 	// Check extent item generation is in range
 	const auto gen = bti.file_extent_generation();
 	if (gen < m_state.m_min_transid) {
@@ -1446,11 +1449,7 @@ BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
 		.m_hold = this_crawl->hold_state(this_state),
 		.m_state = this_state,
 		.m_offset = this_range.begin(),
-		.m_bedf = BtrfsExtentDataFetcher(m_ctx->root_fd()),
 	});
-	bfc->m_bedf.tree(subvol);
-	bfc->m_bedf.objectid(inode);
-	bfc->m_bedf.transid(this_state.m_min_transid);
 	BEESNOTE("Starting task " << this_range);
 	Task(task_title, [bfc]() {
 		BEESNOTE("crawl_batch " << bfc->m_hold->get());
