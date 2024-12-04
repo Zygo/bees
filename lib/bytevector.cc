@@ -44,10 +44,10 @@ namespace crucible {
 	}
 
 	ByteVector::value_type&
-	ByteVector::operator[](size_t size) const
+	ByteVector::operator[](size_t index) const
 	{
 		unique_lock<mutex> lock(m_mutex);
-		return m_ptr.get()[size];
+		return m_ptr.get()[index];
 	}
 
 	ByteVector::ByteVector(const ByteVector &that)
