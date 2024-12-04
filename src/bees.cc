@@ -220,7 +220,7 @@ bees_readahead_check(int const fd, off_t const offset, size_t const size)
 {
 	// FIXME: the rest of the code calls this function more often than necessary,
 	// usually back-to-back calls on the same range in a loop.
-	// Simply discard requests that are identical to recent requests from the same thread.
+	// Simply discard requests that are identical to recent requests.
 	const Stat stat_rv(fd);
 	auto tup = make_tuple(offset, size, stat_rv.st_dev, stat_rv.st_ino);
 	static mutex s_recent_mutex;
@@ -242,7 +242,7 @@ static
 void
 bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 {
-	if (!bees_readahead_check(fd, size, offset)) return;
+	if (!bees_readahead_check(fd, offset, size)) return;
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
@@ -278,7 +278,7 @@ static mutex s_only_one;
 void
 bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2)
 {
-	if (!bees_readahead_check(fd, size, offset) && !bees_readahead_check(fd2, offset2, size2)) return;
+	if (!bees_readahead_check(fd, offset, size) && !bees_readahead_check(fd2, offset2, size2)) return;
 	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size) << ","
 		<< "\n\t" << name_fd(fd2) << " offset " << to_hex(offset2) << " len " << pretty(size2));
 	unique_lock<mutex> m_lock(s_only_one);
@@ -289,7 +289,7 @@ bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, s
 void
 bees_readahead(int const fd, const off_t offset, const size_t size)
 {
-	if (!bees_readahead_check(fd, size, offset)) return;
+	if (!bees_readahead_check(fd, offset, size)) return;
 	BEESNOTE("waiting to readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	unique_lock<mutex> m_lock(s_only_one);
 	bees_readahead_nolock(fd, offset, size);
