@@ -243,8 +243,6 @@ namespace crucible {
 		unsigned long available() const;
 	};
 
-	template<class V> ostream &hexdump(ostream &os, const V &v);
-
 	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v3 {
 		BtrfsIoctlFsInfoArgs();
 		void do_ioctl(int fd);
