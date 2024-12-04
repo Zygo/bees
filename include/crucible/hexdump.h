@@ -12,12 +12,14 @@ namespace crucible {
 	ostream &
 	hexdump(ostream &os, const V &v)
 	{
-		os << "V { size = " << v.size() << ", data:\n";
-		for (size_t i = 0; i < v.size(); i += 8) {
+		const auto v_size = v.size();
+		const uint8_t* const v_data = reinterpret_cast<uint8_t*>(v.data());
+		os << "V { size = " << v_size << ", data:\n";
+		for (size_t i = 0; i < v_size; i += 8) {
 			string hex, ascii;
 			for (size_t j = i; j < i + 8; ++j) {
-				if (j < v.size()) {
-					uint8_t c = v[j];
+				if (j < v_size) {
+					const uint8_t c = v_data[j];
 					char buf[8];
 					sprintf(buf, "%02x ", c);
 					hex += buf;
