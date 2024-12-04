@@ -183,7 +183,6 @@ namespace crucible {
 
 	ostream&
 	operator<<(ostream &os, const ByteVector &bv) {
-		unique_lock<mutex> lock(bv.m_mutex);
 		hexdump(os, bv);
 		return os;
 	}

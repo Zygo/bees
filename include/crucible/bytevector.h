@@ -55,7 +55,6 @@ namespace crucible {
 		Pointer m_ptr;
 		size_t m_size = 0;
 		mutable mutex m_mutex;
-	friend ostream & operator<<(ostream &os, const ByteVector &bv);
 	};
 
 	template <class T>
@@ -74,6 +73,8 @@ namespace crucible {
 		THROW_CHECK2(out_of_range, size(), sizeof(T), size() >= sizeof(T));
 		return reinterpret_cast<T*>(data());
 	}
+
+	ostream& operator<<(ostream &os, const ByteVector &bv);
 }
 
 #endif // _CRUCIBLE_BYTEVECTOR_H_
