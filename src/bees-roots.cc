@@ -1039,9 +1039,10 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		string eta_stamp = "-";
 		string eta_pretty = "-";
 		const auto &deferred_finished = deferred_map.at(subvol);
-		const bool deferred = deferred_finished.first;
 		const bool finished = deferred_finished.second;
-		if (time_so_far > 1 && bytenr_percent > 0 && !finished) {
+		if (finished) {
+			eta_stamp = "finished";
+		} else if (time_so_far > 1 && bytenr_percent > 0) {
 			const time_t eta_duration = time_so_far / (bytenr_percent / 100);
 			const time_t eta_time = eta_duration + now;
 			struct tm ltm = { 0 };
@@ -1055,8 +1056,8 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		const auto &mma = mes.m_map.at(subvol);
 		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
 		const auto pos_scaled_text = mes_sample_size_ok ? pretty(bytenr_offset * mma_ratio) : "-";
-		const auto pos_text = Table::Text(deferred ? "deferred" : pos_scaled_text);
-		const auto pct_text = Table::Text(finished ? "finished" : astringprintf("%.4f%%", bytenr_percent));
+		const auto pos_text = Table::Text(pos_scaled_text);
+		const auto pct_text = Table::Text(astringprintf("%.4f%%", bytenr_percent));
 		const auto size_text = Table::Text( mes_sample_size_ok ? pretty(fs_size * mma_ratio) : "-");
 		eta.insert_row(Table::endpos, vector<Table::Content> {
 			pos_text,
