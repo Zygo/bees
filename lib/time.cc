@@ -98,12 +98,16 @@ namespace crucible {
 		m_rate(rate),
 		m_burst(burst)
 	{
+		THROW_CHECK1(invalid_argument, m_rate, m_rate > 0);
+		THROW_CHECK1(invalid_argument, m_burst, m_burst >= 0);
 	}
 
 	RateLimiter::RateLimiter(double rate) :
 		m_rate(rate),
 		m_burst(rate)
 	{
+		THROW_CHECK1(invalid_argument, m_rate, m_rate > 0);
+		THROW_CHECK1(invalid_argument, m_burst, m_burst >= 0);
 	}
 
 	void
@@ -119,6 +123,7 @@ namespace crucible {
 	double
 	RateLimiter::sleep_time(double cost)
 	{
+		THROW_CHECK1(invalid_argument, m_rate, m_rate > 0);
 		borrow(cost);
 		unique_lock<mutex> lock(m_mutex);
 		update_tokens();
@@ -152,6 +157,21 @@ namespace crucible {
 	{
 		unique_lock<mutex> lock(m_mutex);
 		m_tokens -= cost;
+	}
+
+	void
+	RateLimiter::rate(double const new_rate)
+	{
+		THROW_CHECK1(invalid_argument, new_rate, new_rate > 0);
+		unique_lock<mutex> lock(m_mutex);
+		m_rate = new_rate;
+	}
+
+	double
+	RateLimiter::rate() const
+	{
+		unique_lock<mutex> lock(m_mutex);
+		return m_rate;
 	}
 
 	RateEstimator::RateEstimator(double min_delay, double max_delay) :
@@ -200,6 +220,13 @@ namespace crucible {
 		} else {
 			return update_unlocked(m_last_count);
 		}
+	}
+
+	void
+	RateEstimator::increment(const uint64_t more)
+	{
+		unique_lock<mutex> lock(m_mutex);
+		return update_unlocked(m_last_count + more);
 	}
 
 	uint64_t

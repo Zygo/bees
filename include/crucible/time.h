@@ -34,7 +34,7 @@ namespace crucible {
 		double	m_rate;
 		double	m_burst;
 		double  m_tokens = 0.0;
-		mutex	m_mutex;
+		mutable mutex m_mutex;
 
 		void update_tokens();
 		RateLimiter() = delete;
@@ -45,6 +45,8 @@ namespace crucible {
 		double sleep_time(double cost = 1.0);
 		bool is_ready();
 		void borrow(double cost = 1.0);
+		void rate(double new_rate);
+		double rate() const;
 	};
 
 	class RateEstimator {
@@ -87,6 +89,9 @@ namespace crucible {
 
 		// Read count
 		uint64_t count() const;
+
+		/// Increment count (like update(count() + more), but atomic)
+		void increment(uint64_t more = 1);
 
 		// Convert counts to chrono types
 		chrono::high_resolution_clock::time_point time_point(uint64_t absolute_count) const;
