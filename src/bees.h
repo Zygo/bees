@@ -550,9 +550,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	Timer					m_crawl_timer;
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
-	bool					m_workaround_btrfs_send = false;
-
 	RateEstimator				m_transid_re;
+	bool					m_workaround_btrfs_send = false;
 
 	shared_ptr<BeesScanMode>		m_scanner;
 
@@ -889,6 +888,7 @@ string pretty(double d);
 void bees_readahead(int fd, off_t offset, size_t size);
 void bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2);
 void bees_unreadahead(int fd, off_t offset, size_t size);
+void bees_throttle(double time_used, const char *context);
 string format_time(time_t t);
 
 #endif

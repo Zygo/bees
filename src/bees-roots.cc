@@ -605,8 +605,10 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 		} else {
 			BEESCOUNT(extent_fail);
 		}
+		const auto resolve_age = resolve_timer.age();
 
-		BEESCOUNTADD(extent_ms, resolve_timer.age() * 1000);
+		BEESCOUNTADD(extent_ms, resolve_age * 1000);
+		bees_throttle(resolve_age, "extent_map");
 	}
 
         const size_t rv_count = log_ino.m_iors.size();

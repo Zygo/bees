@@ -20,7 +20,6 @@
 using namespace crucible;
 using namespace std;
 
-
 BeesFdCache::BeesFdCache(shared_ptr<BeesContext> ctx) :
 	m_ctx(ctx)
 {
@@ -214,6 +213,7 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 {
 	// TOOLONG and NOTE can retroactively fill in the filename details, but LOG can't
 	BEESNOTE("dedup " << brp_in);
+	BEESTRACE("dedup " << brp_in);
 
 	if (is_root_ro(brp_in.second.fid().root())) {
 		// BEESLOGDEBUG("WORKAROUND: dst root " << (brp_in.second.fid().root()) << " is read-only);
@@ -262,6 +262,7 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 				BEESLOGWARN("NO Dedup! " << brp);
 			}
 
+			bees_throttle(dedup_timer.age(), "dedup");
 			return rv;
 		} catch (const std::system_error &e) {
 			if (e.code().value() == EAGAIN) {
@@ -989,6 +990,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	Timer resolve_timer;
 
 	struct rusage usage_before;
+	struct rusage usage_after;
 	{
 		BEESNOTE("waiting to resolve addr " << addr << " with LOGICAL_INO");
 		const auto lock = MultiLocker::get_lock("logical_ino");
@@ -1005,12 +1007,11 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 		} else {
 			BEESCOUNT(resolve_fail);
 		}
-		BEESCOUNTADD(resolve_ms, resolve_timer.age() * 1000);
+		DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_after));
+		const auto resolve_timer_age = resolve_timer.age();
+		BEESCOUNTADD(resolve_ms, resolve_timer_age * 1000);
+		bees_throttle(resolve_timer_age, "resolve_addr");
 	}
-
-	// Again!
-	struct rusage usage_after;
-	DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_after));
 
 	const double sys_usage_delta =
 		(usage_after.ru_stime.tv_sec + usage_after.ru_stime.tv_usec / 1000000.0) -

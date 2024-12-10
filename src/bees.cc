@@ -305,6 +305,48 @@ bees_unreadahead(int const fd, off_t offset, size_t size)
 	BEESCOUNTADD(readahead_unread_ms, unreadahead_timer.age() * 1000);
 }
 
+static double bees_throttle_factor = 1.0;
+
+void
+bees_throttle(const double time_used, const char *const context)
+{
+	static mutex s_mutex;
+	unique_lock<mutex> throttle_lock(s_mutex);
+	struct time_pair {
+		double time_used = 0;
+		double time_count = 0;
+		double longest_sleep_time = 0;
+	};
+	static map<string, time_pair> s_time_map;
+	auto &this_time = s_time_map[context];
+	auto &this_time_used = this_time.time_used;
+	auto &this_time_count = this_time.time_count;
+	auto &longest_sleep_time = this_time.longest_sleep_time;
+	this_time_used += time_used;
+	++this_time_count;
+	// Keep the timing data fresh
+	static Timer s_fresh_timer;
+	if (s_fresh_timer.age() > 300) {
+		s_fresh_timer.reset();
+		this_time_count *= 0.9;
+		this_time_used *= 0.9;
+	}
+	// Wait for enough data to calculate rates
+	if (this_time_used < 1.0 || this_time_count < 1.0) return;
+	const auto avg_time = this_time_used / this_time_count;
+	const auto sleep_time = min(60.0, bees_throttle_factor * avg_time - time_used);
+	if (sleep_time <= 0) {
+		return;
+	}
+	if (sleep_time > longest_sleep_time) {
+		BEESLOGDEBUG(context << ": throttle delay " << sleep_time << " s, time used " << time_used << " s, avg time " << avg_time << " s");
+		longest_sleep_time = sleep_time;
+	}
+	throttle_lock.unlock();
+	BEESNOTE(context << ": throttle delay " << sleep_time << " s, time used " << time_used << " s, avg time " << avg_time << " s");
+	nanosleep(sleep_time);
+}
+
 thread_local random_device bees_random_device;
 thread_local uniform_int_distribution<default_random_engine::result_type> bees_random_seed_dist(
 	numeric_limits<default_random_engine::result_type>::min(),
@@ -401,6 +443,8 @@ BeesTempFile::resize(off_t offset)
 
 	// Count time spent here
 	BEESCOUNTADD(tmp_resize_ms, resize_timer.age() * 1000);
+
+	bees_throttle(resize_timer.age(), "tmpfile_resize");
 }
 
 void
@@ -535,6 +579,8 @@ BeesTempFile::make_copy(const BeesFileRange &src)
 		dst_p += len;
 	}
 	BEESCOUNTADD(tmp_copy_ms, copy_timer.age() * 1000);
+
+	bees_throttle(copy_timer.age(), "tmpfile_copy");
 
 	BEESCOUNT(tmp_copy);
 	return rv;
