@@ -645,6 +645,9 @@ namespace crucible {
 		unique_lock<mutex> lock(m_mutex);
 		m_paused = paused;
 		m_condvar.notify_all();
+		if (!m_paused) {
+			start_threads_nolock();
+		}
 		lock.unlock();
 	}
 
