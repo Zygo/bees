@@ -781,7 +781,7 @@ namespace crucible {
 			++s_calls;
 			if (rv != 0 && errno == ENOENT) {
 				// If we are searching a tree that is deleted or no longer exists, just return an empty list
-				nr_items = 0;
+				ioctl_ptr->key.nr_items = 0;
 				break;
 			}
 			if (rv != 0 && errno != EOVERFLOW) {
