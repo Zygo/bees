@@ -1078,7 +1078,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		Table::Text("transid"),
 		Table::Number(m_roots->transid_max()),
 		Table::Text("todo"),
-		Table::Text("ETA"),
+		Table::Text("inaccurate ETA"),
 	});
 	const auto dash_fill = Table::Fill('-');
 	eta.insert_row(1, vector<Table::Content>(eta.cols().size(), dash_fill));
