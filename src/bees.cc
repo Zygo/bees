@@ -574,19 +574,23 @@ operator<<(ostream &os, const siginfo_t &si)
 
 static sigset_t new_sigset, old_sigset;
 
+static
 void
-block_term_signal()
+block_signals()
 {
 	BEESLOGDEBUG("Masking signals");
 
 	DIE_IF_NON_ZERO(sigemptyset(&new_sigset));
 	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGTERM));
 	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGINT));
+	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGUSR1));
+	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGUSR2));
 	DIE_IF_NON_ZERO(sigprocmask(SIG_BLOCK, &new_sigset, &old_sigset));
 }
 
+static
 void
-wait_for_term_signal()
+wait_for_signals()
 {
 	BEESNOTE("waiting for signals");
 	BEESLOGDEBUG("Waiting for signals...");
@@ -603,14 +607,28 @@ wait_for_term_signal()
 			THROW_ERRNO("sigwaitinfo errno = " << errno);
 		} else {
 			BEESLOGNOTICE("Received signal " << rv << " info " << info);
-			// Unblock so we die immediately if signalled again
-			DIE_IF_NON_ZERO(sigprocmask(SIG_BLOCK, &old_sigset, &new_sigset));
-			break;
+			// If SIGTERM or SIGINT, unblock so we die immediately if signalled again
+			switch (info.si_signo) {
+				case SIGUSR1:
+					BEESLOGNOTICE("Received SIGUSR1 - pausing workers");
+					TaskMaster::pause(true);
+					break;
+				case SIGUSR2:
+					BEESLOGNOTICE("Received SIGUSR2 - unpausing workers");
+					TaskMaster::pause(false);
+					break;
+				case SIGTERM:
+				case SIGINT:
+				default:
+					DIE_IF_NON_ZERO(sigprocmask(SIG_BLOCK, &old_sigset, &new_sigset));
+					BEESLOGDEBUG("Signal catcher exiting");
+					return;
+			}
 		}
 	}
-	BEESLOGDEBUG("Signal catcher exiting");
 }
 
+static
 int
 bees_main(int argc, char *argv[])
 {
@@ -634,7 +652,7 @@ bees_main(int argc, char *argv[])
 
 	// Have to block signals now before we create a bunch of threads
 	// so the threads will also have the signals blocked.
-	block_term_signal();
+	block_signals();
 
 	// Create a context so we can apply configuration to it
 	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
@@ -808,7 +826,7 @@ bees_main(int argc, char *argv[])
 	bc->start();
 
 	// Now we just wait forever
-	wait_for_term_signal();
+	wait_for_signals();
 
 	// Shut it down
 	bc->stop();
