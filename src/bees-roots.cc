@@ -1480,6 +1480,15 @@ BeesRoots::clear_caches()
 }
 
 void
+BeesRoots::wait_for_transid(const uint64_t count)
+{
+	const auto now_transid = transid_max_nocache();
+	const auto target_transid = now_transid + count;
+	BEESLOGDEBUG("Waiting for transid " << target_transid << ", current transid is " << now_transid);
+	m_transid_re.wait_until(target_transid);
+}
+
+void
 BeesRoots::crawl_thread()
 {
 	BEESNOTE("creating crawl task");

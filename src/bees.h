@@ -552,6 +552,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	BeesThread				m_writeback_thread;
 	bool					m_workaround_btrfs_send = false;
 
+	RateEstimator				m_transid_re;
+
 	shared_ptr<BeesScanMode>		m_scanner;
 
 	mutex					m_tmpfiles_mutex;
@@ -613,6 +615,8 @@ public:
 
 	uint64_t transid_min();
 	uint64_t transid_max();
+
+	void wait_for_transid(const uint64_t count);
 };
 
 struct BeesHash {
