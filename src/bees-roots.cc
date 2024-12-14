@@ -1280,6 +1280,9 @@ BeesRoots::transid_max_nocache()
 	THROW_CHECK1(runtime_error, rv, rv > 0);
 	// transid must be less than max, or we did something very wrong
 	THROW_CHECK1(runtime_error, rv, rv < numeric_limits<uint64_t>::max());
+
+	// Update the rate estimator
+	m_transid_re.update(rv);
 	return rv;
 }
 
@@ -1497,7 +1500,8 @@ BeesRoots::crawl_thread()
 		BEESTRACE("Measure current transid");
 		catch_all([&]() {
 			BEESTRACE("calling transid_max_nocache");
-			m_transid_re.update(transid_max_nocache());
+			// Will update m_transid_re as side effect
+			transid_max_nocache();
 		});
 
 		const auto new_transid = m_transid_re.count();
@@ -1682,7 +1686,7 @@ BeesRoots::start()
 	m_crawl_thread.exec([&]() {
 		// Measure current transid before creating any crawlers
 		catch_all([&]() {
-			m_transid_re.update(transid_max_nocache());
+			transid_max_nocache();
 		});
 
 		// Make sure we have a full complement of crawlers
