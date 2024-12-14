@@ -550,7 +550,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	Timer					m_crawl_timer;
 	BeesThread				m_crawl_thread;
 	BeesThread				m_writeback_thread;
-	RateEstimator				m_transid_re;
 	bool					m_workaround_btrfs_send = false;
 
 	shared_ptr<BeesScanMode>		m_scanner;
@@ -576,7 +575,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	void writeback_thread();
 	uint64_t next_root(uint64_t root = 0);
 	void current_state_set(const BeesCrawlState &bcs);
-	RateEstimator& transid_re();
 	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
 

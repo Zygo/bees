@@ -2030,12 +2030,6 @@ BeesRoots::open_root_ino(uint64_t root, uint64_t ino)
 	return m_ctx->fd_cache()->open_root_ino(root, ino);
 }
 
-RateEstimator &
-BeesRoots::transid_re()
-{
-	return m_transid_re;
-}
-
 void
 BeesRoots::insert_tmpfile(Fd fd)
 {
