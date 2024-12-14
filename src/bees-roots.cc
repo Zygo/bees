@@ -645,7 +645,7 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 			bedf.objectid(i.m_inum);
 			const auto bti = bedf.at(i.m_offset);
 			if (!bti) {
-				BEESLOGDEBUG("No ref for extent " << to_hex(bytenr) << " at root " << i.m_root << " ino " << i.m_inum << " offset " << to_hex(i.m_offset));
+				// BEESLOGDEBUG("No ref for extent " << to_hex(bytenr) << " at root " << i.m_root << " ino " << i.m_inum << " offset " << to_hex(i.m_offset));
 				BEESCOUNT(extent_ref_missing);
 				return;
 			}
