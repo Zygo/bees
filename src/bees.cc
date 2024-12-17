@@ -716,20 +716,25 @@ bees_main(int argc, char *argv[])
 	BeesRoots::ScanMode root_scan_mode = BeesRoots::SCAN_MODE_EXTENT;
 
 	// Configure getopt_long
+	// Options with no short form
+	enum {
+		BEES_OPT_THROTTLE_FACTOR = 256,
+	};
 	static const struct option long_options[] = {
-		{ "thread-factor",         required_argument, NULL, 'C' },
-		{ "thread-min",            required_argument, NULL, 'G' },
-		{ "strip-paths",           no_argument,       NULL, 'P' },
-		{ "no-timestamps",         no_argument,       NULL, 'T' },
-		{ "workaround-btrfs-send", no_argument,       NULL, 'a' },
-		{ "thread-count",          required_argument, NULL, 'c' },
-		{ "loadavg-target",        required_argument, NULL, 'g' },
-		{ "help",                  no_argument,       NULL, 'h' },
-		{ "scan-mode",             required_argument, NULL, 'm' },
-		{ "absolute-paths",        no_argument,       NULL, 'p' },
-		{ "timestamps",            no_argument,       NULL, 't' },
-		{ "verbose",               required_argument, NULL, 'v' },
-		{ 0, 0, 0, 0 },
+		{ .name = "thread-factor",         .has_arg = required_argument, .val = 'C' },
+		{ .name = "throttle-factor",       .has_arg = required_argument, .val = BEES_OPT_THROTTLE_FACTOR },
+		{ .name = "thread-min",            .has_arg = required_argument, .val = 'G' },
+		{ .name = "strip-paths",           .has_arg = no_argument,       .val = 'P' },
+		{ .name = "no-timestamps",         .has_arg = no_argument,       .val = 'T' },
+		{ .name = "workaround-btrfs-send", .has_arg = no_argument,       .val = 'a' },
+		{ .name = "thread-count",          .has_arg = required_argument, .val = 'c' },
+		{ .name = "loadavg-target",        .has_arg = required_argument, .val = 'g' },
+		{ .name = "help",                  .has_arg = no_argument,       .val = 'h' },
+		{ .name = "scan-mode",             .has_arg = required_argument, .val = 'm' },
+		{ .name = "absolute-paths",        .has_arg = no_argument,       .val = 'p' },
+		{ .name = "timestamps",            .has_arg = no_argument,       .val = 't' },
+		{ .name = "verbose",               .has_arg = required_argument, .val = 'v' },
+		{ 0 },
 	};
 
 	// Build getopt_long's short option list from the long_options table.
@@ -765,6 +770,9 @@ bees_main(int argc, char *argv[])
 
 			case 'C':
 				thread_factor = stod(optarg);
+				break;
+			case BEES_OPT_THROTTLE_FACTOR:
+				bees_throttle_factor = stod(optarg);
 				break;
 			case 'G':
 				thread_min = stoul(optarg);
@@ -850,6 +858,8 @@ bees_main(int argc, char *argv[])
 
 	BEESLOGNOTICE("setting worker thread pool maximum size to " << thread_count);
 	TaskMaster::set_thread_count(thread_count);
+
+	BEESLOGNOTICE("setting throttle factor to " << bees_throttle_factor);
 
 	// Set root path
 	string root_path = argv[optind++];

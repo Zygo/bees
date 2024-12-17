@@ -12,6 +12,7 @@ Load management options:
     -C, --thread-factor   Worker thread factor (default 1)
     -G, --thread-min      Minimum worker thread count (default 0)
     -g, --loadavg-target  Target load average for worker threads (default none)
+        --throttle-factor Idle time between operations (default 1.0)
 
 Filesystem tree traversal options:
     -m, --scan-mode       Scanning mode (0..4, default 4)
