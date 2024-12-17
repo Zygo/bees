@@ -819,7 +819,7 @@ bees_main(int argc, char *argv[])
 	}
 
 	if (optind + 1 != argc) {
-		BEESLOGERR("Only one filesystem path per bees process");
+		BEESLOGERR("Exactly one filesystem path required");
 		return EXIT_FAILURE;
 	}
 
