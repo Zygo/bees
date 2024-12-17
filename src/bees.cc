@@ -735,10 +735,10 @@ bees_main(int argc, char *argv[])
 	// Build getopt_long's short option list from the long_options table.
 	// While we're at it, make sure we didn't duplicate any options.
 	string getopt_list;
-	set<decltype(option::val)> option_vals;
+	map<decltype(option::val), string> option_vals;
 	for (const struct option *op = long_options; op->val; ++op) {
-		THROW_CHECK1(runtime_error, op->val, !option_vals.count(op->val));
-		option_vals.insert(op->val);
+		const auto ins_rv = option_vals.insert(make_pair(op->val, op->name));
+		THROW_CHECK1(runtime_error, op->val, ins_rv.second);
 		if ((op->val & 0xff) != op->val) {
 			continue;
 		}
@@ -749,16 +749,17 @@ bees_main(int argc, char *argv[])
 	}
 
 	// Parse options
-	int c;
 	while (true) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, getopt_list.c_str(), long_options, &option_index);
+		const auto c = getopt_long(argc, argv, getopt_list.c_str(), long_options, &option_index);
 		if (-1 == c) {
 			break;
 		}
 
-		BEESLOGDEBUG("Parsing option '" << static_cast<char>(c) << "'");
+		// getopt_long should have weeded out any invalid options,
+		// so we can go ahead and throw here
+		BEESLOGDEBUG("Parsing option '" << option_vals.at(c) << "'");
 
 		switch (c) {
 
