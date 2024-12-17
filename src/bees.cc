@@ -814,7 +814,7 @@ bees_main(int argc, char *argv[])
 			case 'h':
 			default:
 				do_cmd_help(argv);
-				return EXIT_FAILURE;
+				return EXIT_SUCCESS;
 		}
 	}
 
