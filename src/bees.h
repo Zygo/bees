@@ -78,10 +78,10 @@ const int BEES_PROGRESS_INTERVAL = BEES_STATS_INTERVAL;
 const int BEES_STATUS_INTERVAL = 1;
 
 // Number of file FDs to cache when not in active use
-const size_t BEES_FILE_FD_CACHE_SIZE = 32768;
+const size_t BEES_FILE_FD_CACHE_SIZE = 524288;
 
 // Number of root FDs to cache when not in active use
-const size_t BEES_ROOT_FD_CACHE_SIZE = 4096;
+const size_t BEES_ROOT_FD_CACHE_SIZE = 65536;
 
 // Number of FDs to open (rlimit)
 const size_t BEES_OPEN_FILE_LIMIT = BEES_FILE_FD_CACHE_SIZE + BEES_ROOT_FD_CACHE_SIZE + 100;
