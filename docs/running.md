@@ -75,9 +75,8 @@ in the shell script that launches `bees`:
         schedtool -D -n20 $$
         ionice -c3 -p $$
 
-You can also use the [`--loadavg-target` and `--thread-min`
-options](options.md) to further control the impact of bees on the rest
-of the system.
+You can also use the [load management options](options.md) to further
+control the impact of bees on the rest of the system.
 
 Let the bees fly:
 

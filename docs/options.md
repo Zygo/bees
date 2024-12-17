@@ -36,6 +36,33 @@
 
  Has no effect unless `--loadavg-target` is used to specify a target load.
 
+* `--throttle-factor FACTOR`
+
+ In order to avoid saturating btrfs deferred work queues, bees tracks
+ the time that operations with delayed effect (dedupe and tmpfile copy)
+ and operations with long run times (`LOGICAL_INO`) run.  If an operation
+ finishes before the average run time for that operation, bees will
+ sleep for the remainder of the average run time, so that operations
+ are submitted to btrfs at a rate similar to the rate that btrfs can
+ complete them.
+
+ The `FACTOR` is multiplied by the average run time for each operation
+ to calculate the target delay time.
+
+ `FACTOR` 0 adds no delays.  bees will attempt to saturate btrfs delayed
+ work queues as quickly as possible, which may impact other processes
+ on the same filesystem, or even slow down bees itself.
+
+ `FACTOR` 1.0 is the default, and will attempt to keep btrfs delayed work
+ queues filled at a steady average rate.
+
+ `FACTOR` more than 1.0 will add delays longer than the average
+ run time (e.g. 10.0 will delay all operations that take less than 10x
+ the average run time).  High values of `FACTOR` may be desirable when
+ using bees with other applications on the same filesystem.
+
+ The maximum delay per operation is 60 seconds.
+
 ## Filesystem tree traversal options
 
 * `--scan-mode MODE` or `-m`
