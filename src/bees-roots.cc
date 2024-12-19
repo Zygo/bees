@@ -970,7 +970,9 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 			.first_bytenr = offset,
 			.first_total = fs_size,
 		};
-		if (bti.chunk_type() & (BTRFS_BLOCK_GROUP_METADATA | BTRFS_BLOCK_GROUP_SYSTEM)) {
+		// Mixed-bg filesystems have block groups that are data _and_ metadata.
+		// Block groups that are _only_ metadata should be filtered out.
+		if (0 == (bti.chunk_type() & BTRFS_BLOCK_GROUP_DATA)) {
 			continue;
 		}
 		fs_size += chunk_length;
