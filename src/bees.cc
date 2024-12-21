@@ -326,7 +326,7 @@ bees_throttle(const double time_used, const char *const context)
 	++this_time_count;
 	// Keep the timing data fresh
 	static Timer s_fresh_timer;
-	if (s_fresh_timer.age() > 300) {
+	if (s_fresh_timer.age() > 60) {
 		s_fresh_timer.reset();
 		this_time_count *= 0.9;
 		this_time_used *= 0.9;
