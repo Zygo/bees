@@ -241,7 +241,7 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 	BEESCOUNT(dedup_try);
 
 	BEESNOTE("waiting to dedup " << brp);
-	const auto lock = MultiLocker::get_lock("dedupe");
+	auto lock = MultiLocker::get_lock("dedupe");
 
 	BEESLOGINFO("dedup: src " << pretty(brp.first.size())  << " [" << to_hex(brp.first.begin())  << ".." << to_hex(brp.first.end())  << "] {" << first_addr  << "} " << name_fd(brp.first.fd()) << "\n"
 		 << "       dst " << pretty(brp.second.size()) << " [" << to_hex(brp.second.begin()) << ".." << to_hex(brp.second.end()) << "] {" << second_addr << "} " << name_fd(brp.second.fd()));
@@ -262,6 +262,7 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 				BEESLOGWARN("NO Dedup! " << brp);
 			}
 
+			lock.reset();
 			bees_throttle(dedup_timer.age(), "dedup");
 			return rv;
 		} catch (const std::system_error &e) {
@@ -993,7 +994,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 	struct rusage usage_after;
 	{
 		BEESNOTE("waiting to resolve addr " << addr << " with LOGICAL_INO");
-		const auto lock = MultiLocker::get_lock("logical_ino");
+		auto lock = MultiLocker::get_lock("logical_ino");
 
 		// Get this thread's system CPU usage
 		DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_before));
@@ -1010,6 +1011,7 @@ BeesContext::resolve_addr_uncached(BeesAddress addr)
 		DIE_IF_MINUS_ONE(getrusage(RUSAGE_THREAD, &usage_after));
 		const auto resolve_timer_age = resolve_timer.age();
 		BEESCOUNTADD(resolve_ms, resolve_timer_age * 1000);
+		lock.reset();
 		bees_throttle(resolve_timer_age, "resolve_addr");
 	}
 

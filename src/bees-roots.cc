@@ -592,7 +592,7 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 
 	{
 		BEESNOTE("waiting to create extent map for " << to_hex(bytenr) << " with LOGICAL_INO");
-		const auto lock = MultiLocker::get_lock("logical_ino");
+		auto lock = MultiLocker::get_lock("logical_ino");
 
 		BEESNOTE("Resolving bytenr " << to_hex(bytenr) << " refs " << log_ino.m_iors.size());
 		BEESTOOLONG("Resolving bytenr " << to_hex(bytenr) << " refs " << log_ino.m_iors.size());
@@ -608,6 +608,7 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 		const auto resolve_age = resolve_timer.age();
 
 		BEESCOUNTADD(extent_ms, resolve_age * 1000);
+		lock.reset();
 		bees_throttle(resolve_age, "extent_map");
 	}
 
