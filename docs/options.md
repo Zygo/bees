@@ -49,12 +49,13 @@
  The `FACTOR` is multiplied by the average run time for each operation
  to calculate the target delay time.
 
- `FACTOR` 0 adds no delays.  bees will attempt to saturate btrfs delayed
- work queues as quickly as possible, which may impact other processes
- on the same filesystem, or even slow down bees itself.
+ `FACTOR` 0 is the default, which adds no delays.  bees will attempt
+ to saturate btrfs delayed work queues as quickly as possible, which
+ may impact other processes on the same filesystem, or even slow down
+ bees itself.
 
- `FACTOR` 1.0 is the default, and will attempt to keep btrfs delayed work
- queues filled at a steady average rate.
+ `FACTOR` 1.0 will attempt to keep btrfs delayed work queues filled at
+ a steady average rate.
 
  `FACTOR` more than 1.0 will add delays longer than the average
  run time (e.g. 10.0 will delay all operations that take less than 10x
