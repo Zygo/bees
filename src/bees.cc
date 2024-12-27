@@ -305,7 +305,7 @@ bees_unreadahead(int const fd, off_t offset, size_t size)
 	BEESCOUNTADD(readahead_unread_ms, unreadahead_timer.age() * 1000);
 }
 
-static double bees_throttle_factor = 1.0;
+static double bees_throttle_factor = 0.0;
 
 void
 bees_throttle(const double time_used, const char *const context)
