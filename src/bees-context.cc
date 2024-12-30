@@ -358,6 +358,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	BEESTRACE("scan bfr " << bfr);
 	BEESCOUNT(scan_extent);
 
+	Timer one_timer;
+
 	// We keep moving this method around
 	auto m_ctx = shared_from_this();
 
@@ -854,7 +856,8 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			<< pretty(e.size()) << " "
 			<< dedupe_list.size() << "d" << copy_list.size() << "c"
 			<< ((bytes_zeroed + BLOCK_SIZE_SUMS - 1) / BLOCK_SIZE_SUMS) << "p"
-			<< (extent_compressed ? "z {" : " {")
+			<< (extent_compressed ? "z " : " ")
+			<< one_timer << "s {"
 			<< to_hex(e.bytenr()) << "+" << to_hex(e.offset()) << "} "
 			<< to_hex(e.begin()) << " [" << bar << "] " << to_hex(e.end())
 			<< ' ' << name_fd(bfr.fd())
