@@ -130,7 +130,7 @@ BeesScanMode::start_scan()
 			st->scan();
 		});
 	}
-	m_scan_task.idle();
+	m_scan_task.run();
 }
 
 bool
@@ -768,7 +768,7 @@ BeesScanModeExtent::scan()
 
 	// Good to go, start everything running
 	for (const auto &i : task_map_copy) {
-		i.second.idle();
+		i.second.run();
 	}
 }
 
@@ -901,7 +901,7 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 				<< " time " << crawl_time << " subvol " << subvol);
 		}
 
-		// We did something!  Get in line to run again
+		// We did something!  Get in line to run again (but don't preempt work already queued)
 		Task::current_task().idle();
 		return;
 	}
