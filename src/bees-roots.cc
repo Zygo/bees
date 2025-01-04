@@ -910,6 +910,18 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 	BEESCOUNT(crawl_done);
 }
 
+static
+string
+strf_localtime(const time_t &when)
+{
+	struct tm ltm = { 0 };
+	DIE_IF_ZERO(localtime_r(&when, &ltm));
+
+	char buf[100] = { 0 };
+	DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &ltm));
+	return buf;
+}
+
 void
 BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 {
@@ -1000,6 +1012,18 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 
 	// Report on progress using extent bytenr map
 	Table::Table eta;
+	eta.insert_row(0, vector<Table::Content> {
+		Table::Text("extsz"),
+		Table::Text("datasz"),
+		Table::Text("point"),
+		Table::Text("gen_min"),
+		Table::Text("gen_max"),
+		Table::Text("this cycle start"),
+		Table::Text("ctime"),
+		Table::Text("next cycle ETA"),
+	});
+	const auto dash_fill = Table::Fill('-');
+	eta.insert_row(1, vector<Table::Content>(eta.cols().size(), dash_fill));
 	for (const auto &i : s_magic_crawl_map) {
 		const auto &subvol = i.first;
 		const auto &magic = i.second;
@@ -1038,56 +1062,48 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 			BEESCOUNT(progress_out_of_bg);
 		}
 		const auto bytenr_offset = min(bi_last_bytenr, max(bytenr, bi.first_bytenr)) - bi.first_bytenr + bi.first_total;
-		const auto bytenr_percent = bytenr_offset / (0.01 * fs_size);
+		const auto bytenr_norm = bytenr_offset / double(fs_size);
 		const auto now = time(NULL);
 		const auto time_so_far = now - min(now, this_state.m_started);
+		const string start_stamp = strf_localtime(this_state.m_started);
 		string eta_stamp = "-";
 		string eta_pretty = "-";
 		const auto &deferred_finished = deferred_map.at(subvol);
 		const bool finished = deferred_finished.second;
 		if (finished) {
-			eta_stamp = "finished";
-		} else if (time_so_far > 1 && bytenr_percent > 0) {
-			const time_t eta_duration = time_so_far / (bytenr_percent / 100);
+			// eta_stamp = "idle";
+		} else if (time_so_far > 1 && bytenr_norm > 0.01) {
+			const time_t eta_duration = time_so_far / bytenr_norm;
 			const time_t eta_time = eta_duration + now;
-			struct tm ltm = { 0 };
-			DIE_IF_ZERO(localtime_r(&eta_time, &ltm));
-
-			char buf[1024] = { 0 };
-			DIE_IF_ZERO(strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &ltm));
-			eta_stamp = string(buf);
+			eta_stamp = strf_localtime(eta_time);
 			eta_pretty = pretty_seconds(eta_duration);
 		}
 		const auto &mma = mes.m_map.at(subvol);
 		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
-		const auto pos_scaled_text = mes_sample_size_ok ? pretty(bytenr_offset * mma_ratio) : "-";
-		const auto pos_text = Table::Text(pos_scaled_text);
-		const auto pct_text = Table::Text(astringprintf("%.4f%%", bytenr_percent));
+		const auto posn_text = Table::Text(finished ? "idle" : astringprintf("%06d", int(floor(bytenr_norm * 1000000))));
 		const auto size_text = Table::Text( mes_sample_size_ok ? pretty(fs_size * mma_ratio) : "-");
 		eta.insert_row(Table::endpos, vector<Table::Content> {
-			pos_text,
-			size_text,
-			pct_text,
 			Table::Text(magic.m_max_size == numeric_limits<uint64_t>::max() ? "max" : pretty(magic.m_max_size)),
+			size_text,
+			posn_text,
 			Table::Number(this_state.m_min_transid),
 			Table::Number(this_state.m_max_transid),
+			Table::Text(start_stamp),
 			Table::Text(eta_pretty),
 			Table::Text(eta_stamp),
 		});
 		BEESCOUNT(progress_ok);
 	}
-	eta.insert_row(0, vector<Table::Content> {
-		Table::Text("done"),
+	eta.insert_row(Table::endpos, vector<Table::Content> {
+		Table::Text("total"),
 		Table::Text(pretty(fs_size)),
-		Table::Text("%done"),
-		Table::Text("size"),
-		Table::Text("transid"),
+		Table::Text(""),
+		Table::Text("gen_now"),
 		Table::Number(m_roots->transid_max()),
-		Table::Text("todo"),
-		Table::Text("inaccurate ETA"),
+		Table::Text(""),
+		Table::Text(""),
+		Table::Text(""),
 	});
-	const auto dash_fill = Table::Fill('-');
-	eta.insert_row(1, vector<Table::Content>(eta.cols().size(), dash_fill));
 	eta.left("");
 	eta.mid(" ");
 	eta.right("");
