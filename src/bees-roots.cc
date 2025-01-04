@@ -1632,7 +1632,7 @@ BeesRoots::insert_new_crawl()
 	lock.unlock();
 
 	// Nothing to crawl?  Seems suspicious...
-	if (m_root_crawl_map.empty()) {
+	if (crawl_map_copy.empty()) {
 		BEESLOGINFO("crawl map is empty!");
 	}
 
