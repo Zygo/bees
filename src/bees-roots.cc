@@ -966,15 +966,15 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		THROW_CHECK0(runtime_error, offset > 0);
 		THROW_CHECK0(runtime_error, chunk_length > 0);
 		last_bgaddr = offset + chunk_length;
-		bg_info_map[last_bgaddr] = (bg_info) {
-			.first_bytenr = offset,
-			.first_total = fs_size,
-		};
 		// Mixed-bg filesystems have block groups that are data _and_ metadata.
 		// Block groups that are _only_ metadata should be filtered out.
 		if (0 == (bti.chunk_type() & BTRFS_BLOCK_GROUP_DATA)) {
 			continue;
 		}
+		bg_info_map[last_bgaddr] = (bg_info) {
+			.first_bytenr = offset,
+			.first_total = fs_size,
+		};
 		fs_size += chunk_length;
 	}
 
