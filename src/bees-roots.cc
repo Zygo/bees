@@ -1019,7 +1019,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		Table::Text("gen_min"),
 		Table::Text("gen_max"),
 		Table::Text("this cycle start"),
-		Table::Text("ctime"),
+		Table::Text("tm_left"),
 		Table::Text("next cycle ETA"),
 	});
 	const auto dash_fill = Table::Fill('-');
