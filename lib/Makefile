@@ -14,6 +14,7 @@ CRUCIBLE_OBJS = \
 	fs.o \
 	multilock.o \
 	ntoa.o \
+	openat2.o \
 	path.o \
 	process.o \
 	string.o \
