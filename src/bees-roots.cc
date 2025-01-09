@@ -3,6 +3,7 @@
 #include "crucible/btrfs-tree.h"
 #include "crucible/cache.h"
 #include "crucible/ntoa.h"
+#include "crucible/openat2.h"
 #include "crucible/string.h"
 #include "crucible/table.h"
 #include "crucible/task.h"
@@ -1758,6 +1759,32 @@ BeesRoots::stop_wait()
 	BEESLOGDEBUG("BeesRoots stopped");
 }
 
+static
+Fd
+bees_openat(int const parent_fd, const char *const pathname, uint64_t const flags)
+{
+	// Never O_CREAT so we don't need a mode argument
+	THROW_CHECK1(invalid_argument, flags, (flags & O_CREAT) == 0);
+
+	// Try openat2 if the kernel has it
+	static bool can_openat2 = true;
+	if (can_openat2) {
+		open_how how {
+			.flags = flags,
+			.resolve = RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV,
+		};
+		const auto rv = openat2(parent_fd, pathname, &how, sizeof(open_how));
+		if (rv == -1 && errno == ENOSYS) {
+			can_openat2 = false;
+		} else {
+			return Fd(rv);
+		}
+	}
+
+	// No kernel support, use openat instead
+	return Fd(openat(parent_fd, pathname, flags));
+}
+
 Fd
 BeesRoots::open_root_nocache(uint64_t rootid)
 {
@@ -1820,7 +1847,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 					}
 					// Theoretically there is only one, so don't bother looping.
 					BEESTRACE("dirid " << dirid << " path " << ino.m_paths.at(0));
-					parent_fd = openat(parent_fd, ino.m_paths.at(0).c_str(), FLAGS_OPEN_DIR);
+					parent_fd = bees_openat(parent_fd, ino.m_paths.at(0).c_str(), FLAGS_OPEN_DIR);
 					if (!parent_fd) {
 						BEESLOGTRACE("no parent_fd from dirid");
 						BEESCOUNT(root_parent_path_open_fail);
@@ -1829,7 +1856,7 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 				}
 				// BEESLOG("openat(" << name_fd(parent_fd) << ", " << name << ")");
 				BEESTRACE("openat(" << name_fd(parent_fd) << ", " << name << ")");
-				Fd rv = openat(parent_fd, name.c_str(), FLAGS_OPEN_DIR);
+				Fd rv = bees_openat(parent_fd, name.c_str(), FLAGS_OPEN_DIR);
 				if (!rv) {
 					BEESLOGTRACE("open failed for name " << name << ": " << strerror(errno));
 					BEESCOUNT(root_open_fail);
@@ -1975,7 +2002,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 		// opening in write mode, and if we do open in write mode,
 		// we can't exec the file while we have it open.
 		const char *fp_cstr = file_path.c_str();
-		rv = openat(root_fd, fp_cstr, FLAGS_OPEN_FILE);
+		rv = bees_openat(root_fd, fp_cstr, FLAGS_OPEN_FILE);
 		if (!rv) {
 			// errno == ENOENT is the most common error case.
 			// No need to report it.
