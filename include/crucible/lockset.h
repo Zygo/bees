@@ -117,7 +117,7 @@ namespace crucible {
 		while (full() || locked(name)) {
 			m_condvar.wait(lock);
 		}
-		auto rv = m_set.insert(make_pair(name, crucible::gettid()));
+		auto rv = m_set.insert(make_pair(name, gettid()));
 		THROW_CHECK0(runtime_error, rv.second);
 	}
 
@@ -129,7 +129,7 @@ namespace crucible {
 		if (full() || locked(name)) {
 			return false;
 		}
-		auto rv = m_set.insert(make_pair(name, crucible::gettid()));
+		auto rv = m_set.insert(make_pair(name, gettid()));
 		THROW_CHECK1(runtime_error, name, rv.second);
 		return true;
 	}

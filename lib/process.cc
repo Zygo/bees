@@ -7,12 +7,17 @@
 #include <cstdlib>
 #include <utility>
 
-// for gettid()
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <unistd.h>
 #include <sys/syscall.h>
+
+extern "C" {
+	pid_t
+	__attribute__((weak))
+	gettid() throw()
+	{
+		return syscall(SYS_gettid);
+	}
+};
 
 namespace crucible {
 	using namespace std;
@@ -109,12 +114,6 @@ namespace crucible {
 		if (rv) {
 			THROW_ERRNO("killing process " << m_pid << " with signal " << sig);
 		}
-	}
-
-	pid_t
-	gettid()
-	{
-		return syscall(SYS_gettid);
 	}
 
 	double

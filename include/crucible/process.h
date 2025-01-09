@@ -10,6 +10,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+extern "C" {
+	pid_t gettid() throw();
+};
+
 namespace crucible {
 	using namespace std;
 
@@ -73,7 +77,6 @@ namespace crucible {
 
 	typedef ResourceHandle<Process::id, Process> Pid;
 
-	pid_t gettid();
 	double getloadavg1();
 	double getloadavg5();
 	double getloadavg15();
