@@ -1025,6 +1025,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 	});
 	const auto dash_fill = Table::Fill('-');
 	eta.insert_row(1, vector<Table::Content>(eta.cols().size(), dash_fill));
+	const auto now = time(NULL);
 	for (const auto &i : s_magic_crawl_map) {
 		const auto &subvol = i.first;
 		const auto &magic = i.second;
@@ -1064,7 +1065,6 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		}
 		const auto bytenr_offset = min(bi_last_bytenr, max(bytenr, bi.first_bytenr)) - bi.first_bytenr + bi.first_total;
 		const auto bytenr_norm = bytenr_offset / double(fs_size);
-		const auto now = time(NULL);
 		const auto time_so_far = now - min(now, this_state.m_started);
 		const string start_stamp = strf_localtime(this_state.m_started);
 		string eta_stamp = "-";
@@ -1102,8 +1102,8 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		Table::Text("gen_now"),
 		Table::Number(m_roots->transid_max()),
 		Table::Text(""),
-		Table::Text(""),
-		Table::Text(""),
+		Table::Text("updated"),
+		Table::Text(strf_localtime(now)),
 	});
 	eta.left("");
 	eta.mid(" ");
