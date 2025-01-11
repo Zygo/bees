@@ -26,11 +26,7 @@ Here are some numbers to estimate appropriate hash table sizes:
 Notes:
 
  * If the hash table is too large, no extra dedupe efficiency is
-obtained, and the extra space wastes RAM.  If the hash table contains
-more block records than there are blocks in the filesystem, the extra
-space can slow bees down.  A table that is too large prevents obsolete
-data from being evicted, so bees wastes time looking for matching data
-that is no longer present on the filesystem.
+obtained, and the extra space wastes RAM.
 
  * If the hash table is too small, bees extrapolates from matching
 blocks to find matching adjacent blocks in the filesystem that have been
@@ -59,19 +55,19 @@ patterns on dedupe effectiveness without performing deep inspection of
 both the filesystem data and its structure--a task that is as expensive
 as performing the deduplication.
 
-* **Compression** on the filesystem reduces the average extent length
-compared to uncompressed filesystems.  The maximum compressed extent
-length on btrfs is 128KB, while the maximum uncompressed extent length
-is 128MB.  Longer extents decrease the optimum hash table size while
-shorter extents increase the optimum hash table size because the
-probability of a hash table entry being present (i.e. unevicted) in
-each extent is proportional to the extent length.
+* **Compression** in files reduces the average extent length compared
+to uncompressed files.  The maximum compressed extent length on
+btrfs is 128KB, while the maximum uncompressed extent length is 128MB.
+Longer extents decrease the optimum hash table size while shorter extents
+increase the optimum hash table size, because the probability of a hash
+table entry being present (i.e. unevicted) in each extent is proportional
+to the extent length.
 
    As a rule of thumb, the optimal hash table size for a compressed
 filesystem is 2-4x larger than the optimal hash table size for the same
-data on an uncompressed filesystem.  Dedupe efficiency falls dramatically
-with hash tables smaller than 128MB/TB as the average dedupe extent size
-is larger than the largest possible compressed extent size (128KB).
+data on an uncompressed filesystem.  Dedupe efficiency falls rapidly with
+hash tables smaller than 128MB/TB as the average dedupe extent size is
+larger than the largest possible compressed extent size (128KB).
 
 * **Short writes or fragmentation** also shorten the average extent
 length and increase optimum hash table size.  If a database writes to
@@ -115,7 +111,6 @@ Extent scan mode:
  * Works with 4.15 and later kernels.
  * Can estimate progress and provide an ETA.
  * Can optimize scanning order to dedupe large extents first.
- * Cannot avoid modifying read-only subvols.
  * Can keep up with frequent creation and deletion of snapshots.
 
 Subvol scan modes:
@@ -123,8 +118,7 @@ Subvol scan modes:
  * Work with 4.14 and earlier kernels.
  * Cannot estimate or report progress.
  * Cannot optimize scanning order by extent size.
- * Can avoid modifying read-only subvols (for `btrfs send` workaround).
- * Have problems keeping up with snapshots created during a scan.
+ * Have problems keeping up with multiple snapshots created during a scan.
 
 The default scan mode is 4, "extent".
 
@@ -212,7 +206,7 @@ Extent scan mode
 Scan mode 4, "extent", scans the extent tree instead of the subvol trees.
 Extent scan mode reads each extent once, regardless of the number of
 reflinks or snapshots.  It adapts to the creation of new snapshots
-immediately, without having to revisit old data.
+and reflinks immediately, without having to revisit old data.
 
 In the extent scan mode, extents are separated into multiple size tiers
 to prioritize large extents over small ones.  Deduping large extents
@@ -279,6 +273,15 @@ the rest of the system by pausing bees when other CPU and IO intensive
 loads are active on the system, and resumes bees when the other loads
 are inactive.  This is configured with the [`--loadavg-target` and
 `--thread-min` options](options.md).
+
+bees can self-throttle operations that enqueue work within btrfs.
+These operations are not well controlled by features such as process
+priority or IO priority or ratelimiting, because the enqueued work
+is submitted to btrfs several seconds before btrfs performs the work.
+The [`--throttle-factor` option](options.md) tracks how long it takes
+btrfs to complete queued operations, and reduces bees's submission
+rate to match btrfs's completion rate (or a fraction thereof, to reduce
+system load).
 
 Log verbosity
 -------------
