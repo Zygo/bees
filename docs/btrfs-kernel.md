@@ -1,31 +1,24 @@
-Recommended Kernel Version for bees
-===================================
+Recommended Linux Kernel Version for bees
+=========================================
 
-First, a warning that is not specific to bees:
+First, a warning about old Linux kernel versions:
 
-> **Kernel 5.1, 5.2, and 5.3 should not be used with btrfs due to a
-severe regression that can lead to fatal metadata corruption.**
-This issue is fixed in kernel 5.4.14 and later.
+> **Linux kernel version 5.1, 5.2, and 5.3 should not be used with btrfs
+due to a severe regression that can lead to fatal metadata corruption.**
+This issue is fixed in version 5.4.14 and later.
 
-**Recommended kernel versions for bees are 4.19, 5.4, 5.10, 5.11, 5.15,
-6.0, or 6.1, with recent LTS and -stable updates.**  The latest released
-kernel as of this writing is 6.4.1.
+**Recommended Linux kernel versions for bees are 5.4, 5.10, 5.15, 6.1,
+6.6, or 6.12 with recent LTS and -stable updates.**  The latest released
+kernel as of this writing is 6.12.9, and the earliest supported LTS
+kernel is 5.4.
 
-4.14, 4.9, and 4.4 LTS kernels with recent updates are OK with some
-issues.  Older kernels will be slower (a little slower or a lot slower
-depending on which issues are triggered).  Not all fixes are backported.
+Some optional bees features use kernel APIs introduced in kernel 4.15
+(extent scan) and 5.6 (`openat2` support).  These bees features are not
+available on older kernels.  Support for older kernels may be removed
+in a future bees release.
 
-Obsolete non-LTS kernels have a variety of unfixed issues and should
-not be used with btrfs.  For details see the table below.
-
-bees requires btrfs kernel API version 4.2 or higher, and does not work
-at all on older kernels.
-
-Some bees features rely on kernel 4.15 to work, and these features will
-not be available on older kernels.  Currently, bees is still usable on
-older kernels with degraded performance or with options disabled, but
-support for older kernels may be removed.
-
+bees will not run at all on kernels before 4.2 due to lack of minimal
+API support.
 
 
 
@@ -71,7 +64,7 @@ These bugs are particularly popular among bees users, though not all are specifi
 | 6.3, backported to 5.15.107, 6.1.24, 6.2.11 | 6.3 | vmalloc error, failed to allocate pages | 6.3.10, 6.4 and later.  Bug (f349b15e183d "mm: vmalloc: avoid warn_alloc noise caused by fatal signal" in v6.3-rc6) backported to 6.1.24, 6.2.11, and 5.15.107. | 95a301eefa82 mm/vmalloc: do not output a spurious warning when huge vmalloc() fails
 | 6.2 | 6.3 | `IGNORE_OFFSET` flag ignored in `LOGICAL_INO` ioctl | 6.2.16, 6.3.3, 6.4 and later | 0cad8f14d70c btrfs: fix backref walking not returning all inode refs
 | 6.10 | 6.11 | `adding refs to an existing tree ref`, `failed to run delayed ref`, then read-only | 6.11.10, 6.12 and later | 7d493a5ecc26 btrfs: fix incorrect comparison for delayed refs
-| 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe ioctl on the same extent | - | workaround: avoid doing that
+| 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe/clone ioctl on the same extent | - | workaround: avoid doing that
 
 "Last bad kernel" refers to that version's last stable update from
 kernel.org.  Distro kernels may backport additional fixes.  Consult
@@ -97,12 +90,12 @@ contains the last committed component of the fix.
 Workarounds for known kernel bugs
 ---------------------------------
 
-* **Hangs with concurrent `LOGICAL_INO` and dedupe**:  on all
-  kernel versions so far, multiple threads running `LOGICAL_INO`
-  and dedupe ioctls at the same time on the same inodes or extents
+* **Hangs with concurrent `LOGICAL_INO` and dedupe/clone**:  on all
+  kernel versions so far, multiple threads running `LOGICAL_INO` and
+  dedupe/clone ioctls at the same time on the same inodes or extents
   can lead to a kernel hang.  The kernel enters an infinite loop in
   `add_all_parents`, where `count` is 0, `ref->count` is 1, and
-  `btrfs_next_item` or `btrfs_next_old_item` never find a matching ref).
+  `btrfs_next_item` or `btrfs_next_old_item` never find a matching ref.
 
   bees has two workarounds for this bug: 1. schedule work so that multiple
   threads do not simultaneously access the same inode or the same extent,
@@ -123,58 +116,32 @@ Workarounds for known kernel bugs
 
   It is still theoretically possible to trigger the kernel bug when
   running bees at the same time as other dedupers, or other programs
-  that use `LOGICAL_INO` like `btdu`; however, it's extremely difficult
-  to reproduce the bug without closely cooperating threads.
+  that use `LOGICAL_INO` like `btdu`, or when performing a reflink clone
+  operation such as `cp` or `mv`; however, it's extremely difficult to
+  reproduce the bug without closely cooperating threads.
 
-* **Slow backrefs** (aka toxic extents):  Under certain conditions,
-  if the number of references to a single shared extent grows too
-  high, the kernel consumes more and more CPU while also holding locks
-  that delay write access to the filesystem.  bees avoids this bug
-  by measuring the time the kernel spends performing `LOGICAL_INO`
-  operations and permanently blacklisting any extent or hash involved
-  where the kernel starts to get slow.  In the bees log, such blocks
-  are labelled as 'toxic' hash/block addresses.  Toxic extents are
-  rare (about 1 in 100,000 extents become toxic), but toxic extents can
-  become 8 orders of magnitude more expensive to process than the fastest
-  non-toxic extents.  This seems to affect all dedupe agents on btrfs;
-  at this time of writing only bees has a workaround for this bug.
+* **Slow backrefs** (aka toxic extents):  On older kernels, under certain
+  conditions, if the number of references to a single shared extent grows
+  too high, the kernel consumes more and more CPU while also holding
+  locks that delay write access to the filesystem.  This is no longer
+  a concern on kernels after 5.7 (or an up-to-date 5.4 LTS version),
+  but there are still some remains of earlier workarounds for this issue
+  in bees that have not been fully removed.
 
-  This workaround is less necessary for kernels 5.4.96, 5.7 and later,
-  though the bees workaround can still be triggered on newer kernels
-  by changes in btrfs since kernel version 5.1.
+  bees avoided this bug by measuring the time the kernel spends performing
+  `LOGICAL_INO` operations and permanently blacklisting any extent or
+  hash involved where the kernel starts to get slow.  In the bees log,
+  such blocks are labelled as 'toxic' hash/block addresses.
+
+  Future bees releases will remove toxic extent detection (it only detects
+  false positives now) and clear all previously saved toxic extent bits.
 
 * **dedupe breaks `btrfs send` in old kernels**.  The bees option
   `--workaround-btrfs-send` prevents any modification of read-only subvols
-  in order to avoid breaking `btrfs send`.
+  in order to avoid breaking `btrfs send` on kernels before 5.2.
 
-  This workaround is no longer necessary to avoid kernel crashes
-  and send performance failure on kernel 4.9.207, 4.14.159, 4.19.90,
-  5.3.17, 5.4.4, 5.5 and later; however, some conflict between send
-  and dedupe still remains, so the workaround is still useful.
+  This workaround is no longer necessary to avoid kernel crashes and
+  send performance failure on kernel 5.4.4 and later.  bees will pause
+  dedupe until the send is finished on current kernels.
 
   `btrfs receive` is not and has never been affected by this issue.
-
-Unfixed kernel bugs
--------------------
-
-* **The kernel does not permit `btrfs send` and dedupe to run at the
-  same time**.  Recent kernels no longer crash, but now refuse one
-  operation with an error if the other operation was already running.
-
-  bees has not been updated to handle the new dedupe behavior optimally.
-  Optimal behavior is to defer dedupe operations when send is detected,
-  and resume after the send is finished.  Current bees behavior is to
-  complain loudly about each individual dedupe failure in log messages,
-  and abandon duplicate data references in the snapshot that send is
-  processing.  A future bees version shall have better handling for
-  this situation.
-
-  Workaround:  send `SIGSTOP` to bees, or terminate the bees process,
-  before running `btrfs send`.
-
-  This workaround is not strictly required if snapshot is deleted after
-  sending.  In that case, any duplicate data blocks that were not removed
-  by dedupe will be removed by snapshot delete instead.  The workaround
-  still saves some IO.
-
-  `btrfs receive` is not affected by this issue.
