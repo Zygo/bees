@@ -262,26 +262,54 @@ send` in extent scan mode, and restart bees after the `send` is complete.
 Threads and load management
 ---------------------------
 
-By default, bees creates one worker thread for each CPU detected.
-These threads then perform scanning and dedupe operations.  The number of
-worker threads can be set with the [`--thread-count` and `--thread-factor`
-options](options.md).
+By default, bees creates one worker thread for each CPU detected.  These
+threads then perform scanning and dedupe operations.  bees attempts to
+maximize the amount of productive work each thread does, until either the
+threads are all continuously busy, or there is no remaining work to do.
 
-If desired, bees can automatically increase or decrease the number
-of worker threads in response to system load.  This reduces impact on
-the rest of the system by pausing bees when other CPU and IO intensive
-loads are active on the system, and resumes bees when the other loads
-are inactive.  This is configured with the [`--loadavg-target` and
-`--thread-min` options](options.md).
+In many cases it is not desirable to continually run bees at maximum
+performance.  Maximum performance is not necessary if bees can dedupe
+new data faster than it appears on the filesystem.  If it only takes
+bees 10 minutes per day to dedupe all new data on a filesystem, then
+bees doesn't need to run for more than 10 minutes per day.
 
-bees can self-throttle operations that enqueue work within btrfs.
-These operations are not well controlled by features such as process
-priority or IO priority or ratelimiting, because the enqueued work
-is submitted to btrfs several seconds before btrfs performs the work.
-The [`--throttle-factor` option](options.md) tracks how long it takes
-btrfs to complete queued operations, and reduces bees's submission
-rate to match btrfs's completion rate (or a fraction thereof, to reduce
-system load).
+bees supports a number of options for reducing system load:
+
+ * Run bees for a few hours per day, at an off-peak time (i.e. during
+ a maintenace window), instead of running bees continuously.  Any data
+ added to the filesystem while bees is not running will be scanned when
+ bees restarts.  At the end of the maintenance window, terminate the
+ bees process with SIGTERM to write the hash table and scan position
+ for the next maintenance window.
+
+ * Temporarily pause bees operation by sending the bees process SIGUSR1,
+ and resume operation with SIGUSR2.  This is preferable to freezing
+ and thawing the process, e.g. with freezer cgroups or SIGSTOP/SIGCONT
+ signals, because it allows bees to close open file handles that would
+ otherwise prevent those files from being deleted while bees is frozen.
+
+ * Reduce the number of worker threads with the [`--thread-count` or
+`--thread-factor` options](options.md).  This simply leaves CPU cores
+ idle so that other applications on the host can use them, or to save
+ power.
+
+ * Allow bees to automatically track system load and increase or decrease
+ the number of threads to reach a target system load.  This reduces
+ impact on the rest of the system by pausing bees when other CPU and IO
+ intensive loads are active on the system, and resumes bees when the other
+ loads are inactive.  This is configured with the [`--loadavg-target`
+ and `--thread-min` options](options.md).
+
+ * Allow bees to self-throttle operations that enqueue delayed work
+ within btrfs.  These operations are not well controlled by Linux
+ features such as process priority or IO priority or IO rate-limiting,
+ because the enqueued work is submitted to btrfs several seconds before
+ btrfs performs the work.  By the time btrfs performs the work, it's too
+ late for external throttling to be effective.  The [`--throttle-factor`
+ option](options.md) tracks how long it takes btrfs to complete queued
+ operations, and reduces bees's queued work submission rate to match
+ btrfs's queued work completion rate (or a fraction thereof, to reduce
+ system load).
 
 Log verbosity
 -------------
