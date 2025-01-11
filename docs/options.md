@@ -84,19 +84,22 @@
 
 * `--workaround-btrfs-send` or `-a`
 
+ _This option is obsolete and should not be used any more._
+
  Pretend that read-only snapshots are empty and silently discard any
-request to dedupe files referenced through them.  This is a workaround for
-[problems with the kernel implementation of `btrfs send` and `btrfs send
+request to dedupe files referenced through them.  This is a workaround
+for [problems with old kernels running `btrfs send` and `btrfs send
 -p`](btrfs-kernel.md) which make these btrfs features unusable with bees.
 
- This option should be used to avoid breaking `btrfs send` on the same
-filesystem.
+ This option was used to avoid breaking `btrfs send` on old kernels.
+ The affected kernels are now too old to be recommended for use with bees.
+
+ bees now waits for `btrfs send` to finish.  There is no need for an
+ option to enable this.
 
  **Note:** There is a _significant_ space tradeoff when using this option:
 it is likely no space will be recovered--and possibly significant extra
-space used--until the read-only snapshots are deleted.  On the other
-hand, if snapshots are rotated frequently then bees will spend less time
-scanning them.
+space used--until the read-only snapshots are deleted.
 
 ## Logging options
 
