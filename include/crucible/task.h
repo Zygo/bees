@@ -47,6 +47,10 @@ namespace crucible {
 		/// been destroyed.
 		void append(const Task &task) const;
 
+		/// Schedule Task to run after this Task has run or
+		/// been destroyed, in Task ID order.
+		void insert(const Task &task) const;
+
 		/// Describe Task as text.
 		string title() const;
 
