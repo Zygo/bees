@@ -331,8 +331,11 @@ namespace crucible {
 		PairLock lock(m_mutex, task->m_mutex);
 		if (!task->m_run_now) {
 			task->m_run_now = true;
+			// Move the task and its post-exec queue to follow this task,
+			// and request a sort of the flattened list.
 			m_sort_queue = true;
-			append_nolock(task);
+			m_post_exec_queue.push_back(task);
+			m_post_exec_queue.splice(m_post_exec_queue.end(), task->m_post_exec_queue);
 		}
 	}
 
