@@ -328,6 +328,7 @@ namespace crucible {
 	TaskState::insert(const TaskStatePtr &task)
 	{
 		THROW_CHECK0(invalid_argument, task);
+		THROW_CHECK2(invalid_argument, m_id, task->m_id, m_id != task->m_id);
 		PairLock lock(m_mutex, task->m_mutex);
 		if (!task->m_run_now) {
 			task->m_run_now = true;
