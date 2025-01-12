@@ -172,9 +172,6 @@ namespace crucible {
 		/// objects it holds, and exit its Task function.
 		ExclusionLock try_lock(const Task &task);
 
-		/// Execute Task when Exclusion is unlocked (possibly
-		/// immediately).
-		void insert_task(const Task &t);
 	};
 
 	/// Wrapper around pthread_setname_np which handles length limits

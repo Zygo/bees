@@ -936,21 +936,6 @@ namespace crucible {
 		m_owner.reset();
 	}
 
-	void
-	Exclusion::insert_task(const Task &task)
-	{
-		unique_lock<mutex> lock(m_mutex);
-		const auto sp = m_owner.lock();
-		lock.unlock();
-		if (sp) {
-			// If Exclusion is locked then queue task for release;
-			sp->append(task);
-		} else {
-			// otherwise, run the inserted task immediately
-			task.run();
-		}
-	}
-
 	ExclusionLock
 	Exclusion::try_lock(const Task &task)
 	{
