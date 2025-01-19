@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# if not called from systemd try to replicate mount unsharing on ctrl+c
+# see: https://github.com/Zygo/bees/issues/281
+if [ -z "${SYSTEMD_EXEC_PID}" -a -z "${UNSHARE_DONE}" ]; then
+        UNSHARE_DONE=true
+        export UNSHARE_DONE
+        exec unshare -m --propagation private -- "$0" "$@"
+fi
+
 ## Helpful functions
 INFO(){ echo "INFO:" "$@"; }
 ERRO(){ echo "ERROR:" "$@"; exit 1; }
