@@ -1990,7 +1990,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 	BEESTRACE("searching paths for root " << root << " ino " << ino);
 	Fd rv;
 	if (ipa.m_paths.empty()) {
-		BEESLOGWARN("No paths for root " << root << " ino " << ino);
+		// BEESLOGDEBUG("No paths for root " << root << " ino " << ino);
 		BEESCOUNT(open_lookup_empty);
 	}
 	BEESCOUNT(open_lookup_ok);
@@ -2066,7 +2066,7 @@ BeesRoots::open_root_ino_nocache(uint64_t root, uint64_t ino)
 
 		int attr = ioctl_iflags_get(rv);
 		if (attr & FS_NOCOW_FL) {
-			BEESLOGWARN("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
+			BEESLOGINFO("Opening " << name_fd(rv) << " found FS_NOCOW_FL flag in " << to_hex(attr));
 			rv = Fd();
 			BEESCOUNT(open_wrong_flags);
 			break;

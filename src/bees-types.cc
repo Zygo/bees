@@ -457,7 +457,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 			}
 		}
 		if (found_toxic) {
-			BEESLOGWARN("WORKAROUND: found toxic hash in " << first_bbd << " while extending backward:\n" << *this);
+			BEESLOGDEBUG("WORKAROUND: found toxic hash in " << first_bbd << " while extending backward:\n" << *this);
 			BEESCOUNT(pairbackward_toxic_hash);
 			break;
 		}
@@ -558,7 +558,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 			}
 		}
 		if (found_toxic) {
-			BEESLOGWARN("WORKAROUND: found toxic hash in " << first_bbd << " while extending forward:\n" << *this);
+			BEESLOGDEBUG("WORKAROUND: found toxic hash in " << first_bbd << " while extending forward:\n" << *this);
 			BEESCOUNT(pairforward_toxic_hash);
 			break;
 		}

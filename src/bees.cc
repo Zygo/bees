@@ -198,7 +198,7 @@ BeesTooLong::check() const
 	if (age() > m_limit) {
 		ostringstream oss;
 		m_func(oss);
-		BEESLOGWARN("PERFORMANCE: " << *this << " sec: " << oss.str());
+		BEESLOGINFO("PERFORMANCE: " << *this << " sec: " << oss.str());
 	}
 }
 

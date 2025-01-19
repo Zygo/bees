@@ -259,7 +259,7 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 				BEESCOUNTADD(dedup_bytes, brp.first.size());
 			} else {
 				BEESCOUNT(dedup_miss);
-				BEESLOGWARN("NO Dedup! " << brp);
+				BEESLOGINFO("NO Dedup! " << brp);
 			}
 
 			lock.reset();
@@ -373,7 +373,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 		Extent::OBSCURED | Extent::PREALLOC
 	)) {
 		BEESCOUNT(scan_interesting);
-		BEESLOGWARN("Interesting extent flags " << e << " from fd " << name_fd(bfr.fd()));
+		BEESLOGINFO("Interesting extent flags " << e << " from fd " << name_fd(bfr.fd()));
 	}
 
 	if (e.flags() & Extent::HOLE) {
@@ -556,7 +556,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 			BeesResolver resolved(m_ctx, found_addr);
 			// Toxic extents are really toxic
 			if (resolved.is_toxic()) {
-				BEESLOGWARN("WORKAROUND: discovered toxic match at found_addr " << found_addr << " matching bbd " << bbd);
+				BEESLOGDEBUG("WORKAROUND: discovered toxic match at found_addr " << found_addr << " matching bbd " << bbd);
 				BEESCOUNT(scan_toxic_match);
 				// Make sure we never see this hash again.
 				// It has become toxic since it was inserted into the hash table.
@@ -917,7 +917,7 @@ BeesContext::scan_forward(const BeesFileRange &bfr_in)
 
 	// Sanity check
 	if (bfr.begin() >= bfr.file_size()) {
-		BEESLOGWARN("past EOF: " << bfr);
+		BEESLOGDEBUG("past EOF: " << bfr);
 		BEESCOUNT(scanf_eof);
 		return false;
 	}

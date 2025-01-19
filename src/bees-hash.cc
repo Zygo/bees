@@ -797,7 +797,7 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 	for (auto fp = madv_flags; fp->value; ++fp) {
 		BEESTOOLONG("madvise(" << fp->name << ")");
 		if (madvise(m_byte_ptr, m_size, fp->value)) {
-			BEESLOGWARN("madvise(..., " << fp->name << "): " << strerror(errno) << " (ignored)");
+			BEESLOGNOTICE("madvise(..., " << fp->name << "): " << strerror(errno) << " (ignored)");
 		}
 	}
 
