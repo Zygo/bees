@@ -12,6 +12,8 @@
 
 #else
 
+#include <linux/types.h>
+
 #ifndef RESOLVE_NO_XDEV
 #define RESOLVE_NO_XDEV 1
 
