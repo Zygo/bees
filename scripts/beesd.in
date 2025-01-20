@@ -121,8 +121,6 @@ mount --make-private -osubvolid=5 /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 if [ ! -d "$BEESHOME" ]; then
     INFO "Create subvol $BEESHOME for store bees data"
     btrfs sub cre "$BEESHOME"
-else
-    btrfs sub show "$BEESHOME" &> /dev/null || ERRO "$BEESHOME MUST BE A SUBVOL!"
 fi
 
 # Check DB size
