@@ -116,7 +116,7 @@ mkdir -p "$WORK_DIR" || exit 1
 INFO "MOUNT DIR: $MNT_DIR"
 mkdir -p "$MNT_DIR" || exit 1
 
-mount --make-private -osubvolid=5 /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
+mount --make-private -osubvolid=5,nodev,noexec /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
 if [ ! -d "$BEESHOME" ]; then
     INFO "Create subvol $BEESHOME for store bees data"
