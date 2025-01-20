@@ -1774,6 +1774,7 @@ bees_openat(int const parent_fd, const char *const pathname, uint64_t const flag
 		};
 		const auto rv = openat2(parent_fd, pathname, &how, sizeof(open_how));
 		if (rv == -1 && errno == ENOSYS) {
+			BEESLOGWARN("openat2 returns ENOSYS, falling back to openat");
 			can_openat2 = false;
 		} else {
 			return Fd(rv);
