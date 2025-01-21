@@ -1072,7 +1072,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		const bool finished = deferred_finished.second;
 		if (finished) {
 			// eta_stamp = "idle";
-		} else if (time_so_far > 1 && bytenr_norm > 0.01) {
+		} else if (time_so_far > 10 && bytenr_offset > 1024 * 1024 * 1024) {
 			const time_t eta_duration = time_so_far / bytenr_norm;
 			const time_t eta_time = eta_duration + now;
 			eta_stamp = strf_localtime(eta_time);
