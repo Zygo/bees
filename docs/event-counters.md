@@ -120,13 +120,14 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
 
  * `crawl_again`: An inode crawl was restarted because the extent was already locked by another running crawl.
  * `crawl_blacklisted`: An extent was not scanned because it belongs to a blacklisted file.
- * `crawl_create`: A new subvol or extent crawler was created.
  * `crawl_deferred_inode`: Two tasks attempted to scan the same inode at the same time, so one was deferred.
  * `crawl_done`: One pass over a subvol was completed.
- * `crawl_discard`: An extent that didn't match the crawler's size tier was discarded.
+ * `crawl_discard_high`: An extent that was too large for the crawler's size tier was discarded.
+ * `crawl_discard_low`: An extent that was too small for the crawler's size tier was discarded.
  * `crawl_empty`: A `TREE_SEARCH_V2` ioctl call failed or returned an empty set (usually because all data in the subvol was scanned).
  * `crawl_extent`: The extent crawler queued all references to an extent for processing.
  * `crawl_fail`: A `TREE_SEARCH_V2` ioctl call failed.
+ * `crawl_flop`: Small extent items were not skipped because the next extent started at or before the end of the previous extent.
  * `crawl_gen_high`: An extent item in the search results refers to an extent that is newer than the current crawl's `max_transid` allows.
  * `crawl_gen_low`: An extent item in the search results refers to an extent that is older than the current crawl's `min_transid` allows.
  * `crawl_hole`: An extent item in the search results refers to a hole.
@@ -138,6 +139,8 @@ The `crawl` event group consists of operations related to scanning btrfs trees t
  * `crawl_prealloc`: An extent item in the search results refers to a `PREALLOC` extent.
  * `crawl_push`: An extent item in the search results is suitable for scanning and deduplication.
  * `crawl_scan`: An extent item in the search results is submitted to `BeesContext::scan_forward` for scanning and deduplication.
+ * `crawl_skip`: Small extent items were skipped because no extent of sufficient size was found within the minimum search distance.
+ * `crawl_skip_ms`: Time spent skipping small extent items.
  * `crawl_search`: A `TREE_SEARCH_V2` ioctl call was successful.
  * `crawl_throttled`: Extent scan created too many work queue items and was prevented from creating any more.
  * `crawl_tree_block`: Extent scan found and skipped a metadata tree block.
