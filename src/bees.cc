@@ -246,10 +246,6 @@ bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 	Timer readahead_timer;
 	BEESNOTE("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
 	BEESTOOLONG("readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
-#if 0
-	// In the kernel, readahead() is identical to posix_fadvise(..., POSIX_FADV_DONTNEED)
-	DIE_IF_NON_ZERO(readahead(fd, offset, size));
-#else
 	// Make sure this data is in page cache by brute force
 	// The btrfs kernel code does readahead with lower ioprio
 	// and might discard the readahead request entirely.
@@ -263,13 +259,16 @@ bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 		// Ignore errors and short reads.  It turns out our size
 		// parameter isn't all that accurate, so we can't use
 		// the pread_or_die template.
-		(void)!pread(fd, dummy, this_read_size, working_offset);
-		BEESCOUNT(readahead_count);
-		BEESCOUNTADD(readahead_bytes, this_read_size);
+		const auto pr_rv = pread(fd, dummy, this_read_size, working_offset);
+		if (pr_rv >= 0) {
+			BEESCOUNT(readahead_count);
+			BEESCOUNTADD(readahead_bytes, pr_rv);
+		} else {
+			BEESCOUNT(readahead_fail);
+		}
 		working_offset += this_read_size;
 		working_size -= this_read_size;
 	}
-#endif
 	BEESCOUNTADD(readahead_ms, readahead_timer.age() * 1000);
 }
 
