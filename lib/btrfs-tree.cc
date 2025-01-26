@@ -662,14 +662,6 @@ namespace crucible {
 		type(BTRFS_EXTENT_DATA_KEY);
 	}
 
-	BtrfsFsTreeFetcher::BtrfsFsTreeFetcher(const Fd &new_fd, uint64_t subvol) :
-		BtrfsTreeObjectFetcher(new_fd)
-	{
-		tree(subvol);
-		type(BTRFS_EXTENT_DATA_KEY);
-		scale_size(1);
-	}
-
 	BtrfsInodeFetcher::BtrfsInodeFetcher(const Fd &fd) :
 		BtrfsTreeObjectFetcher(fd)
 	{

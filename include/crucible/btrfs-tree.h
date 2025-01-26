@@ -173,30 +173,27 @@ namespace crucible {
 		void get_sums(uint64_t logical, size_t count, function<void(uint64_t logical, const uint8_t *buf, size_t count)> output);
 	};
 
-	/// Fetch extent items from extent tree
+	/// Fetch extent items from extent tree.
+	/// Does not filter out metadata!  See BtrfsDataExtentTreeFetcher for that.
 	class BtrfsExtentItemFetcher : public BtrfsTreeObjectFetcher {
 	public:
 		BtrfsExtentItemFetcher(const Fd &fd);
 	};
 
-	/// Fetch extent refs from an inode
+	/// Fetch extent refs from an inode.  Caller must set the tree and objectid.
 	class BtrfsExtentDataFetcher : public BtrfsTreeOffsetFetcher {
 	public:
 		BtrfsExtentDataFetcher(const Fd &fd);
 	};
 
-	/// Fetch inodes from a subvol
-	class BtrfsFsTreeFetcher : public BtrfsTreeObjectFetcher {
-	public:
-		BtrfsFsTreeFetcher(const Fd &fd, uint64_t subvol);
-	};
-
+	/// Fetch raw inode items
 	class BtrfsInodeFetcher : public BtrfsTreeObjectFetcher {
 	public:
 		BtrfsInodeFetcher(const Fd &fd);
 		BtrfsTreeItem stat(uint64_t subvol, uint64_t inode);
 	};
 
+	/// Fetch a root (subvol) item
 	class BtrfsRootFetcher : public BtrfsTreeObjectFetcher {
 	public:
 		BtrfsRootFetcher(const Fd &fd);
