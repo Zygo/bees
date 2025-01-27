@@ -5,6 +5,12 @@
 #include "crucible/hexdump.h"
 #include "crucible/seeker.h"
 
+#define CRUCIBLE_BTRFS_TREE_DEBUG(x) do { \
+	if (BtrfsIoctlSearchKey::s_debug_ostream) { \
+		(*BtrfsIoctlSearchKey::s_debug_ostream) << x; \
+	} \
+} while (false)
+
 namespace crucible {
 	using namespace std;
 
@@ -355,6 +361,7 @@ namespace crucible {
 	BtrfsTreeItem
 	BtrfsTreeFetcher::at(uint64_t logical)
 	{
+		CRUCIBLE_BTRFS_TREE_DEBUG("at " << logical);
 		BtrfsIoctlSearchKey &sk = m_sk;
 		fill_sk(sk, logical);
 		// Exact match, should return 0 or 1 items
@@ -397,9 +404,10 @@ namespace crucible {
 	BtrfsTreeFetcher::rlower_bound(uint64_t logical)
 	{
 	#if 0
-	#define BTFRLB_DEBUG(x) do { cerr << x; } while (false)
+		static bool btfrlb_debug = getenv("BTFLRB_DEBUG");
+	#define BTFRLB_DEBUG(x) do { if (btfrlb_debug) cerr << x; } while (false)
 	#else
-	#define BTFRLB_DEBUG(x) do { } while (false)
+	#define BTFRLB_DEBUG(x) CRUCIBLE_BTRFS_TREE_DEBUG(x)
 	#endif
 		BtrfsTreeItem closest_item;
 		uint64_t closest_logical = 0;
@@ -474,6 +482,7 @@ namespace crucible {
 	BtrfsTreeItem
 	BtrfsTreeFetcher::next(uint64_t logical)
 	{
+		CRUCIBLE_BTRFS_TREE_DEBUG("next " << logical);
 		const auto scaled_logical = scale_logical(logical);
 		if (scaled_logical + 1 > scaled_max_logical()) {
 			return BtrfsTreeItem();
@@ -484,6 +493,7 @@ namespace crucible {
 	BtrfsTreeItem
 	BtrfsTreeFetcher::prev(uint64_t logical)
 	{
+		CRUCIBLE_BTRFS_TREE_DEBUG("prev " << logical);
 		const auto scaled_logical = scale_logical(logical);
 		if (scaled_logical < 1) {
 			return BtrfsTreeItem();
@@ -568,9 +578,10 @@ namespace crucible {
 	BtrfsCsumTreeFetcher::get_sums(uint64_t const logical, size_t count, function<void(uint64_t logical, const uint8_t *buf, size_t bytes)> output)
 	{
 	#if 0
-	#define BCTFGS_DEBUG(x) do { cerr << x; } while (false)
+		static bool bctfgs_debug = getenv("BCTFGS_DEBUG");
+	#define BCTFGS_DEBUG(x) do { if (bctfgs_debug) cerr << x; } while (false)
 	#else
-	#define BCTFGS_DEBUG(x) do { } while (false)
+	#define BCTFGS_DEBUG(x) CRUCIBLE_BTRFS_TREE_DEBUG(x)
 	#endif
 		const uint64_t logical_end = logical + count * block_size();
 		BtrfsTreeItem bti = rlower_bound(logical);
