@@ -811,8 +811,18 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 		prefetch_loop();
         });
 
-	// Blacklist might fail if the hash table is not stored on a btrfs
+	// Blacklist might fail if the hash table is not stored on a btrfs,
+	// or if it's on a _different_ btrfs
 	catch_all([&]() {
+		// Root is definitely a btrfs
+		BtrfsIoctlFsInfoArgs root_info;
+		root_info.do_ioctl(m_ctx->root_fd());
+		// Hash might not be a btrfs
+		BtrfsIoctlFsInfoArgs hash_info;
+		if (hash_info.do_ioctl_nothrow(m_fd)) return;
+		// If Hash is a btrfs, Root must be the same one
+		if (root_info.fsid() != hash_info.fsid()) return;
+		// Hash is on the same one, blacklist it
 		m_ctx->blacklist_insert(BeesFileId(m_fd));
 	});
 }
