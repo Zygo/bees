@@ -246,9 +246,11 @@ namespace crucible {
 	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v3 {
 		BtrfsIoctlFsInfoArgs();
 		void do_ioctl(int fd);
+		bool do_ioctl_nothrow(int fd);
 		uint16_t csum_type() const;
 		uint16_t csum_size() const;
 		uint64_t generation() const;
+		vector<uint8_t> fsid() const;
 	};
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlFsInfoArgs &a);
