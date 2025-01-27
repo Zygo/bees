@@ -703,9 +703,8 @@ bees_main(int argc, char *argv[])
 	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
 	BEESLOGDEBUG("context constructed");
 
-	string cwd(readlink_or_die("/proc/self/cwd"));
-
 	// Defaults
+	bool use_relative_paths = false;
 	bool chatter_prefix_timestamp = true;
 	double thread_factor = 0;
 	unsigned thread_count = 0;
@@ -777,7 +776,7 @@ bees_main(int argc, char *argv[])
 				thread_min = stoul(optarg);
 				break;
 			case 'P':
-				crucible::set_relative_path(cwd);
+				use_relative_paths = true;
 				break;
 			case 'T':
 				chatter_prefix_timestamp = false;
@@ -795,7 +794,7 @@ bees_main(int argc, char *argv[])
 				root_scan_mode = static_cast<BeesRoots::ScanMode>(stoul(optarg));
 				break;
 			case 'p':
-				crucible::set_relative_path("");
+				use_relative_paths = false;
 				break;
 			case 't':
 				chatter_prefix_timestamp = true;
@@ -864,6 +863,11 @@ bees_main(int argc, char *argv[])
 	string root_path = argv[optind++];
 	BEESLOGNOTICE("setting root path to '" << root_path << "'");
 	bc->set_root_path(root_path);
+
+	// Set path prefix
+	if (use_relative_paths) {
+		crucible::set_relative_path(name_fd(bc->root_fd()));
+	}
 
 	// Workaround for btrfs send
 	bc->roots()->set_workaround_btrfs_send(workaround_btrfs_send);
