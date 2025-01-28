@@ -203,6 +203,16 @@ namespace crucible {
 		BtrfsTreeItem root(uint64_t subvol);
 	};
 
+	/// Fetch data extent items from extent tree, skipping metadata-only block groups
+	class BtrfsDataExtentTreeFetcher : public BtrfsExtentItemFetcher {
+		BtrfsTreeItem		m_current_bg;
+		BtrfsTreeOffsetFetcher	m_chunk_tree;
+	protected:
+		virtual void next_sk(BtrfsIoctlSearchKey &key, const BtrfsIoctlSearchHeader &hdr) override;
+	public:
+		BtrfsDataExtentTreeFetcher(const Fd &fd);
+	};
+
 }
 
 #endif

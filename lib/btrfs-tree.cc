@@ -707,4 +707,58 @@ namespace crucible {
 		}
 		return item;
 	}
+
+	BtrfsDataExtentTreeFetcher::BtrfsDataExtentTreeFetcher(const Fd &fd) :
+		BtrfsExtentItemFetcher(fd),
+		m_chunk_tree(fd)
+	{
+		tree(BTRFS_EXTENT_TREE_OBJECTID);
+		type(BTRFS_EXTENT_ITEM_KEY);
+		m_chunk_tree.tree(BTRFS_CHUNK_TREE_OBJECTID);
+		m_chunk_tree.type(BTRFS_CHUNK_ITEM_KEY);
+		m_chunk_tree.objectid(BTRFS_FIRST_CHUNK_TREE_OBJECTID);
+	}
+
+	void
+	BtrfsDataExtentTreeFetcher::next_sk(BtrfsIoctlSearchKey &key, const BtrfsIoctlSearchHeader &hdr)
+	{
+		key.min_type = key.max_type = type();
+		key.max_objectid = key.max_offset = numeric_limits<uint64_t>::max();
+		key.min_offset = 0;
+		key.min_objectid = hdr.objectid;
+		const auto step = scale_size();
+		if (key.min_objectid < numeric_limits<uint64_t>::max() - step) {
+			key.min_objectid += step;
+		} else {
+			key.min_objectid = numeric_limits<uint64_t>::max();
+		}
+		// If we're still in our current block group, check here
+		if (!!m_current_bg) {
+			const auto bg_begin = m_current_bg.offset();
+			const auto bg_end = bg_begin + m_current_bg.chunk_length();
+			// If we are still in our current block group, return early
+			if (key.min_objectid >= bg_begin && key.min_objectid < bg_end) return;
+		}
+		// We don't have a current block group or we're out of range
+		// Find the chunk that this bytenr belongs to
+		m_current_bg = m_chunk_tree.rlower_bound(key.min_objectid);
+		// Make sure it's a data block group
+		while (!!m_current_bg) {
+			// Data block group, stop here
+			if (m_current_bg.chunk_type() & BTRFS_BLOCK_GROUP_DATA) break;
+			// Not a data block group, skip to end
+			key.min_objectid = m_current_bg.offset() + m_current_bg.chunk_length();
+			m_current_bg = m_chunk_tree.lower_bound(key.min_objectid);
+		}
+		if (!m_current_bg) {
+			// Ran out of data block groups, stop here
+			return;
+		}
+		// Check to see if bytenr is in the current data block group
+		const auto bg_begin = m_current_bg.offset();
+		if (key.min_objectid < bg_begin) {
+			// Move forward to start of data block group
+			key.min_objectid = bg_begin;
+		}
+	}
 }
