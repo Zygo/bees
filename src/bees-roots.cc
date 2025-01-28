@@ -2,6 +2,7 @@
 
 #include "crucible/btrfs-tree.h"
 #include "crucible/cache.h"
+#include "crucible/cleanup.h"
 #include "crucible/ntoa.h"
 #include "crucible/openat2.h"
 #include "crucible/string.h"
@@ -102,15 +103,19 @@ protected:
 	shared_ptr<BeesRoots>	m_roots;
 	mutex m_scan_task_mutex;
 	Task m_scan_task;
-	bool crawl_batch(const shared_ptr<BeesCrawl>& crawl);
-	virtual void start_scan();
+	bool crawl_one_inode(const shared_ptr<BeesCrawl>& crawl);
+	/// Start a task and run the scan() method in it.  Should be called from next_transid().
+	void start_scan();
+	/// Scan one extent from a Task.  Should restart its task when more data available.
 	virtual void scan() = 0;
 public:
 	virtual ~BeesScanMode() {}
 	BeesScanMode(const shared_ptr<BeesRoots>& roots, const shared_ptr<BeesContext>& ctx);
-	using CrawlMap = decltype(BeesRoots::m_root_crawl_map);
-	virtual void next_transid(const CrawlMap &crawl_map) = 0;
 	virtual const char *ntoa() const = 0;
+	using CrawlMap = decltype(BeesRoots::m_root_crawl_map);
+	/// Called by crawl_transid thread to indicate a change in filesystem transid.
+	/// Should resume scan tasks by calling start_scan().
+	virtual void next_transid() = 0;
 };
 
 BeesScanMode::BeesScanMode(const shared_ptr<BeesRoots>& roots, const shared_ptr<BeesContext>& ctx) :
@@ -134,24 +139,90 @@ BeesScanMode::start_scan()
 	m_scan_task.idle();
 }
 
-bool
-BeesScanMode::crawl_batch(const shared_ptr<BeesCrawl>& crawl)
+struct BeesFileCrawl {
+	shared_ptr<BeesContext>				m_ctx;
+	shared_ptr<BeesCrawl>				m_crawl;
+	shared_ptr<BeesRoots>				m_roots;
+	/// Progress tracker hold object
+	ProgressTracker<BeesCrawlState>::ProgressHolder m_hold;
+	/// Crawl state snapshot when created
+	BeesCrawlState					m_state;
+	/// Currently processed offset in file
+	off_t						m_offset;
+
+	/// Method that does one unit of work for the Task
+	bool scan_one_ref();
+};
+
+class BeesScanModeSubvol : public BeesScanMode {
+protected:
+	using CrawlMap = BeesRoots::CrawlMap;
+	CrawlMap get_crawl_map();
+	bool crawl_one_inode(const shared_ptr<BeesCrawl>& crawl);
+public:
+	virtual ~BeesScanModeSubvol() {}
+	using BeesScanMode::BeesScanMode;
+};
+
+BeesScanModeSubvol::CrawlMap
+BeesScanModeSubvol::get_crawl_map()
 {
-	return m_roots->crawl_batch(crawl);
+	return m_roots->insert_new_crawl();
+}
+
+bool
+BeesScanModeSubvol::crawl_one_inode(const shared_ptr<BeesCrawl>& this_crawl)
+{
+	const auto this_state = this_crawl->get_state_end();
+	BEESNOTE("Crawling inode " << this_state);
+	BEESTRACE("Crawling inode " << this_state);
+	const auto this_range = this_crawl->pop_front();
+	if (!this_range) {
+		return false;
+	}
+	const auto subvol = this_range.fid().root();
+	const auto inode = this_range.fid().ino();
+	ostringstream oss;
+	oss << "crawl_" << subvol << "_" << inode;
+	const auto task_title = oss.str();
+	const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
+		.m_ctx = m_ctx,
+		.m_crawl = this_crawl,
+		.m_roots = m_roots,
+		.m_hold = this_crawl->hold_state(this_state),
+		.m_state = this_state,
+		.m_offset = this_range.begin(),
+	});
+	BEESNOTE("Starting task " << this_range);
+	Task(task_title, [bfc]() {
+		BEESNOTE("crawl_one_inode " << bfc->m_hold->get());
+		if (bfc->scan_one_ref()) {
+			// Append the current task to itself to make
+			// sure we keep a worker processing this file
+			Task::current_task().append(Task::current_task());
+		}
+	}).run();
+	auto next_state = this_state;
+	// Skip to EOF.  Will repeat up to 16 times if there happens to be an extent at 16EB,
+	// which would be a neat trick given that off64_t is signed.
+	next_state.m_offset = max(next_state.m_offset, numeric_limits<uint64_t>::max() - 65536 + 1);
+	this_crawl->set_state(next_state);
+	BEESCOUNT(crawl_scan);
+	return true;
 }
 
 /// Scan the same inode/offset tuple in each subvol.  Good for caching and space saving,
 /// bad for filesystems with rotating snapshots.
-class BeesScanModeLockstep : public BeesScanMode {
+class BeesScanModeLockstep : public BeesScanModeSubvol {
 	using SortKey = tuple<uint64_t, uint64_t, uint64_t>;
 	using Map = map<SortKey, CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<Map> m_sorted;
 	void scan() override;
 public:
-	using BeesScanMode::BeesScanMode;
+	using BeesScanModeSubvol::BeesScanModeSubvol;
 	~BeesScanModeLockstep() override {}
-	void next_transid(const CrawlMap &crawl_map) override;
+	void next_transid() override;
 	const char *ntoa() const override;
 };
 
@@ -175,7 +246,7 @@ BeesScanModeLockstep::scan()
 	while (!sorted.empty()) {
 		const auto this_crawl = sorted.begin()->second;
 		sorted.erase(sorted.begin());
-		const bool rv = crawl_batch(this_crawl);
+		const bool rv = crawl_one_inode(this_crawl);
 		if (rv) {
 			const auto this_range = this_crawl->peek_front();
 			if (this_range) {
@@ -191,8 +262,9 @@ BeesScanModeLockstep::scan()
 }
 
 void
-BeesScanModeLockstep::next_transid(const CrawlMap &crawl_map)
+BeesScanModeLockstep::next_transid()
 {
+	const auto crawl_map = get_crawl_map();
 	auto new_map = make_shared<Map>();
 	for (const auto &i : crawl_map) {
 		if (!is_subvol_tree(i.first)) continue;
@@ -213,15 +285,15 @@ BeesScanModeLockstep::next_transid(const CrawlMap &crawl_map)
 
 /// Scan each subvol in round-robin with no synchronization.
 /// Good for continuous forward progress while avoiding lock contention.
-class BeesScanModeIndependent : public BeesScanMode {
+class BeesScanModeIndependent : public BeesScanModeSubvol {
 	using List = list<CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<List> m_subvols;
 	void scan() override;
 public:
-	using BeesScanMode::BeesScanMode;
+	using BeesScanModeSubvol::BeesScanModeSubvol;
 	~BeesScanModeIndependent() override {}
-	void next_transid(const CrawlMap &crawl_map) override;
+	void next_transid() override;
 	const char *ntoa() const override;
 };
 
@@ -245,7 +317,7 @@ BeesScanModeIndependent::scan()
 	while (!subvols.empty()) {
 		const auto this_crawl = *subvols.begin();
 		subvols.erase(subvols.begin());
-		const bool rv = crawl_batch(this_crawl);
+		const bool rv = crawl_one_inode(this_crawl);
 		if (rv) {
 			subvols.push_back(this_crawl);
 			Task::current_task().idle();
@@ -255,8 +327,9 @@ BeesScanModeIndependent::scan()
 }
 
 void
-BeesScanModeIndependent::next_transid(const CrawlMap &crawl_map)
+BeesScanModeIndependent::next_transid()
 {
+	const auto crawl_map = get_crawl_map();
 	auto new_subvols = make_shared<List>();
 	for (const auto &i : crawl_map) {
 		if (!is_subvol_tree(i.first)) continue;
@@ -275,16 +348,16 @@ BeesScanModeIndependent::next_transid(const CrawlMap &crawl_map)
 /// Scan each subvol completely, in numerical order, before moving on to the next.
 /// This was an experimental mode that requires large amounts of temporary space
 /// and has the lowest hit rate.
-class BeesScanModeSequential : public BeesScanMode {
+class BeesScanModeSequential : public BeesScanModeSubvol {
 	using SortKey = uint64_t;
 	using Map = map<SortKey, CrawlMap::mapped_type>;
 	mutex m_mutex;
 	shared_ptr<Map> m_sorted;
 	void scan() override;
 public:
-	using BeesScanMode::BeesScanMode;
+	using BeesScanModeSubvol::BeesScanModeSubvol;
 	~BeesScanModeSequential() override {}
-	void next_transid(const CrawlMap &crawl_map) override;
+	void next_transid() override;
 	const char *ntoa() const override;
 };
 
@@ -307,7 +380,7 @@ BeesScanModeSequential::scan()
 	auto &sorted = *hold_sorted;
 	while (!sorted.empty()) {
 		const auto this_crawl = sorted.begin()->second;
-		const bool rv = crawl_batch(this_crawl);
+		const bool rv = crawl_one_inode(this_crawl);
 		if (rv) {
 			Task::current_task().idle();
 			return;
@@ -318,8 +391,9 @@ BeesScanModeSequential::scan()
 }
 
 void
-BeesScanModeSequential::next_transid(const CrawlMap &crawl_map)
+BeesScanModeSequential::next_transid()
 {
+	const auto crawl_map = get_crawl_map();
 	auto new_map = make_shared<Map>();
 	for (const auto &i : crawl_map) {
 		if (!is_subvol_tree(i.first)) continue;
@@ -340,7 +414,7 @@ BeesScanModeSequential::next_transid(const CrawlMap &crawl_map)
 
 /// Scan the most recently completely scanned subvols first.  Keeps recently added data
 /// from accumulating in small subvols while large subvols are still undergoing their first scan.
-class BeesScanModeRecent : public BeesScanMode {
+class BeesScanModeRecent : public BeesScanModeSubvol {
 	struct SortKey {
 		uint64_t min_transid, max_transid;
 		bool operator<(const SortKey &that) const {
@@ -352,9 +426,9 @@ class BeesScanModeRecent : public BeesScanMode {
 	shared_ptr<Map> m_sorted;
 	void scan() override;
 public:
-	using BeesScanMode::BeesScanMode;
+	using BeesScanModeSubvol::BeesScanModeSubvol;
 	~BeesScanModeRecent() override {}
-	void next_transid(const CrawlMap &crawl_map) override;
+	void next_transid() override;
 	const char *ntoa() const override;
 };
 
@@ -382,7 +456,7 @@ BeesScanModeRecent::scan()
 		} else {
 			const auto this_crawl = *this_list.begin();
 			this_list.erase(this_list.begin());
-			const bool rv = crawl_batch(this_crawl);
+			const bool rv = crawl_one_inode(this_crawl);
 			if (rv) {
 				this_list.push_back(this_crawl);
 				Task::current_task().idle();
@@ -393,8 +467,9 @@ BeesScanModeRecent::scan()
 }
 
 void
-BeesScanModeRecent::next_transid(const CrawlMap &crawl_map)
+BeesScanModeRecent::next_transid()
 {
+	const auto crawl_map = get_crawl_map();
 	auto new_map = make_shared<Map>();
 	auto &sorted = *new_map;
 	for (const auto &i : crawl_map) {
@@ -422,15 +497,16 @@ BeesScanModeRecent::next_transid(const CrawlMap &crawl_map)
 class BeesScanModeExtent : public BeesScanMode {
 	mutex m_mutex;
 	mutex m_insert_root_mutex;
-	CrawlMap m_crawl_map;
-	map<uint64_t, Task> m_task_map;
+
 	struct MagicCrawl {
 		uint64_t m_min_size;
 		uint64_t m_max_size;
 	};
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& magic);
+
 	using MagicCrawlMap = map<uint64_t, BeesScanModeExtent::MagicCrawl>;
 	static MagicCrawlMap s_magic_crawl_map;
+
 	struct ExtentRef {
 		uint64_t m_root;
 		uint64_t m_inum;
@@ -440,6 +516,7 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& ma
 		Timer m_age;
 	};
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& todo);
+
 	struct ExtentSizeCount {
 		uint64_t m_bytes = 0;
 	};
@@ -448,18 +525,71 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& tod
 		uint64_t m_total = 0;
 	} m_extent_size;
 
+	class SizeTier : public enable_shared_from_this<SizeTier> {
+		shared_ptr<BeesScanModeExtent> m_bsme;
+		shared_ptr<BeesCrawl> m_crawl;
+		shared_ptr<BeesContext> m_ctx;
+		uint64_t m_subvol;
+		MagicCrawl m_size_range;
+		Task m_scan_task;
+		BtrfsDataExtentTreeFetcher m_fetcher;
+
+	public:
+		SizeTier(const shared_ptr<BeesScanModeExtent> &bsme, const uint64_t subvol, const MagicCrawl &size_range);
+		void set_crawl_and_task(const shared_ptr<BeesCrawl> &crawl);
+		void run_task();
+		void find_next_extent();
+		void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len);
+		bool scan_one_ref(const ExtentRef &bior);
+		shared_ptr<BeesCrawl> crawl() const;
+	};
+
+	map<uint64_t, shared_ptr<SizeTier>> m_size_tiers;
+
 	void init_tasks();
 	void scan() override;
-	void map_next_extent(uint64_t subvol);
-	bool crawl_one_extent(const ExtentRef &bior);
-	void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len);
 
 public:
 	BeesScanModeExtent(const shared_ptr<BeesRoots>& roots, const shared_ptr<BeesContext>& ctx);
 	~BeesScanModeExtent() override {}
-	void next_transid(const CrawlMap &crawl_map) override;
+	void next_transid() override;
 	const char *ntoa() const override;
+	void count_extent_size(const uint64_t size);
 };
+
+BeesScanModeExtent::SizeTier::SizeTier(const shared_ptr<BeesScanModeExtent> &bsme, const uint64_t subvol, const MagicCrawl &size_range) :
+	m_bsme(bsme),
+	m_ctx(m_bsme->m_ctx),
+	m_subvol(subvol),
+	m_size_range(size_range),
+	m_fetcher(m_ctx->root_fd())
+{
+}
+
+void
+BeesScanModeExtent::SizeTier::set_crawl_and_task(const shared_ptr<BeesCrawl> &crawl)
+{
+	m_crawl = crawl;
+	ostringstream oss;
+	oss << "extent_" << m_subvol << "_" << pretty(m_size_range.m_min_size & ~BLOCK_MASK_CLONE)
+		<< "_" << pretty(m_size_range.m_max_size);
+	const auto st = shared_from_this();
+	m_scan_task = Task(oss.str(), [st]() {
+		st->find_next_extent();
+	});
+}
+
+void
+BeesScanModeExtent::SizeTier::run_task()
+{
+	m_scan_task.idle();
+}
+
+shared_ptr<BeesCrawl>
+BeesScanModeExtent::SizeTier::crawl() const
+{
+	return m_crawl;
+}
 
 ostream &
 operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& magic)
@@ -529,6 +659,20 @@ BeesScanModeExtent::ntoa() const
 	return "EXTENT";
 }
 
+void
+BeesScanModeExtent::count_extent_size(const uint64_t size)
+{
+	unique_lock<mutex> lock(m_mutex);
+	for (auto &i : m_extent_size.m_map) {
+		const auto &svm = s_magic_crawl_map.at(i.first);
+		if (size >= svm.m_min_size && size <= svm.m_max_size) {
+			i.second.m_bytes += size;
+			break;
+		}
+	}
+	m_extent_size.m_total += size;
+}
+
 static
 bool
 should_throttle()
@@ -555,9 +699,9 @@ should_throttle()
 }
 
 bool
-BeesScanModeExtent::crawl_one_extent(const BeesScanModeExtent::ExtentRef &bior)
+BeesScanModeExtent::SizeTier::scan_one_ref(const BeesScanModeExtent::ExtentRef &bior)
 {
-	BEESTRACE("crawl_one_extent " << bior);
+	BEESTRACE("scan_one_ref " << bior);
 
 	auto inode_mutex = m_ctx->get_inode_mutex(bior.m_inum);
 	auto inode_lock = inode_mutex->try_lock(Task::current_task());
@@ -584,7 +728,7 @@ BeesScanModeExtent::crawl_one_extent(const BeesScanModeExtent::ExtentRef &bior)
 }
 
 void
-BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& hold, const uint64_t len)
+BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& hold, const uint64_t len)
 {
 	BEESNOTE("Creating extent map for " << to_hex(bytenr) << " with LOGICAL_INO");
 	BEESTRACE("Creating extent map for " << to_hex(bytenr) << " with LOGICAL_INO");
@@ -693,15 +837,15 @@ BeesScanModeExtent::create_extent_map(const uint64_t bytenr, const ProgressTrack
 	// Create task to scan all refs to this extent
 	ostringstream oss;
 	oss << "ref_" << hex << bytenr << "_" << pretty(len) << "_" << dec << refs_list->size();
-	const auto bec = dynamic_pointer_cast<BeesScanModeExtent>(shared_from_this());
+	const auto bec = shared_from_this();
 	const auto map_task = Task::current_task();
 	Task crawl_one(oss.str(), [bec, refs_list, map_task]() {
 		if (!refs_list->empty()) {
 			const auto extref = *(refs_list->begin());
 			refs_list->pop_front();
 			catch_all([&]() {
-				// Exceptions in crawl_one_extent make us forget about this ref
-				const bool restart_ref = bec->crawl_one_extent(extref);
+				// Exceptions in scan_one_ref make us forget about this ref
+				const bool restart_ref = bec->scan_one_ref(extref);
 				if (restart_ref) {
 					refs_list->push_front(extref);
 				}
@@ -724,15 +868,15 @@ BeesScanModeExtent::init_tasks()
 {
 	BEESTRACE("init_tasks");
 
-	// Make sure all the magic crawlers are inserted in m_crawl_map,
+	// Make sure all the magic crawlers are inserted in m_size_tiers,
 	// and each one has a Task
 	unique_lock<mutex> lock_insert_root(m_insert_root_mutex);
 	unique_lock<mutex> lock(m_mutex);
 	for (const auto &i : s_magic_crawl_map) {
 		const auto subvol = i.first;
 		const auto &magic = i.second;
-		const auto found = m_crawl_map.find(subvol);
-		if (found == m_crawl_map.end()) {
+		const auto found = m_size_tiers.find(subvol);
+		if (found == m_size_tiers.end()) {
 			lock.unlock();
 			BeesCrawlState new_bcs;
 			new_bcs.m_root = subvol;
@@ -740,18 +884,9 @@ BeesScanModeExtent::init_tasks()
 			new_bcs.m_max_transid = m_roots->transid_max();
 			const auto this_crawl = m_roots->insert_root(new_bcs);
 			lock.lock();
-			m_crawl_map.insert(make_pair(subvol, this_crawl));
-			BEESCOUNT(crawl_create);
-		}
-		auto task_found = m_task_map.find(subvol);
-		if (task_found == m_task_map.end()) {
-			ostringstream oss;
-			oss << "extent_" << subvol << "_" << pretty(magic.m_min_size & ~BLOCK_MASK_CLONE)
-				<< "_" << pretty(magic.m_max_size);
-			const auto bec = dynamic_pointer_cast<BeesScanModeExtent>(shared_from_this());
-			m_task_map.insert(make_pair(subvol, Task(oss.str(), [bec, subvol]() {
-				bec->map_next_extent(subvol);
-			})));
+			const auto new_size_tier = make_shared<SizeTier>(dynamic_pointer_cast<BeesScanModeExtent>(shared_from_this()), subvol, magic);
+			new_size_tier->set_crawl_and_task(this_crawl);
+			m_size_tiers.insert(make_pair(subvol, new_size_tier));
 		}
 		m_extent_size.m_map.insert(make_pair(subvol, ExtentSizeCount {}));
 	}
@@ -763,141 +898,240 @@ BeesScanModeExtent::scan()
 	BEESTRACE("bsm scan");
 
 	unique_lock<mutex> lock(m_mutex);
-	const auto task_map_copy = m_task_map;
-	lock.unlock();
-
-	// Good to go, start everything running
-	for (const auto &i : task_map_copy) {
-		i.second.idle();
+	// Poke all the size tier scan tasks
+	for (const auto &i : m_size_tiers) {
+		i.second->run_task();
 	}
 }
 
 void
-BeesScanModeExtent::map_next_extent(uint64_t const subvol)
+BeesScanModeExtent::SizeTier::find_next_extent()
 {
-	BEESTRACE("map_next_extent " << subvol);
+	BEESTRACE("find_next_extent " << m_subvol);
 
-	size_t discard_count = 0;
+	size_t size_low_count = 0;
+	size_t size_high_count = 0;
 	size_t gen_low_count = 0;
 	size_t gen_high_count = 0;
 	size_t loop_count = 0;
+	size_t skip_count = 0;
+	size_t flop_count = 0;
 	size_t init_s_calls = BtrfsIoctlSearchKey::s_calls;
 	size_t init_s_loops = BtrfsIoctlSearchKey::s_loops;
 	Timer crawl_time;
 
-	unique_lock<mutex> lock(m_mutex);
-	const auto found = m_crawl_map.find(subvol);
-	assert(found != m_crawl_map.end());
-	THROW_CHECK0(runtime_error, found != m_crawl_map.end());
-	CrawlMap::mapped_type this_crawl = found->second;
-	lock.unlock();
-	THROW_CHECK0(runtime_error, this_crawl);
+	// Low-level extent search debugging
+	shared_ptr<ostringstream> debug_oss;
+#if 0
+	// Enable a _lot_ of debugging output
+	debug_oss = make_shared<ostringstream>();
+#endif
+	if (debug_oss) {
+		BtrfsIoctlSearchKey::s_debug_ostream = debug_oss;
+	}
 
-	BtrfsExtentItemFetcher beif(m_ctx->root_fd());
-	beif.scale_size(BLOCK_SIZE_SUMS);
+	// Write out the stats no matter how we exit
+	Cleanup write_stats([&]() {
+		// Count stats first so we don't pollute the crawl stats with the map stats
+		const auto search_calls = BtrfsIoctlSearchKey::s_calls - init_s_calls;
+		const auto search_loops = BtrfsIoctlSearchKey::s_loops - init_s_loops;
+		if (crawl_time.age() > 1) {
+			BEESLOGDEBUG(
+				"loop_count " << loop_count
+				<< " size_low_count " << size_low_count
+				<< " size_high_count " << size_high_count
+				<< " gen_low_count " << gen_low_count
+				<< " gen_high_count " << gen_high_count
+				<< " search_calls " << search_calls
+				<< " search_loops " << search_loops
+				<< " skips " << skip_count
+				<< " flops " << flop_count
+				<< " time " << crawl_time
+				<< " subvol " << m_subvol
+				<< " search/loop " << pretty(search_calls / loop_count)
+				<< " skip/loop " << (100 * skip_count / loop_count) << "%"
+				<< " flop/loop " << (100 * flop_count / loop_count) << "%"
+			);
+			if (debug_oss) {
+				BEESLOGDEBUG("debug oss trace:\n" << debug_oss->str());
+			}
+		}
+		BtrfsIoctlSearchKey::s_debug_ostream.reset();
+	});
+
+#define MNE_DEBUG(x) do { \
+	if (debug_oss) { \
+		(*debug_oss) << x << "\n"; \
+	} \
+} while(false)
+
+	// Find current position
+	BEESTRACE("get_state_end");
+	const BeesCrawlState old_state = m_crawl->get_state_end();
+	BEESNOTE("Crawling extent " << old_state);
+	BEESTRACE("Crawling extent " << old_state);
+	auto current_bytenr = old_state.m_objectid;
+	MNE_DEBUG("current_bytenr = " << current_bytenr);
+
+	// Hold current position until we find a new one
+	auto current_hold = m_crawl->hold_state(old_state);
+
+	// Get transid range out of the old state
+	const auto min_transid = old_state.m_min_transid;
+	const auto max_transid = old_state.m_max_transid;
+
+	// Set fetcher to current transid
+	m_fetcher.transid(min_transid);
 
 	// Get the next item from the crawler
-	while (true) {
+	while (!m_crawl->deferred()) {
+		if (debug_oss) {
+			// There is a lot of debug output.  Dump it if it gets too long
+			if (!debug_oss->str().empty()) {
+				if (crawl_time.age() > 1) {
+					BEESLOGDEBUG("debug oss trace (so far):\n" << debug_oss->str());
+					debug_oss->str("");
+				}
+			}
+		}
+
 		++loop_count;
+		MNE_DEBUG("Loop #" << loop_count << " current_bytenr " << to_hex(current_bytenr));
 
-		BEESTRACE("get_state_end");
-		const auto this_state = this_crawl->get_state_end();
-		BEESNOTE("Crawling extent " << this_state);
-		BEESTRACE("Crawling extent " << this_state);
-		const auto this_range = this_crawl->pop_front();
-		BEESTRACE("this_range check");
+		const auto bti = m_fetcher.lower_bound(current_bytenr);
+		if (!bti) {
+			// Ran out of data in this scan cycle
+			MNE_DEBUG("Crawl finished after " << to_hex(current_bytenr));
+			m_crawl->restart_crawl();
+			// All of our local state is now invalid.  Restart the whole Task.
+			Task::current_task().idle();
+			// In ordered mode, just have the task call us again.
+			return true;
+		}
 
-		// Ran out of data in this subvol, wait for next_transid to refill it
-		if (!this_range) {
-			break;
+		// Get the position of both ends of the extent
+		const auto this_bytenr = bti.objectid();
+		const auto this_length = bti.offset();
+
+		const auto next_bytenr = this_bytenr + this_length;
+		// Position must not overflow
+		THROW_CHECK3(runtime_error, this_bytenr, this_length, next_bytenr, next_bytenr > this_bytenr);
+		// Position must advance
+		THROW_CHECK2(runtime_error, current_bytenr, next_bytenr, next_bytenr > current_bytenr);
+
+		// We are now committed to this extent, and will not retry it after an exception.
+		// Move the crawl position to the next item.
+		current_bytenr = next_bytenr;
+
+		// We need BeesCrawlState objects to talk to BeesCrawl's state-tracking code
+		auto this_state = old_state;
+		this_state.m_objectid = this_bytenr;
+
+		auto next_state = this_state;
+		next_state.m_objectid = next_bytenr;
+
+		// Create a holder for the next bytenr state and swap it out of the loop
+		auto next_hold = m_crawl->hold_state(next_state);
+		swap(current_hold, next_hold);
+
+		// The pointer formerly stored in current_hold will persist until the end of this loop iteration.
+		// The pointer formerly stored in next_hold will persist until this point in the next loop iteration.
+
+		MNE_DEBUG("this_bytenr = " << to_hex(this_bytenr) << ", this_length = " << pretty(this_length) << ", next_bytenr = " << to_hex(next_bytenr));
+
+		// In mixed-bg filesystems there are metadata objects mixed in with data objects.
+		// Skip over TREE_BLOCK extent items, they don't have files.
+		if (bti.extent_flags() & BTRFS_EXTENT_FLAG_TREE_BLOCK) {
+			MNE_DEBUG("BTRFS_EXTENT_FLAG_TREE_BLOCK");
+			BEESCOUNT(crawl_tree_block);
+			continue;
 		}
 
 		// Calculate average proportion of each extent size
-		const uint64_t this_range_size = this_range.size();
-		unique_lock<mutex> lock(m_mutex);
-		for (auto &i : m_extent_size.m_map) {
-			const auto &svm = s_magic_crawl_map.at(i.first);
-			if (this_range_size >= svm.m_min_size && this_range_size <= svm.m_max_size) {
-				i.second.m_bytes += this_range_size;
-				break;
-			}
-		}
-		m_extent_size.m_total += this_range_size;
-		lock.unlock();
+		m_bsme->count_extent_size(this_length);
 
 		// Check extent length against size range
-		const auto &subvol_magic = s_magic_crawl_map.at(subvol);
-		const uint64_t lower_size_bound = subvol_magic.m_min_size;
-		const uint64_t upper_size_bound = subvol_magic.m_max_size;
+		const uint64_t lower_size_bound = m_size_range.m_min_size;
+		const uint64_t upper_size_bound = m_size_range.m_max_size;
 
 		// If this extent is out of range, move on to the next
-		if (this_range_size < lower_size_bound || this_range_size > upper_size_bound) {
-			// Advance the begin point in case we get into trouble later on
-			this_crawl->hold_state(this_state);
-			BEESCOUNT(crawl_discard);
-			++discard_count;
+		if (this_length < lower_size_bound || this_length > upper_size_bound) {
+			MNE_DEBUG("discard: this_length = " << pretty(this_length) << " lower_size_bound = " << pretty(lower_size_bound) << " upper_size_bound " << pretty(upper_size_bound));
 
-			// Skip the skipping until we get the issues sorted out
-			continue;
+			// If extent is longer than max_size, the extent will advance faster than the skip
+			if (this_length > upper_size_bound) {
+				++size_high_count;
+				BEESCOUNT(crawl_discard_high);
+				continue;
+			}
+
+			// Must be small then
+			BEESCOUNT(crawl_discard_low);
+			++size_low_count;
 
 			// Skip ahead over any below-min-size extents
-			BEESTRACE("min_size " << pretty(lower_size_bound) << " > scale_size " << pretty(beif.scale_size()));
-			const auto lsb_rounded = lower_size_bound & ~(beif.scale_size() - 1);
-			// Don't bother doing backward searches when skipping less than 128K,
-			// the search will cost more than reading 32 consecutive extent records
-			// FIXME: need to make this aware of block group boundaries so it doesn't
-			// blow 5 CPU seconds scanning metadata
-			if (lsb_rounded >= 128 * 1024) {
-				const auto lsb_rounded = lower_size_bound & ~(beif.scale_size() - 1);
-				const auto objectid = this_range.end() + lsb_rounded - beif.scale_size();
-				BEESTRACE("objectid = " << this_state.m_objectid << ", adjusted to " << objectid);
-				BEESTOOLONG("subvol " << subvol << " skipping forward " << pretty(lsb_rounded) << " from " << to_hex(this_state.m_objectid) << " to " << to_hex(objectid));
-				BEESNOTE("subvol " << subvol << " skipping forward " << pretty(lsb_rounded) << " from " << to_hex(this_state.m_objectid) << " to " << to_hex(objectid));
-				const auto bti = beif.rlower_bound(objectid);
-				auto mutable_state = this_state;
-				mutable_state.m_objectid = bti.objectid();
-				if (mutable_state.m_objectid <= this_state.m_objectid) {
-					// BEESLOGDEBUG("skip failed: this_state " << this_state << ", mutable_state " << mutable_state);
-					// No extent found between end and search position, skip ahead to search position
-					mutable_state.m_objectid = objectid;
-					BEESCOUNT(crawl_skip_fail);
-				} else {
-					const auto discard_hold = this_crawl->hold_state(mutable_state);
-					BEESCOUNT(crawl_skip_ok);
-				}
+			BEESTRACE("min_size " << pretty(lower_size_bound) << " > scale_size " << pretty(m_fetcher.scale_size()));
+			const auto lsb_rounded = lower_size_bound & ~(m_fetcher.scale_size() - 1);
+			// Don't bother doing backward searches when skipping 128K or less.
+			// The search will cost more than reading 32 consecutive extent records.
+			if (lsb_rounded <= 128 * 1024) {
+				continue;
 			}
+
+			Timer skip_timer;
+
+			// Choose a point that would be inside a min-size extent which starts here
+			const auto objectid = next_bytenr + lsb_rounded - m_fetcher.scale_size();
+			BEESTRACE("objectid = " << next_bytenr << ", adjusted to " << objectid);
+			MNE_DEBUG("objectid = " << next_bytenr << ", adjusted to " << objectid);
+			BEESTOOLONG("subvol " << m_subvol << " skipping forward " << pretty(lsb_rounded) << " from " << to_hex(this_state.m_objectid) << " to " << to_hex(objectid));
+			BEESNOTE("subvol " << m_subvol << " skipping forward " << pretty(lsb_rounded) << " from " << to_hex(this_state.m_objectid) << " to " << to_hex(objectid));
+			MNE_DEBUG("subvol " << m_subvol << " skipping forward " << pretty(lsb_rounded) << " from " << to_hex(this_state.m_objectid) << " to " << to_hex(objectid));
+
+			// Find an extent which starts before the chosen point
+			const auto bti = m_fetcher.rlower_bound(objectid);
+			if (!bti) {
+				MNE_DEBUG("Crawl finished: skip found no extent after " << to_hex(objectid));
+				// Keep going without skipping
+				continue;
+			}
+			const auto new_bytenr = bti.objectid();
+			if (new_bytenr <= next_bytenr) {
+				MNE_DEBUG("flopped: new_bytenr " << to_hex(new_bytenr) << " < next_bytenr " << to_hex(next_bytenr));
+				// No extent found between end of current extent and chosen point, skip ahead to end of current extent
+				// ...which is where current_bytenr already is, so no need to change anything
+				BEESCOUNT(crawl_flop);
+				++flop_count;
+			} else {
+				MNE_DEBUG("skipped: new_bytenr " << to_hex(new_bytenr) << " > next_bytenr " << to_hex(next_bytenr));
+				// We skipped over some extents, start with the one we landed in
+				current_bytenr = new_bytenr;
+				BEESCOUNT(crawl_skip);
+				++skip_count;
+			}
+			BEESCOUNTADD(crawl_skip_ms, skip_timer.age() * 1000);
 			continue;
 		}
 
-		const auto bytenr = this_range.fid().ino();
-		const auto bti = beif.at(bytenr);
-
 		// Check extent item generation is in range
-		// FIXME: we already had this in crawl state, and we threw it away
 		const auto gen = bti.extent_generation();
-		if (gen < this_state.m_min_transid) {
+		if (gen < min_transid) {
+			MNE_DEBUG("generation " << gen << " < " << min_transid);
 			BEESCOUNT(crawl_gen_low);
 			++gen_low_count;
 			continue;
 		}
-		if (gen > this_state.m_max_transid) {
+		if (gen > max_transid) {
+			MNE_DEBUG("generation " << gen << " > " << max_transid);
 			BEESCOUNT(crawl_gen_high);
 			++gen_high_count;
 			continue;
 		}
 
 		// Map this extent here to regulate task creation
-		create_extent_map(bytenr, this_crawl->hold_state(this_state), this_range_size);
-
+		// Note next_hold >= this_hold > current_hold after the swap above.
+		create_extent_map(this_bytenr, m_crawl->hold_state(this_state), this_length);
 		BEESCOUNT(crawl_extent);
-		const auto search_calls = BtrfsIoctlSearchKey::s_calls - init_s_calls;
-		const auto search_loops = BtrfsIoctlSearchKey::s_loops - init_s_loops;
-		if (crawl_time.age() > 1) {
-			BEESLOGDEBUG("loop_count " << loop_count << " discard_count " << discard_count
-				<< " gen_low_count " << gen_low_count << " gen_high_count " << gen_high_count
-				<< " search_calls " << search_calls << " search_loops " << search_loops
-				<< " time " << crawl_time << " subvol " << subvol);
-		}
 
 		// We did something!  Get in line to run again...unless we're throttled
 		if (!should_throttle()) {
@@ -905,6 +1139,8 @@ BeesScanModeExtent::map_next_extent(uint64_t const subvol)
 		}
 		return;
 	}
+
+	// Crawl state is updated by holder destructors
 
 	// All crawls done
 	BEESCOUNT(crawl_done);
@@ -923,12 +1159,9 @@ strf_localtime(const time_t &when)
 }
 
 void
-BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
+BeesScanModeExtent::next_transid()
 {
 	BEESTRACE("Extent next_transid");
-
-	// We maintain our own crawl map
-	(void)crawl_map_unused;
 
 	// Do the important parts first, the rest can return early or die with an exception
 
@@ -942,11 +1175,14 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 		unique_lock<mutex> lock(m_mutex);
 		for (const auto &i : s_magic_crawl_map) {
 			const auto subvol = i.first;
-			const auto found = m_crawl_map.find(subvol);
-			if (found != m_crawl_map.end()) {
+			const auto found = m_size_tiers.find(subvol);
+			if (found != m_size_tiers.end()) {
+				const auto crawl = found->second->crawl();
 				// Have to save these for the progress table
-				deferred_map.insert(make_pair(subvol, make_pair(found->second->deferred(), found->second->finished())));
-				found->second->deferred(false);
+				deferred_map.insert(make_pair(subvol, make_pair(crawl->deferred(), crawl->finished())));
+
+				// If the crawl has stopped (e.g. due to running out of data), then restart it here
+				crawl->deferred(false);
 			}
 		}
 	}
@@ -999,7 +1235,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 	// Grab a copy of members
 	unique_lock<mutex> lock(m_mutex);
 	const auto mes = m_extent_size;
-	const auto cmc = m_crawl_map;
+	const auto cmc = m_size_tiers;
 
 	// Decay the extent size map averages
 	static const double decay = .99;
@@ -1037,7 +1273,7 @@ BeesScanModeExtent::next_transid(const CrawlMap &crawl_map_unused)
 			continue;
 		}
 
-		const auto this_crawl = found->second;
+		const auto this_crawl = found->second->crawl();
 		THROW_CHECK1(runtime_error, subvol, this_crawl);
 
 		// Get the last _completed_ state
@@ -1318,26 +1554,11 @@ BeesRoots::transid_max()
 	return rv;
 }
 
-struct BeesFileCrawl {
-	shared_ptr<BeesContext>				m_ctx;
-	shared_ptr<BeesCrawl>				m_crawl;
-	shared_ptr<BeesRoots>				m_roots;
-	/// Progress tracker hold object
-	ProgressTracker<BeesCrawlState>::ProgressHolder m_hold;
-	/// Crawl state snapshot when created
-	BeesCrawlState					m_state;
-	/// Currently processed offset in file
-	off_t						m_offset;
-
-	/// Method that does one unit of work for the Task
-	bool crawl_one_extent();
-};
-
 bool
-BeesFileCrawl::crawl_one_extent()
+BeesFileCrawl::scan_one_ref()
 {
-	BEESNOTE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
-	BEESTRACE("crawl_one_extent m_offset " << to_hex(m_offset) << " state " << m_state);
+	BEESNOTE("scan_one_ref m_offset " << to_hex(m_offset) << " state " << m_state);
+	BEESTRACE("scan_one_ref m_offset " << to_hex(m_offset) << " state " << m_state);
 
 	BtrfsExtentDataFetcher bedf(m_ctx->root_fd());
 	bedf.tree(m_state.m_root);
@@ -1452,47 +1673,6 @@ BeesFileCrawl::crawl_one_extent()
 	return true;
 }
 
-bool
-BeesRoots::crawl_batch(shared_ptr<BeesCrawl> this_crawl)
-{
-	const auto this_state = this_crawl->get_state_end();
-	BEESNOTE("Crawling batch " << this_state);
-	BEESTRACE("Crawling batch " << this_state);
-	const auto this_range = this_crawl->pop_front();
-	if (!this_range) {
-		return false;
-	}
-	const auto subvol = this_range.fid().root();
-	const auto inode = this_range.fid().ino();
-	ostringstream oss;
-	oss << "crawl_" << subvol << "_" << inode;
-	const auto task_title = oss.str();
-	const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
-		.m_ctx = m_ctx,
-		.m_crawl = this_crawl,
-		.m_roots = shared_from_this(),
-		.m_hold = this_crawl->hold_state(this_state),
-		.m_state = this_state,
-		.m_offset = this_range.begin(),
-	});
-	BEESNOTE("Starting task " << this_range);
-	Task(task_title, [bfc]() {
-		BEESNOTE("crawl_batch " << bfc->m_hold->get());
-		if (bfc->crawl_one_extent()) {
-			// Append the current task to itself to make
-			// sure we keep a worker processing this file
-			Task::current_task().append(Task::current_task());
-		}
-	}).run();
-	auto next_state = this_state;
-	// Skip to EOF.  Will repeat up to 16 times if there happens to be an extent at 16EB,
-	// which would be a neat trick given that off64_t is signed.
-	next_state.m_offset = max(next_state.m_offset, numeric_limits<uint64_t>::max() - 65536 + 1);
-	this_crawl->set_state(next_state);
-	BEESCOUNT(crawl_scan);
-	return true;
-}
-
 void
 BeesRoots::clear_caches()
 {
@@ -1519,7 +1699,7 @@ BeesRoots::crawl_thread()
 	const auto crawl_new = Task("crawl_new", [shared_this]() {
 		BEESTRACE("crawl_new " << shared_this);
 		catch_all([&]() {
-			shared_this->insert_new_crawl();
+			shared_this->m_scanner->next_transid();
 		});
 	});
 
@@ -1600,7 +1780,7 @@ BeesRoots::insert_root(const BeesCrawlState &new_bcs)
 	return found->second;
 }
 
-void
+BeesRoots::CrawlMap
 BeesRoots::insert_new_crawl()
 {
 	BEESNOTE("adding crawlers for new subvols and removing crawlers for removed subvols");
@@ -1641,7 +1821,6 @@ BeesRoots::insert_new_crawl()
 	BEESTRACE("rebuilding crawl map");
 
 	lock.lock();
-	THROW_CHECK0(runtime_error, m_scanner);
 
 	// Work from a copy because BeesCrawl might change the world under us
 	const auto crawl_map_copy = m_root_crawl_map;
@@ -1652,8 +1831,7 @@ BeesRoots::insert_new_crawl()
 		BEESLOGINFO("crawl map is empty!");
 	}
 
-	// We'll send an empty map to the scanner anyway, maybe we want it to stop
-	m_scanner->next_transid(crawl_map_copy);
+	return crawl_map_copy;
 }
 
 void
@@ -2104,10 +2282,11 @@ BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) 
 }
 
 bool
-BeesCrawl::restart_crawl()
+BeesCrawl::restart_crawl_unlocked()
 {
 	const auto roots = m_ctx->roots();
 	const auto next_transid = roots->transid_max();
+
 	auto crawl_state = get_state_end();
 
 	// If we are already at transid_max then we are still finished
@@ -2136,6 +2315,13 @@ BeesCrawl::restart_crawl()
 }
 
 bool
+BeesCrawl::restart_crawl()
+{
+	unique_lock<mutex> lock(m_mutex);
+	return restart_crawl_unlocked();
+}
+
+bool
 BeesCrawl::fetch_extents()
 {
 	BEESTRACE("fetch_extents " << get_state_end());
@@ -2149,7 +2335,8 @@ BeesCrawl::fetch_extents()
 
 	// We can't scan an empty transid interval.
 	if (m_finished || old_state.m_max_transid <= old_state.m_min_transid) {
-		return restart_crawl();
+		// fetch_extents is called from pop_front or peek_front, both of which hold the lock
+		return restart_crawl_unlocked();
 	}
 
 	// Check for btrfs send workaround: don't scan RO roots at all, pretend
@@ -2190,7 +2377,8 @@ BeesCrawl::fetch_extents()
 
 	// Find an extent data item in this subvol in the transid range
 	BEESTRACE("looking for new objects " << old_state);
-	// Don't set max_transid to m_max_transid here.	 See crawl_one_extent.
+
+	// Don't set max_transid to m_max_transid here.	 See scan_one_ref.
 	m_btof.transid(old_state.m_min_transid);
 	if (catch_all([&]() {
 		m_next_extent_data = m_btof.lower_bound(old_state.m_objectid);
@@ -2209,7 +2397,7 @@ BeesCrawl::fetch_extents()
 	if (!m_next_extent_data) {
 		// Ran out of data in this subvol and transid.
 		// Try to restart immediately if more transids are available.
-		return restart_crawl();
+		return restart_crawl_unlocked();
 	}
 	auto new_state = old_state;
 	new_state.m_objectid = max(m_next_extent_data.objectid() + m_btof.scale_size(), m_next_extent_data.objectid());

@@ -521,7 +521,7 @@ class BeesCrawl {
 
 	bool fetch_extents();
 	void fetch_extents_harder();
-	bool restart_crawl();
+	bool restart_crawl_unlocked();
 	BeesFileRange bti_to_bfr(const BtrfsTreeItem &bti) const;
 
 public:
@@ -535,6 +535,7 @@ public:
 	void deferred(bool def_setting);
 	bool deferred() const;
 	bool finished() const;
+	bool restart_crawl();
 };
 
 class BeesScanMode;
@@ -543,7 +544,8 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	shared_ptr<BeesContext>			m_ctx;
 
 	BeesStringFile				m_crawl_state_file;
-	map<uint64_t, shared_ptr<BeesCrawl>>	m_root_crawl_map;
+	using CrawlMap = map<uint64_t, shared_ptr<BeesCrawl>>;
+	CrawlMap				m_root_crawl_map;
 	mutex					m_mutex;
 	uint64_t				m_crawl_dirty = 0;
 	uint64_t				m_crawl_clean = 0;
@@ -562,7 +564,7 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	condition_variable			m_stop_condvar;
 	bool					m_stop_requested = false;
 
-	void insert_new_crawl();
+	CrawlMap insert_new_crawl();
 	Fd open_root_nocache(uint64_t root);
 	Fd open_root_ino_nocache(uint64_t root, uint64_t ino);
 	uint64_t transid_max_nocache();
@@ -579,12 +581,13 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
 
-friend class BeesScanModeExtent;
 	shared_ptr<BeesCrawl> insert_root(const BeesCrawlState &bcs);
 
 friend class BeesCrawl;
 friend class BeesFdCache;
 friend class BeesScanMode;
+friend class BeesScanModeSubvol;
+friend class BeesScanModeExtent;
 
 public:
 	BeesRoots(shared_ptr<BeesContext> ctx);
