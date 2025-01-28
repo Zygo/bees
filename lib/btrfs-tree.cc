@@ -413,8 +413,8 @@ namespace crucible {
 		uint64_t closest_logical = 0;
 		BtrfsIoctlSearchKey &sk = m_sk;
 		size_t loops = 0;
-		BTFRLB_DEBUG("rlower_bound: " << to_hex(logical) << endl);
-		seek_backward(scale_logical(logical), [&](uint64_t lower_bound, uint64_t upper_bound) {
+		BTFRLB_DEBUG("rlower_bound: " << to_hex(logical) << " in tree " << tree() << endl);
+		seek_backward(scale_logical(logical), [&](uint64_t const lower_bound, uint64_t const upper_bound) {
 			++loops;
 			fill_sk(sk, unscale_logical(min(scaled_max_logical(), lower_bound)));
 			set<uint64_t> rv;
@@ -424,29 +424,31 @@ namespace crucible {
 				BTFRLB_DEBUG("fetch: loop " << loops << " lower_bound..upper_bound " << to_hex(lower_bound) << ".." << to_hex(upper_bound));
 				for (auto &i : sk.m_result) {
 					next_sk(sk, i);
-					const auto this_logical = hdr_logical(i);
-					const auto scaled_hdr_logical = scale_logical(this_logical);
-					BTFRLB_DEBUG(" " << to_hex(scaled_hdr_logical));
-					if (hdr_match(i)) {
-						if (this_logical <= logical && this_logical > closest_logical) {
-							closest_logical = this_logical;
-							closest_item = i;
-						}
-						BTFRLB_DEBUG("(match)");
-						rv.insert(scaled_hdr_logical);
-					}
-					if (scaled_hdr_logical > upper_bound || hdr_stop(i)) {
-						if (scaled_hdr_logical >= upper_bound) {
-							BTFRLB_DEBUG("(" << to_hex(scaled_hdr_logical) << " >= " << to_hex(upper_bound) << ")");
-						}
-						if (hdr_stop(i)) {
-							rv.insert(numeric_limits<uint64_t>::max());
-							BTFRLB_DEBUG("(stop)");
-						}
+					// If hdr_stop or !hdr_match, don't inspect the item
+					if (hdr_stop(i)) {
+						rv.insert(numeric_limits<uint64_t>::max());
+						BTFRLB_DEBUG("(stop)");
 						break;
-					} else {
-						BTFRLB_DEBUG("(cont'd)");
 					}
+					if (!hdr_match(i)) {
+						BTFRLB_DEBUG("(no match)");
+						continue;
+					}
+					const auto this_logical = hdr_logical(i);
+					BTFRLB_DEBUG(" " << to_hex(this_logical) << " " << i);
+					const auto scaled_hdr_logical = scale_logical(this_logical);
+					BTFRLB_DEBUG(" " << "(match)");
+					if (this_logical <= logical && this_logical > closest_logical) {
+						closest_logical = this_logical;
+						closest_item = i;
+						BTFRLB_DEBUG("(closest)");
+					}
+					rv.insert(scaled_hdr_logical);
+					if (scaled_hdr_logical > upper_bound) {
+						BTFRLB_DEBUG("(" << to_hex(scaled_hdr_logical) << " >= " << to_hex(upper_bound) << ")");
+						break;
+					}
+					BTFRLB_DEBUG("(cont'd)");
 				}
 				BTFRLB_DEBUG(endl);
 				// We might get a search result that contains only non-matching items.
