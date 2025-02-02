@@ -201,6 +201,7 @@ namespace crucible {
 		static thread_local size_t s_calls;
 		static thread_local size_t s_loops;
 		static thread_local size_t s_loops_empty;
+		static thread_local shared_ptr<ostream> s_debug_ostream;
 	};
 
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_key &key);

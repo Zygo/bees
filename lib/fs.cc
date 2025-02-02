@@ -757,6 +757,7 @@ namespace crucible {
 	thread_local size_t BtrfsIoctlSearchKey::s_calls = 0;
 	thread_local size_t BtrfsIoctlSearchKey::s_loops = 0;
 	thread_local size_t BtrfsIoctlSearchKey::s_loops_empty = 0;
+	thread_local shared_ptr<ostream> BtrfsIoctlSearchKey::s_debug_ostream;
 
 	bool
 	BtrfsIoctlSearchKey::do_ioctl_nothrow(int fd)
@@ -776,6 +777,9 @@ namespace crucible {
 			ioctl_ptr = ioctl_arg.get<btrfs_ioctl_search_args_v2>();
 			ioctl_ptr->key = static_cast<const btrfs_ioctl_search_key&>(*this);
 			ioctl_ptr->buf_size = buf_size;
+			if (s_debug_ostream) {
+				(*s_debug_ostream) << "bisk " << (ioctl_ptr->key) << "\n";
+			}
 			// Don't bother supporting V1.  Kernels that old have other problems.
 			int rv = ioctl(fd, BTRFS_IOC_TREE_SEARCH_V2, ioctl_arg.data());
 			++s_calls;
