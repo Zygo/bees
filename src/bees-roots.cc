@@ -2380,15 +2380,12 @@ BeesCrawl::fetch_extents()
 
 	// Don't set max_transid to m_max_transid here.	 See scan_one_ref.
 	m_btof.transid(old_state.m_min_transid);
+
+	// Deprecated: don't call this on the extent tree any more
+	assert(m_btof.tree() != BTRFS_EXTENT_TREE_OBJECTID);
+
 	if (catch_all([&]() {
 		m_next_extent_data = m_btof.lower_bound(old_state.m_objectid);
-		if (m_btof.tree() == BTRFS_EXTENT_TREE_OBJECTID) {
-			// Skip over TREE_BLOCK extent items, they don't have files
-			while (!!m_next_extent_data && (m_next_extent_data.extent_flags() & BTRFS_EXTENT_FLAG_TREE_BLOCK)) {
-				BEESCOUNT(crawl_tree_block);
-				m_next_extent_data = m_btof.next(m_next_extent_data.objectid());
-			}
-		}
 	})) {
 		// Whoops that didn't work.  Stop scanning this subvol, move on to the next.
 		m_deferred = true;
@@ -2425,19 +2422,13 @@ BeesCrawl::bti_to_bfr(const BtrfsTreeItem &bti) const
 	if (!bti) {
 		return BeesFileRange();
 	}
-	if (bti.type() == BTRFS_EXTENT_ITEM_KEY) {
-		return BeesFileRange(
-			BeesFileId(get_state_end().m_root, bti.objectid()),
-			bti.objectid(),
-			bti.objectid() + bti.offset()
-		);
-	} else {
-		return BeesFileRange(
-			BeesFileId(get_state_end().m_root, bti.objectid()),
-			bti.offset(),
-			bti.offset() + bti.file_extent_logical_bytes()
-		);
-	}
+	// Deprecated: don't call peek_front() or pop_front() with extent tree any more
+	assert(bti.type() != BTRFS_EXTENT_ITEM_KEY);
+	return BeesFileRange(
+		BeesFileId(get_state_end().m_root, bti.objectid()),
+		bti.offset(),
+		bti.offset() + bti.file_extent_logical_bytes()
+	);
 }
 
 BeesFileRange
