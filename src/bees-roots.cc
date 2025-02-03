@@ -1938,7 +1938,6 @@ BeesRoots::stop_request()
 	unique_lock<mutex> lock(m_stop_mutex);
 	m_stop_requested = true;
 	m_stop_condvar.notify_all();
-	lock.unlock();
 }
 
 void
