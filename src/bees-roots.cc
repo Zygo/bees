@@ -1797,90 +1797,72 @@ BeesRoots::open_root_nocache(uint64_t rootid)
 	}
 
 	// Find backrefs for this rootid and follow up to root
-	BtrfsIoctlSearchKey sk;
-	sk.tree_id = BTRFS_ROOT_TREE_OBJECTID;
-	sk.min_objectid = sk.max_objectid = rootid;
-	sk.min_type = sk.max_type = BTRFS_ROOT_BACKREF_KEY;
+	BtrfsRootFetcher brf(m_ctx->root_fd());
+	const auto bti = brf.root_backref(rootid);
+	if (!bti) {
+		BEESLOGDEBUG("No path for rootid " << rootid);
+		BEESCOUNT(root_notfound);
+		return Fd();
+	}
 
-	BEESTRACE("sk " << sk);
-	while (sk.min_objectid <= rootid) {
-		sk.do_ioctl(m_ctx->root_fd());
+	// Get dirid (path from parent subvol's root to this subvol) and basename (in that dirid)
+	const auto dirid = bti.root_ref_dirid();
+	const auto name = bti.root_ref_name();
+	const auto parent_rootid = bti.offset();
+	BEESTRACE("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
 
-		if (sk.m_result.empty()) {
-			break;
+	// Try to open the parent recursively
+	BEESCOUNT(root_parent_open_try);
+	Fd parent_fd = open_root(parent_rootid);
+	if (!parent_fd) {
+		BEESLOGTRACE("no parent_fd");
+		BEESCOUNT(root_parent_open_fail);
+		return Fd();
+	}
+	BEESCOUNT(root_parent_open_ok);
+
+	if (dirid != BTRFS_FIRST_FREE_OBJECTID) {
+		BEESTRACE("dirid " << dirid << " root " << rootid << " INO_PATH");
+		BtrfsIoctlInoPathArgs ino(dirid);
+		if (!ino.do_ioctl_nothrow(parent_fd)) {
+			BEESLOGDEBUG("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd) << ": " << strerror(errno));
+			BEESCOUNT(root_parent_path_fail);
+			return Fd();
 		}
-
-		for (auto i : sk.m_result) {
-			sk.next_min(i, BTRFS_ROOT_BACKREF_KEY);
-			if (i.type == BTRFS_ROOT_BACKREF_KEY && i.objectid == rootid) {
-				const auto dirid = btrfs_get_member(&btrfs_root_ref::dirid, i.m_data);
-				const auto name_len = btrfs_get_member(&btrfs_root_ref::name_len, i.m_data);
-				const auto name_start = sizeof(struct btrfs_root_ref);
-				const auto name_end = name_len + name_start;
-				THROW_CHECK2(runtime_error, i.m_data.size(), name_end, i.m_data.size() >= name_end);
-				const string name(i.m_data.data() + name_start, i.m_data.data() + name_end);
-
-				const auto parent_rootid = i.offset;
-				// BEESLOG("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
-				BEESTRACE("parent_rootid " << parent_rootid << " dirid " << dirid << " name " << name);
-				BEESCOUNT(root_parent_open_try);
-				Fd parent_fd = open_root(parent_rootid);
-				if (!parent_fd) {
-					BEESLOGTRACE("no parent_fd");
-					BEESCOUNT(root_parent_open_fail);
-					continue;
-				}
-				BEESCOUNT(root_parent_open_ok);
-
-				if (dirid != BTRFS_FIRST_FREE_OBJECTID) {
-					BEESTRACE("dirid " << dirid << " root " << rootid << " INO_PATH");
-					BtrfsIoctlInoPathArgs ino(dirid);
-					if (!ino.do_ioctl_nothrow(parent_fd)) {
-						BEESLOGINFO("dirid " << dirid << " inode path lookup failed in parent_fd " << name_fd(parent_fd) << ": " << strerror(errno));
-						BEESCOUNT(root_parent_path_fail);
-						continue;
-					}
-					if (ino.m_paths.empty()) {
-						BEESLOGINFO("dirid " << dirid << " inode has no paths in parent_fd " << name_fd(parent_fd));
-						BEESCOUNT(root_parent_path_empty);
-						continue;
-					}
-					// Theoretically there is only one, so don't bother looping.
-					BEESTRACE("dirid " << dirid << " path " << ino.m_paths.at(0));
-					parent_fd = bees_openat(parent_fd, ino.m_paths.at(0).c_str(), FLAGS_OPEN_DIR);
-					if (!parent_fd) {
-						BEESLOGTRACE("no parent_fd from dirid");
-						BEESCOUNT(root_parent_path_open_fail);
-						continue;
-					}
-				}
-				// BEESLOG("openat(" << name_fd(parent_fd) << ", " << name << ")");
-				BEESTRACE("openat(" << name_fd(parent_fd) << ", " << name << ")");
-				Fd rv = bees_openat(parent_fd, name.c_str(), FLAGS_OPEN_DIR);
-				if (!rv) {
-					BEESLOGTRACE("open failed for name " << name << ": " << strerror(errno));
-					BEESCOUNT(root_open_fail);
-					continue;
-				}
-				BEESCOUNT(root_found);
-
-				// Verify correct root ID
-				// Throw exceptions here because these are very rare events
-				// and unlike the file open case, we don't have alternatives to try
-				auto new_root_id = btrfs_get_root_id(rv);
-				THROW_CHECK2(runtime_error, new_root_id, rootid, new_root_id == rootid);
-				Stat st(rv);
-				THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
-				// BEESLOGDEBUG("open_root_nocache " << rootid << ": " << name_fd(rv));
-
-				BEESCOUNT(root_ok);
-				return rv;
-			}
+		if (ino.m_paths.empty()) {
+			BEESLOGDEBUG("dirid " << dirid << " inode has no paths in parent_fd " << name_fd(parent_fd));
+			BEESCOUNT(root_parent_path_empty);
+			return Fd();
+		}
+		// Theoretically there is only one, so don't bother looping.
+		BEESTRACE("dirid " << dirid << " path " << ino.m_paths.at(0));
+		parent_fd = bees_openat(parent_fd, ino.m_paths.at(0).c_str(), FLAGS_OPEN_DIR);
+		if (!parent_fd) {
+			BEESLOGTRACE("no parent_fd from dirid");
+			BEESCOUNT(root_parent_path_open_fail);
+			return Fd();
 		}
 	}
-	BEESLOGDEBUG("No path for rootid " << rootid);
-	BEESCOUNT(root_notfound);
-	return Fd();
+	BEESTRACE("openat(" << name_fd(parent_fd) << ", " << name << ")");
+	Fd rv = bees_openat(parent_fd, name.c_str(), FLAGS_OPEN_DIR);
+	if (!rv) {
+		BEESLOGTRACE("open failed for name " << name << ": " << strerror(errno));
+		BEESCOUNT(root_open_fail);
+		return rv;
+	}
+	BEESCOUNT(root_found);
+
+	// Verify correct root ID
+	// Throw exceptions here because these are very rare events
+	// and unlike the file open case, we don't have alternatives to try
+	const auto new_root_id = btrfs_get_root_id(rv);
+	THROW_CHECK2(runtime_error, new_root_id, rootid, new_root_id == rootid);
+	Stat st(rv);
+	THROW_CHECK1(runtime_error, st.st_ino, st.st_ino == BTRFS_FIRST_FREE_OBJECTID);
+	// BEESLOGDEBUG("open_root_nocache " << rootid << ": " << name_fd(rv));
+
+	BEESCOUNT(root_ok);
+	return rv;
 }
 
 Fd
