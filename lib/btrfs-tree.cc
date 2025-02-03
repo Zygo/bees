@@ -696,17 +696,31 @@ namespace crucible {
 		BtrfsTreeObjectFetcher(fd)
 	{
 		tree(BTRFS_ROOT_TREE_OBJECTID);
-		type(BTRFS_ROOT_ITEM_KEY);
 		scale_size(1);
 	}
 
 	BtrfsTreeItem
-	BtrfsRootFetcher::root(uint64_t subvol)
+	BtrfsRootFetcher::root(const uint64_t subvol)
 	{
+		const auto my_type = BTRFS_ROOT_ITEM_KEY;
+		type(my_type);
 		const auto item = at(subvol);
 		if (!!item) {
 			THROW_CHECK2(runtime_error, item.objectid(), subvol, subvol == item.objectid());
-			THROW_CHECK2(runtime_error, item.type(), BTRFS_ROOT_ITEM_KEY, item.type() == BTRFS_ROOT_ITEM_KEY);
+			THROW_CHECK2(runtime_error, item.type(), my_type, item.type() == my_type);
+		}
+		return item;
+	}
+
+	BtrfsTreeItem
+	BtrfsRootFetcher::root_backref(const uint64_t subvol)
+	{
+		const auto my_type = BTRFS_ROOT_BACKREF_KEY;
+		type(my_type);
+		const auto item = at(subvol);
+		if (!!item) {
+			THROW_CHECK2(runtime_error, item.objectid(), subvol, subvol == item.objectid());
+			THROW_CHECK2(runtime_error, item.type(), my_type, item.type() == my_type);
 		}
 		return item;
 	}

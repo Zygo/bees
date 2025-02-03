@@ -198,6 +198,7 @@ namespace crucible {
 	public:
 		BtrfsRootFetcher(const Fd &fd);
 		BtrfsTreeItem root(uint64_t subvol);
+		BtrfsTreeItem root_backref(uint64_t subvol);
 	};
 
 	/// Fetch data extent items from extent tree, skipping metadata-only block groups
