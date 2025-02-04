@@ -538,8 +538,8 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& tod
 		SizeTier(const shared_ptr<BeesScanModeExtent> &bsme, const uint64_t subvol, const MagicCrawl &size_range);
 		void set_crawl_and_task(const shared_ptr<BeesCrawl> &crawl);
 		void run_task();
-		void find_next_extent();
-		void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len);
+		bool find_next_extent();
+		void create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& m_hold, uint64_t len, const Task &again);
 		bool scan_one_ref(const ExtentRef &bior);
 		shared_ptr<BeesCrawl> crawl() const;
 	};
@@ -728,7 +728,7 @@ BeesScanModeExtent::SizeTier::scan_one_ref(const BeesScanModeExtent::ExtentRef &
 }
 
 void
-BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& hold, const uint64_t len)
+BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const ProgressTracker<BeesCrawlState>::ProgressHolder& hold, const uint64_t len, const Task &next_task)
 {
 	BEESNOTE("Creating extent map for " << to_hex(bytenr) << " with LOGICAL_INO");
 	BEESTRACE("Creating extent map for " << to_hex(bytenr) << " with LOGICAL_INO");
@@ -838,8 +838,7 @@ BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const Pro
 	ostringstream oss;
 	oss << "ref_" << hex << bytenr << "_" << pretty(len) << "_" << dec << refs_list->size();
 	const auto bec = shared_from_this();
-	const auto map_task = Task::current_task();
-	Task crawl_one(oss.str(), [bec, refs_list, map_task]() {
+	Task crawl_one(oss.str(), [bec, refs_list, next_task]() {
 		if (!refs_list->empty()) {
 			const auto extref = *(refs_list->begin());
 			refs_list->pop_front();
@@ -854,9 +853,10 @@ BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const Pro
 		if (refs_list->empty()) {
 			// We might be throttled and we're about to exit a task, so restart our map task
 			if (!should_throttle()) {
-				map_task.idle();
+				next_task.idle();
 			}
 		} else {
+			// Run the next ref
 			Task::current_task().run();
 		}
 	});
@@ -892,19 +892,31 @@ BeesScanModeExtent::init_tasks()
 	}
 }
 
+static bool bees_ordered_scan = false;
+
 void
 BeesScanModeExtent::scan()
 {
 	BEESTRACE("bsm scan");
 
 	unique_lock<mutex> lock(m_mutex);
-	// Poke all the size tier scan tasks
-	for (const auto &i : m_size_tiers) {
-		i.second->run_task();
+	const auto size_tiers_copy = m_size_tiers;
+	lock.unlock();
+
+	if (bees_ordered_scan) {
+		// Ordered scan: Run size tier scan tasks in order until one of them finds a new extent
+		for (const auto &i : size_tiers_copy) {
+			if (i.second->find_next_extent()) break;
+		}
+	} else {
+		// Parallel scan: Run all the scan tasks at once
+		for (const auto &i : size_tiers_copy) {
+			i.second->run_task();
+		}
 	}
 }
 
-void
+bool
 BeesScanModeExtent::SizeTier::find_next_extent()
 {
 	BEESTRACE("find_next_extent " << m_subvol);
@@ -1128,22 +1140,31 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 			continue;
 		}
 
-		// Map this extent here to regulate task creation
-		// Note next_hold >= this_hold > current_hold after the swap above.
-		create_extent_map(this_bytenr, m_crawl->hold_state(this_state), this_length);
-		BEESCOUNT(crawl_extent);
+		const auto find_next_task = Task::current_task();
+		// Note next_hold >= this_hold > current_hold after the swap above,
+		// so the extent map may or may not advance the BeesCrawlState position.
+		const auto hold_state = m_crawl->hold_state(this_state);
+		const auto sft = shared_from_this();
+		ostringstream oss;
+		oss << "map_" << to_hex(this_bytenr) << "_" << pretty(this_length);
+		Task create_map_task(oss.str(), [sft, this_bytenr, hold_state, this_length, find_next_task]() {
+			sft->create_extent_map(this_bytenr, hold_state, this_length, find_next_task);
+			BEESCOUNT(crawl_extent);
+		});
+		create_map_task.run();
 
 		// We did something!  Get in line to run again...unless we're throttled
 		if (!should_throttle()) {
 			Task::current_task().idle();
 		}
-		return;
+		return true;
 	}
 
 	// Crawl state is updated by holder destructors
 
 	// All crawls done
 	BEESCOUNT(crawl_done);
+	return false;
 }
 
 static
