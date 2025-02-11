@@ -8,21 +8,15 @@ thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 thread_local bool BeesTracer::tl_first = true;
 thread_local bool BeesTracer::tl_silent = false;
 
+bool
+exception_check()
+{
 #if __cplusplus >= 201703
-static
-bool
-exception_check()
-{
 	return uncaught_exceptions();
-}
 #else
-static
-bool
-exception_check()
-{
 	return uncaught_exception();
-}
 #endif
+}
 
 BeesTracer::~BeesTracer()
 {
