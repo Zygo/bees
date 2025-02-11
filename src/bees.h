@@ -134,6 +134,14 @@ const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
 #define BEESLOGINFO(x)   BEESLOG(LOG_INFO, x)
 #define BEESLOGDEBUG(x)  BEESLOG(LOG_DEBUG, x)
 
+#define BEESLOGONCE(__x) do { \
+        static bool already_logged = false; \
+        if (!already_logged) { \
+                already_logged = true; \
+                BEESLOGNOTICE(__x); \
+        } \
+} while (false)
+
 #define BEESCOUNT(stat) do { \
 	BeesStats::s_global.add_count(#stat); \
 } while (0)

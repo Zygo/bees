@@ -4,6 +4,7 @@
 #include "crucible/process.h"
 #include "crucible/string.h"
 #include "crucible/task.h"
+#include "crucible/uname.h"
 
 #include <cctype>
 #include <cmath>
@@ -11,16 +12,18 @@
 
 #include <iostream>
 #include <memory>
+#include <regex>
 #include <sstream>
 
 // PRIx64
 #include <inttypes.h>
 
-#include <sched.h>
-#include <sys/fanotify.h>
-
 #include <linux/fs.h>
 #include <sys/ioctl.h>
+
+// statfs
+#include <linux/magic.h>
+#include <sys/statfs.h>
 
 // setrlimit
 #include <sys/time.h>
@@ -391,6 +394,73 @@ BeesStringFile::read()
 	return read_string(fd, st.st_size);
 }
 
+static
+void
+bees_fsync(int const fd)
+{
+
+	// Note that when btrfs renames a temporary over an existing file,
+	// it flushes the temporary, so we get the right behavior if we
+	// just do nothing here (except when the file is first created;
+	// however, in that case the result is the same as if the file
+	// did not exist, was empty, or was filled with garbage).
+	//
+	// Kernel versions prior to 5.16 had bugs which would put ghost
+	// dirents in $BEESHOME if there was a crash when we called
+	// fsync() here.
+	//
+	// Some other filesystems will throw our data away if we don't
+	// call fsync, so we do need to call fsync() on those filesystems.
+	//
+	// Newer btrfs kernel versions rely on fsync() to report
+	// unrecoverable write errors.	If we don't check the fsync()
+	// result, we'll lose the data when we rename().  Kernel 6.2 added
+	// a number of new root causes for the class of "unrecoverable
+	// write errors" so we need to check this now.
+
+	BEESNOTE("checking filesystem type for " << name_fd(fd));
+	// LSB deprecated statfs without providing a replacement that
+	// can fill in the f_type field.
+	struct statfs stf = { 0 };
+	DIE_IF_NON_ZERO(fstatfs(fd, &stf));
+	if (stf.f_type != BTRFS_SUPER_MAGIC) {
+		BEESLOGONCE("Using fsync on non-btrfs filesystem type " << to_hex(stf.f_type));
+		BEESNOTE("fsync non-btrfs " << name_fd(fd));
+		DIE_IF_NON_ZERO(fsync(fd));
+		return;
+	}
+
+	static bool did_uname = false;
+	static bool do_fsync = false;
+
+	if (!did_uname) {
+		Uname uname;
+		const string version(uname.release);
+		static const regex version_re(R"/(^(\d+)\.(\d+)\.)/", regex::optimize | regex::ECMAScript);
+		smatch m;
+		// Last known bug in the fsync-rename use case was fixed in kernel 5.16
+		static const auto min_major = 5, min_minor = 16;
+		if (regex_search(version, m, version_re)) {
+			const auto major = stoul(m[1]);
+			const auto minor = stoul(m[2]);
+			if (tie(major, minor) > tie(min_major, min_minor)) {
+				BEESLOGONCE("Using fsync on btrfs because kernel version is " << major << "." << minor);
+				do_fsync = true;
+			} else {
+				BEESLOGONCE("Not using fsync on btrfs because kernel version is " << major << "." << minor);
+			}
+		} else {
+			BEESLOGONCE("Not using fsync on btrfs because can't parse kernel version '" << version << "'");
+		}
+		did_uname = true;
+	}
+
+	if (do_fsync) {
+		BEESNOTE("fsync btrfs " << name_fd(fd));
+		DIE_IF_NON_ZERO(fsync(fd));
+	}
+}
+
 void
 BeesStringFile::write(string contents)
 {
@@ -406,19 +476,8 @@ BeesStringFile::write(string contents)
 		Fd ofd = openat_or_die(m_dir_fd, tmpname, FLAGS_CREATE_FILE, S_IRUSR | S_IWUSR);
 		BEESNOTE("writing " << tmpname << " in " << name_fd(m_dir_fd));
 		write_or_die(ofd, contents);
-#if 0
-		// This triggers too many btrfs bugs.  I wish I was kidding.
-		// Forget snapshots, balance, compression, and dedupe:
-		// the system call you have to fear on btrfs is fsync().
-		// Also note that when bees renames a temporary over an
-		// existing file, it flushes the temporary, so we get
-		// the right behavior if we just do nothing here
-		// (except when the file is first created; however,
-		// in that case the result is the same as if the file
-		// did not exist, was empty, or was filled with garbage).
 		BEESNOTE("fsyncing " << tmpname << " in " << name_fd(m_dir_fd));
-		DIE_IF_NON_ZERO(fsync(ofd));
-#endif
+		bees_fsync(ofd);
 	}
 	BEESNOTE("renaming " << tmpname << " to " << m_name << " in FD " << name_fd(m_dir_fd));
 	BEESTRACE("renaming " << tmpname << " to " << m_name << " in FD " << name_fd(m_dir_fd));
