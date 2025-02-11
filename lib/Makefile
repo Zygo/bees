@@ -17,6 +17,7 @@ CRUCIBLE_OBJS = \
 	openat2.o \
 	path.o \
 	process.o \
+	seeker.o \
 	string.o \
 	table.o \
 	task.o \

@@ -36,6 +36,8 @@ seeker_test(const vector<uint64_t> &vec, uint64_t const target)
 	}
 	cerr << " } = ";
 	size_t loops = 0;
+	tl_seeker_debug_str = make_shared<ostringstream>();
+	bool local_test_fails = false;
 	bool excepted = catch_all([&]() {
 		auto found = seek_backward(target, [&](uint64_t lower, uint64_t upper) {
 			++loops;
@@ -52,13 +54,15 @@ seeker_test(const vector<uint64_t> &vec, uint64_t const target)
 			cerr << " (correct)";
 		} else {
 			cerr << " (INCORRECT - right answer is " << my_found << ")";
-			test_fails = true;
+			local_test_fails = true;
 		}
 	});
 	cerr << " (" << loops << " loops)" << endl;
-	if (excepted) {
+	if (excepted || local_test_fails) {
+		cerr << dynamic_pointer_cast<ostringstream>(tl_seeker_debug_str)->str();
 		test_fails = true;
 	}
+	tl_seeker_debug_str.reset();
 }
 
 static
