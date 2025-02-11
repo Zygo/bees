@@ -13,7 +13,7 @@ namespace crucible {
 	hexdump(ostream &os, const V &v)
 	{
 		const auto v_size = v.size();
-		const uint8_t* const v_data = reinterpret_cast<uint8_t*>(v.data());
+		const uint8_t* const v_data = reinterpret_cast<const uint8_t*>(v.data());
 		os << "V { size = " << v_size << ", data:\n";
 		for (size_t i = 0; i < v_size; i += 8) {
 			string hex, ascii;
