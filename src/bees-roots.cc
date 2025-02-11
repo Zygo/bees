@@ -933,6 +933,7 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 
 	// Low-level extent search debugging
 	shared_ptr<ostringstream> debug_oss;
+	const bool debug_oss_only_exceptions = true;
 #if 0
 	// Enable a _lot_ of debugging output
 	debug_oss = make_shared<ostringstream>();
@@ -966,7 +967,9 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 				);
 			}
 			if (debug_oss) {
-				BEESLOGDEBUG("debug oss trace:\n" << debug_oss->str());
+				if (!debug_oss_only_exceptions || exception_check()) {
+					BEESLOGDEBUG("debug oss trace:\n" << debug_oss->str());
+				}
 			}
 		}
 		BtrfsIoctlSearchKey::s_debug_ostream.reset();
@@ -1002,7 +1005,9 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 			// There is a lot of debug output.  Dump it if it gets too long
 			if (!debug_oss->str().empty()) {
 				if (crawl_time.age() > 1) {
-					BEESLOGDEBUG("debug oss trace (so far):\n" << debug_oss->str());
+					if (!debug_oss_only_exceptions) {
+						BEESLOGDEBUG("debug oss trace (so far):\n" << debug_oss->str());
+					}
 					debug_oss->str("");
 				}
 			}
