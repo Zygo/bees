@@ -418,6 +418,7 @@ namespace crucible {
 			++loops;
 			fill_sk(sk, unscale_logical(min(scaled_max_logical(), lower_bound)));
 			set<uint64_t> rv;
+			bool too_far = false;
 			do {
 				sk.nr_items = 4;
 				sk.do_ioctl(fd());
@@ -426,6 +427,7 @@ namespace crucible {
 					next_sk(sk, i);
 					// If hdr_stop or !hdr_match, don't inspect the item
 					if (hdr_stop(i)) {
+						too_far = true;
 						rv.insert(numeric_limits<uint64_t>::max());
 						BTFRLB_DEBUG("(stop)");
 						break;
@@ -438,22 +440,23 @@ namespace crucible {
 					BTFRLB_DEBUG(" " << to_hex(this_logical) << " " << i);
 					const auto scaled_hdr_logical = scale_logical(this_logical);
 					BTFRLB_DEBUG(" " << "(match)");
+					if (scaled_hdr_logical > upper_bound) {
+						too_far = true;
+						BTFRLB_DEBUG("(" << to_hex(scaled_hdr_logical) << " >= " << to_hex(upper_bound) << ")");
+						break;
+					}
 					if (this_logical <= logical && this_logical > closest_logical) {
 						closest_logical = this_logical;
 						closest_item = i;
 						BTFRLB_DEBUG("(closest)");
 					}
 					rv.insert(scaled_hdr_logical);
-					if (scaled_hdr_logical > upper_bound) {
-						BTFRLB_DEBUG("(" << to_hex(scaled_hdr_logical) << " >= " << to_hex(upper_bound) << ")");
-						break;
-					}
 					BTFRLB_DEBUG("(cont'd)");
 				}
 				BTFRLB_DEBUG(endl);
 				// We might get a search result that contains only non-matching items.
 				// Keep looping until we find any matching item or we run out of tree.
-			} while (rv.empty() && !sk.m_result.empty());
+			} while (!too_far && rv.empty() && !sk.m_result.empty());
 			return rv;
 		}, scale_logical(lookbehind_size()));
 		return closest_item;
