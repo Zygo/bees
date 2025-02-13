@@ -19,7 +19,9 @@ seeker_finder(const vector<uint64_t> &vec, uint64_t lower, uint64_t upper)
 	if (ub != s.end()) ++ub;
 	if (ub != s.end()) ++ub;
 	for (; ub != s.end(); ++ub) {
-		if (*ub > upper) break;
+		if (*ub > upper) {
+			break;
+		}
 	}
 	return set<uint64_t>(lb, ub);
 }
@@ -28,7 +30,7 @@ static bool test_fails = false;
 
 static
 void
-seeker_test(const vector<uint64_t> &vec, uint64_t const target)
+seeker_test(const vector<uint64_t> &vec, uint64_t const target, bool const always_out = false)
 {
 	cerr << "Find " << target << " in {";
 	for (auto i : vec) {
@@ -39,10 +41,10 @@ seeker_test(const vector<uint64_t> &vec, uint64_t const target)
 	tl_seeker_debug_str = make_shared<ostringstream>();
 	bool local_test_fails = false;
 	bool excepted = catch_all([&]() {
-		auto found = seek_backward(target, [&](uint64_t lower, uint64_t upper) {
+		const auto found = seek_backward(target, [&](uint64_t lower, uint64_t upper) {
 			++loops;
 			return seeker_finder(vec, lower, upper);
-		});
+		}, uint64_t(32));
 		cerr << found;
 		uint64_t my_found = 0;
 		for (auto i : vec) {
@@ -58,10 +60,10 @@ seeker_test(const vector<uint64_t> &vec, uint64_t const target)
 		}
 	});
 	cerr << " (" << loops << " loops)" << endl;
-	if (excepted || local_test_fails) {
+	if (excepted || local_test_fails || always_out) {
 		cerr << dynamic_pointer_cast<ostringstream>(tl_seeker_debug_str)->str();
-		test_fails = true;
 	}
+	test_fails = test_fails || local_test_fails;
 	tl_seeker_debug_str.reset();
 }
 
@@ -93,6 +95,39 @@ test_seeker()
 	seeker_test(vector<uint64_t> { 0, numeric_limits<uint64_t>::max() }, numeric_limits<uint64_t>::max());
 	seeker_test(vector<uint64_t> { 0, numeric_limits<uint64_t>::max() }, numeric_limits<uint64_t>::max() - 1);
 	seeker_test(vector<uint64_t> { 0, numeric_limits<uint64_t>::max() - 1 }, numeric_limits<uint64_t>::max());
+
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 0);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 1);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 2);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 3);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 4);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 5);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 6);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 7);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 8);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, 9);
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 1 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 2 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 3 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 4 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 5 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 6 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 7 );
+	seeker_test(vector<uint64_t> { 0, 1, 2, 4, 8 }, numeric_limits<uint64_t>::max() - 8 );
+
+	// Pulled from a bees debug log
+	seeker_test(vector<uint64_t> {
+		6821962845,
+		6821962848,
+		6821963411,
+		6821963422,
+		6821963536,
+		6821963539,
+		6821963835, // <- appeared during the search, causing an exception
+		6821963841,
+		6822575316,
+	}, 6821971036, true);
 }
 
 
