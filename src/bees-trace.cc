@@ -28,18 +28,18 @@ BeesTracer::~BeesTracer()
 {
 	if (!tl_silent && exception_check()) {
 		if (tl_first) {
-			BEESLOGNOTICE("--- BEGIN TRACE --- exception ---");
+			BEESLOG(BEES_TRACE_LEVEL, "TRACE: --- BEGIN TRACE --- exception ---");
 			tl_first = false;
 		}
 		try {
 			m_func();
 		} catch (exception &e) {
-			BEESLOGNOTICE("Nested exception: " << e.what());
+			BEESLOG(BEES_TRACE_LEVEL, "TRACE: Nested exception: " << e.what());
 		} catch (...) {
-			BEESLOGNOTICE("Nested exception ...");
+			BEESLOG(BEES_TRACE_LEVEL, "TRACE: Nested exception ...");
 		}
 		if (!m_next_tracer) {
-			BEESLOGNOTICE("---  END  TRACE --- exception ---");
+			BEESLOG(BEES_TRACE_LEVEL, "TRACE: ---  END  TRACE --- exception ---");
 		}
 	}
 	tl_next_tracer = m_next_tracer;
@@ -61,12 +61,12 @@ void
 BeesTracer::trace_now()
 {
 	BeesTracer *tp = tl_next_tracer;
-	BEESLOGNOTICE("--- BEGIN TRACE ---");
+	BEESLOG(BEES_TRACE_LEVEL, "TRACE: --- BEGIN TRACE ---");
 	while (tp) {
 		tp->m_func();
 		tp = tp->m_next_tracer;
 	}
-	BEESLOGNOTICE("---  END  TRACE ---");
+	BEESLOG(BEES_TRACE_LEVEL, "TRACE: ---  END  TRACE ---");
 }
 
 bool

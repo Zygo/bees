@@ -572,7 +572,7 @@ BeesRangePair::grow(shared_ptr<BeesContext> ctx, bool constrained)
 	}
 
 	if (first.overlaps(second)) {
-		BEESLOGTRACE("after grow, first " << first << "\n\toverlaps " << second);
+		BEESLOGDEBUG("after grow, first " << first << "\n\toverlaps " << second);
 		BEESCOUNT(bug_grow_pair_overlaps);
 	}
 
@@ -674,7 +674,7 @@ BeesAddress::magic_check(uint64_t flags)
 	static const unsigned recognized_flags = compressed_flags | delalloc_flags | ignore_flags | unusable_flags;
 
 	if (flags & ~recognized_flags) {
-		BEESLOGTRACE("Unrecognized flags in " << fiemap_extent_flags_ntoa(flags));
+		BEESLOGNOTICE("Unrecognized flags in " << fiemap_extent_flags_ntoa(flags));
 		m_addr = UNUSABLE;
 		// maybe we throw here?
 		BEESCOUNT(addr_unrecognized);

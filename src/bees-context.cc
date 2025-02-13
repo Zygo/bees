@@ -230,8 +230,10 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 	BeesAddress first_addr(brp.first.fd(), brp.first.begin());
 	BeesAddress second_addr(brp.second.fd(), brp.second.begin());
 
-	if (first_addr.get_physical_or_zero() == second_addr.get_physical_or_zero()) {
-		BEESLOGTRACE("equal physical addresses in dedup");
+	const auto first_gpoz = first_addr.get_physical_or_zero();
+	const auto second_gpoz = second_addr.get_physical_or_zero();
+	if (first_gpoz == second_gpoz) {
+		BEESLOGDEBUG("equal physical addresses " << first_addr << " and " << second_addr << " in dedup");
 		BEESCOUNT(bug_dedup_same_physical);
 	}
 
