@@ -5,6 +5,7 @@
 #include "crucible/cleanup.h"
 #include "crucible/ntoa.h"
 #include "crucible/openat2.h"
+#include "crucible/seeker.h"
 #include "crucible/string.h"
 #include "crucible/table.h"
 #include "crucible/task.h"
@@ -940,6 +941,7 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 #endif
 	if (debug_oss) {
 		BtrfsIoctlSearchKey::s_debug_ostream = debug_oss;
+		tl_seeker_debug_str = debug_oss;
 	}
 
 	// Write out the stats no matter how we exit
@@ -973,6 +975,7 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 			}
 		}
 		BtrfsIoctlSearchKey::s_debug_ostream.reset();
+		tl_seeker_debug_str.reset();
 	});
 
 #define MNE_DEBUG(x) do { \
