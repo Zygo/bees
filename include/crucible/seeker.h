@@ -66,7 +66,7 @@ namespace crucible {
 		// We need one loop for each bit of the search space to find the lower bound,
 		// one loop for each bit of the search space to find the upper bound,
 		// and one extra loop to confirm the boundary is correct.
-		for (size_t loop_count = min(numeric_limits<Pos>::digits * size_t(2) + 1, max_loops); loop_count; --loop_count) {
+		for (size_t loop_count = min((1 + numeric_limits<Pos>::digits) * size_t(2), max_loops); loop_count; --loop_count) {
 			SEEKER_DEBUG_LOG("fetch(probe_pos = " << probe_pos << ", target_pos = " << target_pos << ")");
 			auto result = fetch(probe_pos, target_pos);
 			const Pos low_pos = result.empty() ? end_pos : *result.begin();
@@ -128,9 +128,10 @@ namespace crucible {
 			}
 			if (high_pos < target_pos) {
 				// results are all too low, so probe_pos..high_pos is too low
-				// raise the low bound to high_pos since it's above probe_pos
-				SEEKER_DEBUG_LOG("lower_bound = high_pos " << high_pos);
-				lower_bound = high_pos;
+				// raise the low bound to high_pos but not above upper_bound
+				const auto next_pos = min(high_pos, upper_bound);
+				SEEKER_DEBUG_LOG("lower_bound = next_pos " << next_pos);
+				lower_bound = next_pos;
 			}
 			// compute a new probe pos at the middle of the range and try again
 			// we can't have a zero-size range here because we would not have set found_low yet
