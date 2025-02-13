@@ -1091,7 +1091,6 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 			++size_low_count;
 
 			// Skip ahead over any below-min-size extents
-			BEESTRACE("min_size " << pretty(lower_size_bound) << " > scale_size " << pretty(m_fetcher.scale_size()));
 			const auto lsb_rounded = lower_size_bound & ~(m_fetcher.scale_size() - 1);
 			// Don't bother doing backward searches when skipping 128K or less.
 			// The search will cost more than reading 32 consecutive extent records.
