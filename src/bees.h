@@ -193,7 +193,7 @@ class BeesTracer {
 	thread_local static bool tl_silent;
 	thread_local static bool tl_first;
 public:
-	BeesTracer(function<void()> f, bool silent = false);
+	BeesTracer(const function<void()> &f, bool silent = false);
 	~BeesTracer();
 	static void trace_now();
 	static bool get_silent();

@@ -49,7 +49,7 @@ BeesTracer::~BeesTracer()
 	}
 }
 
-BeesTracer::BeesTracer(function<void()> f, bool silent) :
+BeesTracer::BeesTracer(const function<void()> &f, bool silent) :
 	m_func(f)
 {
 	m_next_tracer = tl_next_tracer;
