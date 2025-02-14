@@ -948,22 +948,24 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 		const auto search_calls = BtrfsIoctlSearchKey::s_calls - init_s_calls;
 		const auto search_loops = BtrfsIoctlSearchKey::s_loops - init_s_loops;
 		if (crawl_time.age() > 1) {
-			BEESLOGDEBUG(
-				"loop_count " << loop_count
-				<< " size_low_count " << size_low_count
-				<< " size_high_count " << size_high_count
-				<< " gen_low_count " << gen_low_count
-				<< " gen_high_count " << gen_high_count
-				<< " search_calls " << search_calls
-				<< " search_loops " << search_loops
-				<< " skips " << skip_count
-				<< " flops " << flop_count
-				<< " time " << crawl_time
-				<< " subvol " << m_subvol
-				<< " search/loop " << pretty(search_calls / loop_count)
-				<< " skip/loop " << (100 * skip_count / loop_count) << "%"
-				<< " flop/loop " << (100 * flop_count / loop_count) << "%"
-			);
+			if (loop_count) {
+				BEESLOGDEBUG(
+					"loop_count " << loop_count
+					<< " size_low_count " << size_low_count
+					<< " size_high_count " << size_high_count
+					<< " gen_low_count " << gen_low_count
+					<< " gen_high_count " << gen_high_count
+					<< " search_calls " << search_calls
+					<< " search_loops " << search_loops
+					<< " skips " << skip_count
+					<< " flops " << flop_count
+					<< " time " << crawl_time
+					<< " subvol " << m_subvol
+					<< " search/loop " << pretty(search_calls / loop_count)
+					<< " skip/loop " << (100 * skip_count / loop_count) << "%"
+					<< " flop/loop " << (100 * flop_count / loop_count) << "%"
+				);
+			}
 			if (debug_oss) {
 				BEESLOGDEBUG("debug oss trace:\n" << debug_oss->str());
 			}
