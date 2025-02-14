@@ -780,10 +780,6 @@ BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const Pro
 
 	BtrfsExtentDataFetcher bedf(m_ctx->root_fd());
 
-	// Collect extent ref tasks as a series of stand-alone events
-	// chained after the first task created, then run the first one.
-	// This prevents other threads from starting to process an
-	// extent until we have all of its refs in the queue.
 	const auto refs_list = make_shared<list<ExtentRef>>();
 	for (const auto &i : log_ino.m_iors) {
 		catch_all([&](){
