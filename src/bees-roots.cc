@@ -899,6 +899,9 @@ BeesScanModeExtent::scan()
 {
 	BEESTRACE("bsm scan");
 
+	// Do nothing if we are throttled
+	if (should_throttle()) return;
+
 	unique_lock<mutex> lock(m_mutex);
 	const auto size_tiers_copy = m_size_tiers;
 	lock.unlock();
