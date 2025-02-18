@@ -819,7 +819,8 @@ BeesHashTable::BeesHashTable(shared_ptr<BeesContext> ctx, string filename, off_t
 		root_info.do_ioctl(m_ctx->root_fd());
 		// Hash might not be a btrfs
 		BtrfsIoctlFsInfoArgs hash_info;
-		if (hash_info.do_ioctl_nothrow(m_fd)) return;
+		// If btrfs fs_info ioctl fails, it must be a different fs
+		if (!hash_info.do_ioctl_nothrow(m_fd)) return;
 		// If Hash is a btrfs, Root must be the same one
 		if (root_info.fsid() != hash_info.fsid()) return;
 		// Hash is on the same one, blacklist it
