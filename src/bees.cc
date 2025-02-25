@@ -502,6 +502,19 @@ BeesTempFile::resize(off_t offset)
 	// Count time spent here
 	BEESCOUNTADD(tmp_resize_ms, resize_timer.age() * 1000);
 
+	// Modify flags - every time
+	// - btrfs will keep trying to set FS_NOCOMP_FL behind us when compression heuristics identify
+	//   the data as compressible, but it fails to compress
+	// - clear FS_NOCOW_FL because we can only dedupe between files with the same FS_NOCOW_FL state,
+	//   and we don't open FS_NOCOW_FL files for dedupe.
+	BEESTRACE("Getting FS_COMPR_FL and FS_NOCOMP_FL on m_fd " << name_fd(m_fd));
+	int flags = ioctl_iflags_get(m_fd);
+	flags |= FS_COMPR_FL;
+	flags &= ~(FS_NOCOMP_FL | FS_NOCOW_FL);
+	BEESTRACE("Setting FS_COMPR_FL and clearing FS_NOCOMP_FL | FS_NOCOW_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
+	ioctl_iflags_set(m_fd, flags);
+
+	// That may have queued some delayed ref deletes, so throttle them
 	bees_throttle(resize_timer.age(), "tmpfile_resize");
 }
 
@@ -542,17 +555,6 @@ BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
 
 	// Add this file to open_root_ino lookup table
 	m_roots->insert_tmpfile(m_fd);
-
-	// Set compression attribute
-	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
-	int flags = ioctl_iflags_get(m_fd);
-	flags |= FS_COMPR_FL;
-
-	// Clear NOCOW because it conflicts with COMPR, and NOCOW could be set on the root subvol
-	flags &= FS_NOCOW_FL;
-
-	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	ioctl_iflags_set(m_fd, flags);
 
 	// Count time spent here
 	BEESCOUNTADD(tmp_create_ms, create_timer.age() * 1000);
