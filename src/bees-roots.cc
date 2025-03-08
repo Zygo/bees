@@ -1148,7 +1148,7 @@ BeesScanModeExtent::SizeTier::find_next_extent()
 		const auto hold_state = m_crawl->hold_state(this_state);
 		const auto sft = shared_from_this();
 		ostringstream oss;
-		oss << "map_" << to_hex(this_bytenr) << "_" << pretty(this_length);
+		oss << "map_" << hex << this_bytenr << dec << "_" << pretty(this_length);
 		Task create_map_task(oss.str(), [sft, this_bytenr, hold_state, this_length, find_next_task]() {
 			sft->create_extent_map(this_bytenr, hold_state, this_length, find_next_task);
 			BEESCOUNT(crawl_extent);
