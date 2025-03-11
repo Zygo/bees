@@ -228,8 +228,10 @@ bees_readahead_check(int const fd, off_t const offset, size_t const size)
 	auto tup = make_tuple(offset, size, stat_rv.st_dev, stat_rv.st_ino);
 	static mutex s_recent_mutex;
 	static set<decltype(tup)> s_recent;
+	static Timer s_recent_timer;
 	unique_lock<mutex> lock(s_recent_mutex);
-	if (s_recent.size() > BEES_MAX_EXTENT_REF_COUNT) {
+	if (s_recent_timer.age() > 5.0) {
+		s_recent_timer.reset();
 		s_recent.clear();
 		BEESCOUNT(readahead_clear);
 	}
