@@ -1,6 +1,7 @@
 PREFIX ?= /usr
 ETC_PREFIX ?= /etc
 LIBDIR ?= lib
+BINDIR ?= sbin
 
 LIB_PREFIX ?= $(PREFIX)/$(LIBDIR)
 LIBEXEC_PREFIX ?= $(LIB_PREFIX)/bees
@@ -55,7 +56,7 @@ install_bees: src $(RUN_INSTALL_TESTS)
 
 install_scripts: ## Install scipts
 install_scripts: scripts
-	install -Dm755 scripts/beesd $(DESTDIR)$(PREFIX)/sbin/beesd
+	install -Dm755 scripts/beesd $(DESTDIR)$(PREFIX)/$(BINDIR)/beesd
 	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(ETC_PREFIX)/bees/beesd.conf.sample
 ifneq ($(SYSTEMD_SYSTEM_UNIT_DIR),)
 	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_SYSTEM_UNIT_DIR)/beesd@.service

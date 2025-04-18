@@ -5,7 +5,7 @@ After=sysinit.target
 
 [Service]
 Type=simple
-ExecStart=@PREFIX@/sbin/beesd --no-timestamps %i
+ExecStart=@PREFIX@/@BINDIR@/beesd --no-timestamps %i
 CPUAccounting=true
 CPUSchedulingPolicy=batch
 CPUWeight=12
