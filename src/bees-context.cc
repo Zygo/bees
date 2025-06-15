@@ -387,7 +387,7 @@ BeesContext::scan_one_extent(const BeesFileRange &bfr, const Extent &e)
 	if (e.flags() & Extent::PREALLOC) {
 		// Prealloc is all zero and we replace it with a hole.
 		// No special handling is required here.  Nuke it and move on.
-		BEESLOGINFO("prealloc extent " << e);
+		BEESLOGINFO("prealloc extent " << e << " in " << bfr);
 		// Must not extend past EOF
 		auto extent_size = min(e.end(), bfr.file_size()) - e.begin();
 		// Must hold tmpfile until dedupe is done
