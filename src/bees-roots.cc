@@ -1323,7 +1323,8 @@ BeesScanModeExtent::next_transid()
 		}
 		const auto bytenr_offset = min(bi_last_bytenr, max(bytenr, bi.first_bytenr)) - bi.first_bytenr + bi.first_total;
 		const auto bytenr_norm = bytenr_offset / double(fs_size);
-		const auto time_so_far = now - min(now, this_state.m_started);
+		const auto eta_start = min(now, this_state.m_started);
+		const auto time_so_far = now - eta_start;
 		const string start_stamp = strf_localtime(this_state.m_started);
 		string eta_stamp = "-";
 		string eta_pretty = "-";
@@ -1333,9 +1334,10 @@ BeesScanModeExtent::next_transid()
 			// eta_stamp = "idle";
 		} else if (time_so_far > 10 && bytenr_offset > 1024 * 1024 * 1024) {
 			const time_t eta_duration = time_so_far / bytenr_norm;
-			const time_t eta_time = eta_duration + now;
+			const time_t eta_time = eta_duration + eta_start;
+			const time_t eta_remain = eta_time - now;
 			eta_stamp = strf_localtime(eta_time);
-			eta_pretty = pretty_seconds(eta_duration);
+			eta_pretty = pretty_seconds(eta_remain);
 		}
 		const auto &mma = mes.m_map.at(subvol);
 		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
