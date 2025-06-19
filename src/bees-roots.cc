@@ -1347,7 +1347,7 @@ BeesScanModeExtent::next_transid()
 		}
 		const auto &mma = mes.m_map.at(subvol);
 		const auto mma_ratio = mes_sample_size_ok ? (mma.m_bytes / double(mes.m_total)) : 1.0;
-		const auto posn_text = Table::Text(astringprintf("%06d", int(floor(bytenr_norm * 1000000))));
+		const auto posn_text = Table::Text(astringprintf("%06d", int(floor(bytenr_norm * 999999))));
 		const auto size_text = Table::Text( mes_sample_size_ok ? pretty(fs_size * mma_ratio) : "-");
 		eta.insert_row(Table::endpos, vector<Table::Content> {
 			Table::Text(magic.m_max_size == numeric_limits<uint64_t>::max() ? "max" : pretty(magic.m_max_size)),
