@@ -1336,7 +1336,7 @@ BeesScanModeExtent::next_transid()
 		string eta_pretty = "-";
 		const auto &deferred_finished = deferred_map.at(subvol);
 		const bool finished = deferred_finished.second;
-		if (finished) {
+		if (finished && m_roots->up_to_date(this_state)) {
 			eta_stamp = "idle";
 		} else if (time_so_far > 10 && bytenr_offset > 1024 * 1024 * 1024) {
 			const time_t eta_duration = time_so_far / bytenr_norm;
@@ -2312,15 +2312,19 @@ BeesCrawl::BeesCrawl(shared_ptr<BeesContext> ctx, BeesCrawlState initial_state) 
 }
 
 bool
+BeesRoots::up_to_date(const BeesCrawlState &bcs)
+{
+	// If we are already at transid_max then we are up to date
+	return bcs.m_max_transid >= transid_max();
+}
+
+bool
 BeesCrawl::restart_crawl_unlocked()
 {
 	const auto roots = m_ctx->roots();
-	const auto next_transid = roots->transid_max();
-
 	auto crawl_state = get_state_end();
 
-	// If we are already at transid_max then we are still finished
-	m_finished = crawl_state.m_max_transid >= next_transid;
+	m_finished = roots->up_to_date(crawl_state);
 
 	if (m_finished) {
 		m_deferred = true;
@@ -2331,7 +2335,7 @@ BeesCrawl::restart_crawl_unlocked()
 
 		// Start new crawl
 		crawl_state.m_min_transid = crawl_state.m_max_transid;
-		crawl_state.m_max_transid = next_transid;
+		crawl_state.m_max_transid = roots->transid_max();
 		crawl_state.m_objectid = 0;
 		crawl_state.m_offset = 0;
 		crawl_state.m_started = current_time;
