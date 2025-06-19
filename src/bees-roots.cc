@@ -1305,8 +1305,8 @@ BeesScanModeExtent::next_transid()
 		const auto this_crawl = found->second->crawl();
 		THROW_CHECK1(runtime_error, subvol, this_crawl);
 
-		// Get the last _completed_ state
-		const auto this_state = this_crawl->get_state_begin();
+		// Get the last _queued_ state
+		const auto this_state = this_crawl->get_state_end();
 
 		auto bytenr = this_state.m_objectid;
 		const auto bg_found = bg_info_map.lower_bound(bytenr);
