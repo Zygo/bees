@@ -547,6 +547,10 @@ BeesTempFile::BeesTempFile(shared_ptr<BeesContext> ctx) :
 	BEESTRACE("Getting FS_COMPR_FL on m_fd " << name_fd(m_fd));
 	int flags = ioctl_iflags_get(m_fd);
 	flags |= FS_COMPR_FL;
+
+	// Clear NOCOW because it conflicts with COMPR, and NOCOW could be set on the root subvol
+	flags &= FS_NOCOW_FL;
+
 	BEESTRACE("Setting FS_COMPR_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
 	ioctl_iflags_set(m_fd, flags);
 
