@@ -423,7 +423,7 @@ bees_fsync(int const fd)
 	// can fill in the f_type field.
 	struct statfs stf = { 0 };
 	DIE_IF_NON_ZERO(fstatfs(fd, &stf));
-	if (stf.f_type != BTRFS_SUPER_MAGIC) {
+	if (static_cast<decltype(BTRFS_SUPER_MAGIC)>(stf.f_type) != BTRFS_SUPER_MAGIC) {
 		BEESLOGONCE("Using fsync on non-btrfs filesystem type " << to_hex(stf.f_type));
 		BEESNOTE("fsync non-btrfs " << name_fd(fd));
 		DIE_IF_NON_ZERO(fsync(fd));
