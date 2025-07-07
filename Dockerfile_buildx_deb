@@ -3,7 +3,7 @@ RUN apt-get update \
  && apt-get install --no-install-recommends -y \
      fakeroot=1.33-1 git=1:2.43.0-1ubuntu7.2 build-essential=12.10ubuntu1 \
      devscripts=2.23.7 debhelper=13.14.1ubuntu5 dh-make=2.202304 \
-     btrfs-progs=6.6.3-1.1build2 markdown=1.0.1-12 pkg-config=1.8.1-2build1 \
+     btrfs-progs=6.6.3-1.1build2 cmark-gfm=0.29.0.gfm.6-6build1 pkg-config=1.8.1-2build1 \
  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS build
@@ -18,7 +18,7 @@ RUN mkdir debian \
 Section: utils\n\
 Priority: optional\n\
 Maintainer: %s <%s>\n\
-Build-Depends: debhelper-compat (= 13), markdown, btrfs-progs\n\
+Build-Depends: debhelper-compat (= 13), cmark-gfm, btrfs-progs\n\
 Standards-Version: 4.5.1\n\
 Homepage: https://github.com/Zygo/bees\n\
 \n\
