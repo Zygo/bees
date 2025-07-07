@@ -4,6 +4,7 @@ define TEMPLATE_COMPILER =
 sed $< >$@ \
 		-e's#@DESTDIR@#$(DESTDIR)#' \
 		-e's#@PREFIX@#$(PREFIX)#' \
+		-e's#@BINDIR@#$(BINDIR)#' \
 		-e's#@ETC_PREFIX@#$(ETC_PREFIX)#' \
 		-e's#@LIBEXEC_PREFIX@#$(LIBEXEC_PREFIX)#'
 endef

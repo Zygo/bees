@@ -423,7 +423,7 @@ bees_fsync(int const fd)
 	// can fill in the f_type field.
 	struct statfs stf = { 0 };
 	DIE_IF_NON_ZERO(fstatfs(fd, &stf));
-	if (stf.f_type != BTRFS_SUPER_MAGIC) {
+	if (static_cast<decltype(BTRFS_SUPER_MAGIC)>(stf.f_type) != BTRFS_SUPER_MAGIC) {
 		BEESLOGONCE("Using fsync on non-btrfs filesystem type " << to_hex(stf.f_type));
 		BEESNOTE("fsync non-btrfs " << name_fd(fd));
 		DIE_IF_NON_ZERO(fsync(fd));
@@ -509,10 +509,14 @@ BeesTempFile::resize(off_t offset)
 	//   and we don't open FS_NOCOW_FL files for dedupe.
 	BEESTRACE("Getting FS_COMPR_FL and FS_NOCOMP_FL on m_fd " << name_fd(m_fd));
 	int flags = ioctl_iflags_get(m_fd);
+	const auto orig_flags = flags;
+
 	flags |= FS_COMPR_FL;
 	flags &= ~(FS_NOCOMP_FL | FS_NOCOW_FL);
-	BEESTRACE("Setting FS_COMPR_FL and clearing FS_NOCOMP_FL | FS_NOCOW_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
-	ioctl_iflags_set(m_fd, flags);
+	if (flags != orig_flags) {
+		BEESTRACE("Setting FS_COMPR_FL and clearing FS_NOCOMP_FL | FS_NOCOW_FL on m_fd " << name_fd(m_fd) << " flags " << to_hex(flags));
+		ioctl_iflags_set(m_fd, flags);
+	}
 
 	// That may have queued some delayed ref deletes, so throttle them
 	bees_throttle(resize_timer.age(), "tmpfile_resize");
