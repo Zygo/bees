@@ -183,26 +183,41 @@ BeesScanModeSubvol::crawl_one_inode(const shared_ptr<BeesCrawl>& this_crawl)
 	}
 	const auto subvol = this_range.fid().root();
 	const auto inode = this_range.fid().ino();
-	ostringstream oss;
-	oss << "crawl_" << subvol << "_" << inode;
-	const auto task_title = oss.str();
-	const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
-		.m_ctx = m_ctx,
-		.m_crawl = this_crawl,
-		.m_roots = m_roots,
-		.m_hold = this_crawl->hold_state(this_state),
-		.m_state = this_state,
-		.m_offset = this_range.begin(),
-	});
-	BEESNOTE("Starting task " << this_range);
-	Task(task_title, [bfc]() {
-		BEESNOTE("crawl_one_inode " << bfc->m_hold->get());
-		if (bfc->scan_one_ref()) {
-			// Append the current task to itself to make
-			// sure we keep a worker processing this file
-			Task::current_task().append(Task::current_task());
+	bool run_the_task = false;
+	catch_all([&]() {
+		BtrfsInodeFetcher inode_btf(m_ctx->root_fd());
+		const auto inode_item = inode_btf.stat(subvol, inode);
+		if (!!inode_item) {
+			const auto flags = inode_item.inode_flags();
+			if (0 != (flags & BTRFS_INODE_NODATASUM)) {
+				BEESLOGDEBUG("unsupported inode flags for ref at root " << subvol << " ino " << inode << ": " << btrfs_inode_flags_ntoa(flags));
+			} else {
+				run_the_task = true;
+			}
 		}
-	}).run();
+	});
+	if (run_the_task) {
+		ostringstream oss;
+		oss << "crawl_" << subvol << "_" << inode;
+		const auto task_title = oss.str();
+		const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
+			.m_ctx = m_ctx,
+			.m_crawl = this_crawl,
+			.m_roots = m_roots,
+			.m_hold = this_crawl->hold_state(this_state),
+			.m_state = this_state,
+			.m_offset = this_range.begin(),
+		});
+		BEESNOTE("Starting task " << this_range);
+		Task(task_title, [bfc]() {
+			BEESNOTE("crawl_one_inode " << bfc->m_hold->get());
+			if (bfc->scan_one_ref()) {
+				// Append the current task to itself to make
+				// sure we keep a worker processing this file
+				Task::current_task().append(Task::current_task());
+			}
+		}).run();
+	}
 	auto next_state = this_state;
 	// Skip to EOF.  Will repeat up to 16 times if there happens to be an extent at 16EB,
 	// which would be a neat trick given that off64_t is signed.
@@ -780,10 +795,27 @@ BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const Pro
 	}
 
 	BtrfsExtentDataFetcher bedf(m_ctx->root_fd());
+	BtrfsInodeFetcher inode_btf(m_ctx->root_fd());
 
 	const auto refs_list = make_shared<list<ExtentRef>>();
+	bool found_nocow = false;
+	bool check_nocow = true;
 	for (const auto &i : log_ino.m_iors) {
 		catch_all([&](){
+			if (check_nocow) {
+				BEESTRACE("checking inode flags for extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum);
+				BEESNOTE("checking inode flags for extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum);
+				const auto inode_item = inode_btf.stat(i.m_root, i.m_inum);
+				if (!!inode_item) {
+					const auto flags = inode_item.inode_flags();
+					check_nocow = false;
+					if (0 != (flags & BTRFS_INODE_NODATASUM)) {
+						BEESLOGDEBUG("unsupported inode flags for extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum << ": " << btrfs_inode_flags_ntoa(flags));
+						found_nocow = true;
+						return; // from the catch_all
+					}
+				}
+			}
 			BEESTRACE("mapping extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum << " offset " << to_hex(i.m_offset));
 			BEESNOTE("mapping extent " << to_hex(bytenr) << " ref at root " << i.m_root << " ino " << i.m_inum << " offset " << to_hex(i.m_offset));
 
@@ -808,6 +840,11 @@ BeesScanModeExtent::SizeTier::create_extent_map(const uint64_t bytenr, const Pro
 			refs_list->push_back(extref);
 			BEESCOUNT(extent_ref_ok);
 		});
+		// Completely abandon the extent if it is nodatasum
+		if (found_nocow) {
+			BEESCOUNT(extent_nodatasum);
+			return;
+		}
 	}
 	BEESCOUNT(extent_mapped);
 
