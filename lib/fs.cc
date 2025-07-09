@@ -987,6 +987,28 @@ namespace crucible {
 		return bits_ntoa(objectid, table);
 	}
 
+	string
+	btrfs_inode_flags_ntoa(uint64_t const inode_flags)
+	{
+		static const bits_ntoa_table table[] = {
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_NODATASUM),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_NODATACOW),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_READONLY),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_NOCOMPRESS),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_PREALLOC),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_SYNC),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_IMMUTABLE),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_APPEND),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_NODUMP),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_NOATIME),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_DIRSYNC),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_COMPRESS),
+			NTOA_TABLE_ENTRY_BITS(BTRFS_INODE_ROOT_ITEM_INIT),
+			NTOA_TABLE_ENTRY_END()
+		};
+		return bits_ntoa(inode_flags, table);
+	}
+
 	ostream &
 	operator<<(ostream &os, const btrfs_ioctl_search_key &key)
 	{

@@ -208,6 +208,7 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchKey &key);
 
 	string btrfs_chunk_type_ntoa(uint64_t type);
+	string btrfs_inode_flags_ntoa(uint64_t inode_flags);
 	string btrfs_search_type_ntoa(unsigned type);
 	string btrfs_search_objectid_ntoa(uint64_t objectid);
 	string btrfs_compress_type_ntoa(uint8_t type);
