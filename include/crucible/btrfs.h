@@ -91,7 +91,23 @@ enum btrfs_compression_type {
 	#define BTRFS_UUID_KEY_SUBVOL   251
 	#define BTRFS_UUID_KEY_RECEIVED_SUBVOL  252
 	#define BTRFS_STRING_ITEM_KEY   253
+#endif
 
+// BTRFS_INODE_* was added to include/uapi/btrfs_tree.h in v6.2-rc1
+#ifndef BTRFS_INODE_NODATASUM
+	#define BTRFS_INODE_NODATASUM		(1U << 0)
+	#define BTRFS_INODE_NODATACOW		(1U << 1)
+	#define BTRFS_INODE_READONLY		(1U << 2)
+	#define BTRFS_INODE_NOCOMPRESS		(1U << 3)
+	#define BTRFS_INODE_PREALLOC		(1U << 4)
+	#define BTRFS_INODE_SYNC		(1U << 5)
+	#define BTRFS_INODE_IMMUTABLE		(1U << 6)
+	#define BTRFS_INODE_APPEND		(1U << 7)
+	#define BTRFS_INODE_NODUMP		(1U << 8)
+	#define BTRFS_INODE_NOATIME		(1U << 9)
+	#define BTRFS_INODE_DIRSYNC		(1U << 10)
+	#define BTRFS_INODE_COMPRESS		(1U << 11)
+	#define BTRFS_INODE_ROOT_ITEM_INIT	(1U << 31)
 #endif
 
 #ifndef BTRFS_FREE_SPACE_INFO_KEY
