@@ -158,6 +158,13 @@ namespace crucible {
 	}
 
 	uint64_t
+	BtrfsTreeItem::inode_flags() const
+	{
+		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_INODE_ITEM_KEY);
+		return btrfs_get_member(&btrfs_inode_item::flags, m_data);
+	}
+
+	uint64_t
 	BtrfsTreeItem::file_extent_logical_bytes() const
 	{
 		THROW_CHECK1(invalid_argument, btrfs_search_type_ntoa(m_type), m_type == BTRFS_EXTENT_DATA_KEY);

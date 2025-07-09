@@ -49,6 +49,7 @@ namespace crucible {
 		/// @}
 
 		/// @{ Inode items
+		uint64_t inode_flags() const;
 		uint64_t inode_size() const;
 		/// @}
 
