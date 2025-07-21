@@ -14,7 +14,7 @@ BeesThread::exec(function<void()> func)
 {
 	m_timer.reset();
 	BEESLOGDEBUG("BeesThread exec " << m_name);
-	m_thread_ptr = make_shared<thread>([=]() {
+	m_thread_ptr = make_shared<thread>([this, func]() {
 		BeesNote::set_name(m_name);
 		BEESLOGDEBUG("Starting thread " << m_name);
 		BEESNOTE("thread function");

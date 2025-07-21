@@ -1126,15 +1126,15 @@ BeesContext::start()
 	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_progress_thread = make_shared<BeesThread>("progress_report");
 	m_status_thread = make_shared<BeesThread>("status_report");
-	m_progress_thread->exec([=]() {
+	m_progress_thread->exec([this]() {
 		show_progress();
 	});
-	m_status_thread->exec([=]() {
+	m_status_thread->exec([this]() {
 		dump_status();
 	});
 
 	// Set up temporary file pool
-	m_tmpfile_pool.generator([=]() -> shared_ptr<BeesTempFile> {
+	m_tmpfile_pool.generator([this]() -> shared_ptr<BeesTempFile> {
 		return make_shared<BeesTempFile>(shared_from_this());
 	});
 	m_logical_ino_pool.generator([]() {

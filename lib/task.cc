@@ -754,7 +754,7 @@ namespace crucible {
 		m_prev_loadavg = getloadavg1();
 
 		if (target && !m_load_tracking_thread) {
-			m_load_tracking_thread = make_shared<thread>([=] () { loadavg_thread_fn(); });
+			m_load_tracking_thread = make_shared<thread>([this] () { loadavg_thread_fn(); });
 			m_load_tracking_thread->detach();
 		}
 	}
@@ -944,7 +944,7 @@ namespace crucible {
 	TaskConsumer::TaskConsumer(const shared_ptr<TaskMasterState> &tms) :
 		m_master(tms)
 	{
-		m_thread = make_shared<thread>([=](){ consumer_thread(); });
+		m_thread = make_shared<thread>([this](){ consumer_thread(); });
 	}
 
 	class BarrierState {
