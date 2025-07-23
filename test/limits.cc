@@ -7,22 +7,6 @@
 
 using namespace crucible;
 
-// Like catch_all but don't bother printing anything
-static
-int
-silent_catch_all(const function<void()> &f)
-{
-	try {
-		f();
-		return 0;
-	} catch (const exception &) {
-		return 1;
-	} catch (...) {
-		return -1;
-	}
-}
-
-
 #define SHOULD_FAIL(expr) assert(1 == silent_catch_all([&]() { (expr); }))
 
 #define SHOULD_PASS(expr, result) assert(0 == silent_catch_all([&]() { assert((result) == (expr)); }))
