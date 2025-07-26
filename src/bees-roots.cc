@@ -697,7 +697,7 @@ should_throttle()
 	// If there's too many entries in the queue, stop adding new ones until workers catch up
 	// If there's not too many entries in the queue, restart the scan task
 	const auto instance_count = Task::instance_count();
-	const auto instance_limit = BEES_MAX_EXTENT_REF_COUNT;
+	const auto instance_limit = BEES_MAX_EXTENT_TASK_COUNT;
 	// Add some hysteresis so that we aren't constantly flipping throttle on and off
 	const bool queue_empty = s_throttled && instance_count < instance_limit * .90;
 	const bool queue_full = !s_throttled && instance_count > instance_limit * .99;

@@ -97,7 +97,13 @@ const double BEES_TOXIC_SYS_DURATION = 5.0;
 
 // Maximum number of refs to a single extent before we have other problems
 // If we have more than 10K refs to an extent, adding another will save 0.01% space
-const size_t BEES_MAX_EXTENT_REF_COUNT = 9999; // (16 * 1024 * 1024 / 24);
+// The kernel limit is (16 * 1024 * 1024 / 24), but this is far too large for practical dedupe.
+const size_t BEES_MAX_EXTENT_REF_COUNT = 9999;
+
+// Maximum number of extent tasks in the in-memory queue
+// More tasks = more memory, but also more parallel execution
+// Fewer tasks = less queue delay, so restart after shutdown repeats less work
+const size_t BEES_MAX_EXTENT_TASK_COUNT = 9999;
 
 // How long between hash table histograms
 const double BEES_HASH_TABLE_ANALYZE_INTERVAL = BEES_STATS_INTERVAL;
