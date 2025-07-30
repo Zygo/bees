@@ -134,7 +134,7 @@ namespace crucible {
 	typename NamedPtr<Return, Arguments...>::Ptr
 	NamedPtr<Return, Arguments...>::insert_item(Func fn, Arguments... args)
 	{
-		Key k(args...);
+		const Key k(args...);
 
 		// Is it already in the map?
 		unique_lock<mutex> lock_lookup(m_map_rep->m_mutex);
