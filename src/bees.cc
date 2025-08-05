@@ -694,7 +694,7 @@ static
 void
 block_signals()
 {
-	BEESLOGDEBUG("Masking signals");
+	BEESTRACE("Masking signals");
 
 	DIE_IF_NON_ZERO(sigemptyset(&new_sigset));
 	DIE_IF_NON_ZERO(sigaddset(&new_sigset, SIGTERM));
@@ -772,7 +772,7 @@ bees_main(int argc, char *argv[])
 
 	// Create a context so we can apply configuration to it
 	shared_ptr<BeesContext> bc = make_shared<BeesContext>();
-	BEESLOGDEBUG("context constructed");
+	BEESTRACE("context constructed");
 
 	// Defaults
 	bool use_relative_paths = false;
