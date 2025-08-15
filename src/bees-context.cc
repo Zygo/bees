@@ -1154,6 +1154,9 @@ BeesContext::start()
 
 	// Kick off the crawlers
 	roots()->start();
+
+	// Startup is finished.  Any further exceptions will require -v8 to be seen.
+	bees_trace_level = LOG_DEBUG;
 }
 
 void

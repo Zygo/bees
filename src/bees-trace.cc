@@ -4,6 +4,10 @@
 
 int bees_log_level = 8;
 
+/// Default level for exception stacktraces at startup.
+/// Will be lowered to LOG_DEBUG once startup is complete.
+int bees_trace_level = LOG_ERR;
+
 thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 thread_local bool BeesTracer::tl_first = true;
 thread_local bool BeesTracer::tl_silent = false;
@@ -22,18 +26,18 @@ BeesTracer::~BeesTracer()
 {
 	if (!tl_silent && exception_check()) {
 		if (tl_first) {
-			BEESLOG(BEES_TRACE_LEVEL, "TRACE: --- BEGIN TRACE --- exception ---");
+			BEESLOG(bees_trace_level, "TRACE: --- BEGIN TRACE --- exception ---");
 			tl_first = false;
 		}
 		try {
 			m_func();
 		} catch (exception &e) {
-			BEESLOG(BEES_TRACE_LEVEL, "TRACE: Nested exception: " << e.what());
+			BEESLOG(bees_trace_level, "TRACE: Nested exception: " << e.what());
 		} catch (...) {
-			BEESLOG(BEES_TRACE_LEVEL, "TRACE: Nested exception ...");
+			BEESLOG(bees_trace_level, "TRACE: Nested exception ...");
 		}
 		if (!m_next_tracer) {
-			BEESLOG(BEES_TRACE_LEVEL, "TRACE: ---  END  TRACE --- exception ---");
+			BEESLOG(bees_trace_level, "TRACE: ---  END  TRACE --- exception ---");
 		}
 	}
 	tl_next_tracer = m_next_tracer;
@@ -55,12 +59,12 @@ void
 BeesTracer::trace_now()
 {
 	BeesTracer *tp = tl_next_tracer;
-	BEESLOG(BEES_TRACE_LEVEL, "TRACE: --- BEGIN TRACE ---");
+	BEESLOG(bees_trace_level, "TRACE: --- BEGIN TRACE ---");
 	while (tp) {
 		tp->m_func();
 		tp = tp->m_next_tracer;
 	}
-	BEESLOG(BEES_TRACE_LEVEL, "TRACE: ---  END  TRACE ---");
+	BEESLOG(bees_trace_level, "TRACE: ---  END  TRACE ---");
 }
 
 bool

@@ -753,7 +753,7 @@ bees_main(int argc, char *argv[])
 			BEESLOGDEBUG("exception (ignored): " << s);
 			BEESCOUNT(exception_caught_silent);
 		} else {
-			BEESLOG(BEES_TRACE_LEVEL, "TRACE: EXCEPTION: " << s);
+			BEESLOG(bees_trace_level, "TRACE: EXCEPTION: " << s);
 			BEESCOUNT(exception_caught);
 		}
 	});
