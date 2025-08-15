@@ -34,10 +34,19 @@
 using namespace crucible;
 using namespace std;
 
+static
+void
+do_cmd_version()
+{
+	cout << "bees version " << BEES_VERSION << endl;
+}
+
+static
 void
 do_cmd_help(char *argv[])
 {
-	fprintf(stderr, BEES_USAGE, argv[0]);
+	do_cmd_version();
+	fprintf(stdout, BEES_USAGE, argv[0]);
 }
 
 // static inline helpers ----------------------------------------
@@ -965,6 +974,20 @@ bees_main(int argc, char *argv[])
 int
 main(int argc, char *argv[])
 {
+	// Handle --version and --help before any bees-specific initialisation.
+	for (int i = 1; i < argc; ++i) {
+		const string argvi = argv[i];
+		if (argvi == "--version") {
+			do_cmd_version();
+			return EXIT_SUCCESS;
+		}
+		if (argvi == "--help" || argvi == "-h") {
+			do_cmd_help(argv);
+			return EXIT_SUCCESS;
+		}
+	}
+
+	// Unconditional version banner on log output
 	cerr << "bees version " << BEES_VERSION << endl;
 
 	if (argc < 2) {

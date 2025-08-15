@@ -5,7 +5,8 @@ fs-root-path MUST be the root of a btrfs filesystem tree (subvol id 5).
 Other directories will be rejected.
 
 Options:
-    -h, --help            Show this help
+    -h, --help            Show this help and exit
+        --version         Print version information and exit
 
 Load management options:
     -c, --thread-count    Worker thread count (default CPU count * factor)
