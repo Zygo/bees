@@ -909,7 +909,7 @@ bees_main(int argc, char *argv[])
 
 	BEESLOGINFO("setting rlimit NOFILE to " << BEES_OPEN_FILE_LIMIT);
 
-	struct rlimit lim = {
+	const struct rlimit lim = {
 		.rlim_cur = BEES_OPEN_FILE_LIMIT,
 		.rlim_max = BEES_OPEN_FILE_LIMIT,
 	};
