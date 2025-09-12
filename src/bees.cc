@@ -255,12 +255,12 @@ bees_readahead_nolock(int const fd, const off_t offset, const size_t size)
 	// The btrfs kernel code does readahead with lower ioprio
 	// and might discard the readahead request entirely.
 	BEESNOTE("emulating readahead " << name_fd(fd) << " offset " << to_hex(offset) << " len " << pretty(size));
-	auto working_size = min(size, uint64_t(128 * 1024 * 1024));
+	auto working_size = min(uint64_t(size), uint64_t(128 * 1024 * 1024));
 	auto working_offset = offset;
 	while (working_size) {
 		// don't care about multithreaded writes to this buffer--it is garbage anyway
 		static uint8_t dummy[BEES_READAHEAD_SIZE];
-		const size_t this_read_size = min(working_size, sizeof(dummy));
+		const size_t this_read_size = min(working_size, uint64_t(sizeof(dummy)));
 		// Ignore errors and short reads.  It turns out our size
 		// parameter isn't all that accurate, so we can't use
 		// the pread_or_die template.
