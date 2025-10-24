@@ -6,7 +6,6 @@ After=sysinit.target
 [Service]
 Type=simple
 ExecStart=@PREFIX@/@BINDIR@/beesd --no-timestamps %i
-CPUAccounting=true
 CPUSchedulingPolicy=batch
 CPUWeight=12
 IOSchedulingClass=idle
