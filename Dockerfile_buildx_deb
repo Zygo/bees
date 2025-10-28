@@ -1,0 +1,56 @@
+# This Dockerfile provides a simple way to build the bees .deb package in a clean environment.
+# Package versions are not pinned for maintainability and compatibility with Ubuntu LTS updates.
+# For reproducible builds, consider using snapshot.ubuntu.com or apt caching.
+FROM ubuntu:24.04 AS base
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y \
+     fakeroot git build-essential devscripts debhelper dh-make \
+     btrfs-progs cmark-gfm pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
+WORKDIR /build/bees
+RUN chown -R ubuntu:ubuntu /build 
+USER ubuntu
+RUN git clone https://github.com/Zygo/bees.git .
+ARG DEBFULLNAME="Maintainer Name"
+ARG DEBEMAIL="usere@example.pro"
+RUN mkdir debian \
+ && printf "Source: bees\n\
+Section: utils\n\
+Priority: optional\n\
+Maintainer: %s <%s>\n\
+Build-Depends: debhelper-compat (= 13), cmark-gfm, btrfs-progs\n\
+Standards-Version: 4.5.1\n\
+Homepage: https://github.com/Zygo/bees\n\
+\n\
+Package: bees\n\
+Architecture: any\n\
+Depends: \${shlibs:Depends}, \${misc:Depends}, btrfs-progs\n\
+Description: Btrfs deduplication daemon\n\
+ A daemon that deduplicates data on Btrfs volumes using\n\
+ reflinks and stable file handles.\
+" "${DEBFULLNAME}" "${DEBEMAIL}" > debian/control \
+ && printf "#!/usr/bin/make -f\n\
+%%:\n\
+	dh \$@\n\
+\n\
+override_dh_auto_build:\n\
+	make\n\
+\n\
+override_dh_auto_install:\n\
+	make DESTDIR=\$(CURDIR)/debian/tmp SYSTEMD_SYSTEM_UNIT_DIR=/lib/systemd/system install"  > debian/rules \
+ && chmod +x debian/rules \
+ && printf "usr/sbin/beesd\n\
+usr/lib/bees/bees\n\
+etc/bees/beesd.conf.sample\n\
+lib/systemd/system/beesd@.service" >debian/install \
+ && mkdir -p debian/source && echo "3.0 (native)" > debian/source/format
+ENV EDITOR=true
+RUN bash -c 'dch --create -v $(git describe --always --dirty | sed -E 's/^[a-zA-Z]//') --package bees'\
+ && sed -E -i 's/(git clean -dfx -e localconf)/\1 -e debian\//g' Makefile \
+ && dpkg-buildpackage -us -uc
+
+FROM scratch AS final
+WORKDIR /
+COPY --from=build /build/*.deb .
