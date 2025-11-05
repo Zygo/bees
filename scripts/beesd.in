@@ -23,7 +23,7 @@ readonly AL128K="$((128*1024))"
 readonly AL16M="$((16*1024*1024))"
 readonly CONFIG_DIR=@ETC_PREFIX@/bees/
 
-readonly bees_bin=$(realpath @DESTDIR@/@LIBEXEC_PREFIX@/bees)
+readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
 
 command -v "$bees_bin" &> /dev/null || ERRO "Missing 'bees' agent"
 
