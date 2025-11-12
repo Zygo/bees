@@ -65,6 +65,7 @@ These bugs are particularly popular among bees users, though not all are specifi
 | 6.3, backported to 5.15.107, 6.1.24, 6.2.11 | 6.3 | vmalloc error, failed to allocate pages | 6.3.10, 6.4 and later.  Bug (f349b15e183d "mm: vmalloc: avoid warn_alloc noise caused by fatal signal" in v6.3-rc6) backported to 6.1.24, 6.2.11, and 5.15.107. | 95a301eefa82 mm/vmalloc: do not output a spurious warning when huge vmalloc() fails
 | 6.2 | 6.3 | `IGNORE_OFFSET` flag ignored in `LOGICAL_INO` ioctl | 6.2.16, 6.3.3, 6.4 and later | 0cad8f14d70c btrfs: fix backref walking not returning all inode refs
 | 6.10 | 6.11 | `adding refs to an existing tree ref`, `failed to run delayed ref`, then read-only | 6.11.10, 6.12 and later | 7d493a5ecc26 btrfs: fix incorrect comparison for delayed refs
+| - | 6.14 | modifying pages during direct IO writes causes csum failure | 6.15 and later | 968f19c5b1b7 btrfs: always fallback to buffered write if the inode requires checksum
 | 5.4 | - | kernel hang when multiple threads are running `LOGICAL_INO` and dedupe/clone ioctl on the same extent | - | workaround: avoid doing that
 
 "Last bad kernel" refers to that version's last stable update from
