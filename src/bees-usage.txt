@@ -6,6 +6,7 @@ Other directories will be rejected.
 
 Options:
     -h, --help            Show this help
+    -V, --version         Output version information and exit
 
 Load management options:
     -c, --thread-count    Worker thread count (default CPU count * factor)
@@ -26,7 +27,7 @@ Logging options:
     -T, --no-timestamps   Omit timestamps in log output
     -p, --absolute-paths  Show absolute paths (default)
     -P, --strip-paths     Strip $CWD from beginning of all paths in the log
-    -v, --verbose         Set maximum log level (0..8, default 8)
+    -v, --verbose         Set maximum log level (0..8, default %d)
 
 Optional environment variables:
     BEESHOME    Path to hash table and configuration files

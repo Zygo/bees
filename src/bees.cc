@@ -35,9 +35,16 @@ using namespace crucible;
 using namespace std;
 
 void
+print_version(FILE *stream=stdout)
+{
+	fprintf(stream, "bees version %s\n", BEES_VERSION);
+}
+
+void
 do_cmd_help(char *argv[])
 {
-	fprintf(stderr, BEES_USAGE, argv[0]);
+	print_version(stderr);
+	fprintf(stderr, BEES_USAGE, argv[0], bees_log_level);
 }
 
 // static inline helpers ----------------------------------------
@@ -803,6 +810,7 @@ bees_main(int argc, char *argv[])
 		{ .name = "absolute-paths",        .has_arg = no_argument,       .val = 'p' },
 		{ .name = "timestamps",            .has_arg = no_argument,       .val = 't' },
 		{ .name = "verbose",               .has_arg = required_argument, .val = 'v' },
+		{ .name = "version",               .has_arg = no_argument,       .val = 'V' },
 		{ 0 },
 	};
 
@@ -879,7 +887,10 @@ bees_main(int argc, char *argv[])
 					BEESLOGNOTICE("log level set to " << bees_log_level);
 				}
 				break;
-
+			case 'V':
+				print_version();
+				bees_log_level = LOG_WARNING + 1; //Suppress the log message at the end
+				return EXIT_SUCCESS;
 			case 'h':
 			default:
 				do_cmd_help(argv);
@@ -965,8 +976,6 @@ bees_main(int argc, char *argv[])
 int
 main(int argc, char *argv[])
 {
-	cerr << "bees version " << BEES_VERSION << endl;
-
 	if (argc < 2) {
 		do_cmd_help(argv);
 		return EXIT_FAILURE;
