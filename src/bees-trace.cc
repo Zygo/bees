@@ -2,7 +2,9 @@
 
 // tracing ----------------------------------------
 
-int bees_log_level = 8;
+/* default log level is LOG_INFO i.e.*/
+/* LOG_WARNING (4); LOG_NOTICE (5); LOG_INFO (6); LOG_DEBUG (7) */
+int bees_log_level = LOG_INFO + 1;
 
 thread_local BeesTracer *BeesTracer::tl_next_tracer = nullptr;
 thread_local bool BeesTracer::tl_first = true;
