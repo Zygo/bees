@@ -45,7 +45,7 @@ struct open_how {
 extern "C" {
 
 /// Weak symbol to support libc with no syscall wrapper
-int openat2(int dirfd, const char *pathname, struct open_how *how, size_t size) throw();
+int openat2(int dirfd, const char *pathname, const struct open_how *how, size_t size) throw();
 
 };
 
