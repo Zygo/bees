@@ -39,6 +39,10 @@ help(){
     exec "$bees_bin" --help
 }
 
+version(){
+    exec "$bees_bin" --version
+}
+
 for i in $("$bees_bin" --help 2>&1 | grep -E " --" | sed -e "s/^[^-]*-/-/" -e "s/,[^-]*--/ --/" -e "s/ [^-]*$//")
 do
    TMP_ARGS="$TMP_ARGS $i"
@@ -66,6 +70,8 @@ for arg in "${ARGUMENTS[@]}"; do
     case $arg in
         -h) help;;
         --help) help;;
+        -V) version;;
+        --version) version;;
     esac
 done
 
