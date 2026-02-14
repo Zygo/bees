@@ -44,9 +44,11 @@ const off_t BLOCK_SIZE_MAX_EXTENT_SAME = 4096 * 4096;
 const off_t BLOCK_SIZE_MAX_COMPRESSED_EXTENT = 128 * 1024;
 
 // Maximum length of any extent in bytes
-// except we've seen 1.03G extents...
-// ...FIEMAP is slow and full of lies
-const off_t BLOCK_SIZE_MAX_EXTENT = 128 * 1024 * 1024;
+// Kernel commit 24542bf7ea5e4fdfdb5157ff544c093fa4dcb536
+// ("btrfs: limit fallocate extent reservation to 256MB")
+// introduces a bug where prealloc extents can be 256M long
+// instead of BTRFS_MAX_EXTENT_SIZE, i.e. 128M.
+const off_t BLOCK_SIZE_MAX_EXTENT = 256 * 1024 * 1024;
 
 // Masks, so we don't have to write "(BLOCK_SIZE_CLONE - 1)" everywhere
 const off_t BLOCK_MASK_CLONE = BLOCK_SIZE_CLONE - 1;
