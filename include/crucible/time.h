@@ -11,24 +11,39 @@
 
 namespace crucible {
 
+	/// Sleep for approximately @p secs seconds.
+	/// Returns the actual elapsed sleep time in seconds.
 	double nanosleep(double secs);
 
+	/// Elapsed-time stopwatch.  Measures wall-clock time since
+	/// construction or the last reset() call.
 	class Timer {
 		chrono::high_resolution_clock::time_point m_start;
 
 	public:
 		Timer();
+		/// Elapsed time in seconds since construction or last reset().
 		double age() const;
+		/// Raw time point recorded at construction or last reset().
 		chrono::high_resolution_clock::time_point get() const;
+		/// Elapsed time in seconds, rounded to the nearest 1/@p precision seconds.
 		double report(int precision = 1000) const;
+		/// Reset the start time to now.
 		void reset();
+		/// Return elapsed time in seconds and reset the start time to now.
 		double lap();
+		/// True if elapsed time is less than @p d seconds.
 		bool operator<(double d) const;
+		/// True if elapsed time is greater than @p d seconds.
 		bool operator>(double d) const;
 	};
 
+	/// Format elapsed time as a human-readable string.
 	ostream &operator<<(ostream &os, const Timer &t);
 
+	/// Token-bucket rate limiter.  Tokens accumulate at a fixed rate
+	/// up to a configurable burst capacity.  Callers sleep until
+	/// enough tokens are available to cover the requested cost.
 	class RateLimiter {
 		Timer	m_timer;
 		double	m_rate;
@@ -39,16 +54,29 @@ namespace crucible {
 		void update_tokens();
 		RateLimiter() = delete;
 	public:
+		/// Construct with @p rate tokens per second and @p burst maximum token capacity.
 		RateLimiter(double rate, double burst);
+		/// Construct with @p rate tokens per second; burst capacity equals the rate.
 		RateLimiter(double rate);
+		/// Block until @p cost tokens are available, then consume them.
 		void sleep_for(double cost = 1.0);
+		/// Return seconds to wait for @p cost tokens to become available.
 		double sleep_time(double cost = 1.0);
+		/// Return true if at least one token is available without sleeping.
 		bool is_ready();
+		/// Consume @p cost tokens immediately without sleeping; balance may go negative.
 		void borrow(double cost = 1.0);
+		/// Set the token accumulation rate in tokens per second.
 		void rate(double new_rate);
+		/// Return the current token accumulation rate in tokens per second.
 		double rate() const;
 	};
 
+	/// Adaptive rate estimator for a monotonically increasing integer counter.
+	/// Tracks a decaying weighted average of the counter's rate of change and
+	/// provides blocking waits and time estimates for future count values.
+	/// The decay constant (0.99) produces a smooth estimate that adapts
+	/// to changes in rate over time.
 	class RateEstimator {
 		mutable mutex m_mutex;
 		mutable condition_variable m_condvar;
@@ -68,40 +96,49 @@ namespace crucible {
 		pair<double, double> ratio_unlocked() const;
 		void update_unlocked(uint64_t new_count);
 	public:
+		/// Construct with @p min_delay and @p max_delay bounding the polling
+		/// interval in seconds used by wait_for() and wait_until().
 		RateEstimator(double min_delay = 1, double max_delay = 3600);
 
-		// Block until count reached
+		/// Block until the count has increased by at least @p new_count_relative.
 		void wait_for(uint64_t new_count_relative) const;
+		/// Block until the count reaches or exceeds @p new_count_absolute.
 		void wait_until(uint64_t new_count_absolute) const;
 
-		// Computed rates and ratios
+		/// Estimated rate of change in counts per second.
 		double rate() const;
+		/// Weighted numerator and denominator underlying the rate estimate.
 		pair<double, double> ratio() const;
 
-		// Inspect raw num/den
+		/// Raw (unweighted) internal numerator and denominator of the rate estimate.
 		pair<double, double> raw() const;
 
-		// Write count
+		/// Record a new absolute count value and wake any waiting threads.
 		void update(uint64_t new_count);
 
-		// Ignore counts that go backwards
+		/// Record a new count value, ignoring values less than the current count.
 		void update_monotonic(uint64_t new_count);
 
-		// Read count
+		/// Return the most recently recorded count value.
 		uint64_t count() const;
 
-		/// Increment count (like update(count() + more), but atomic)
+		/// Atomically increment the count by @p more and wake any waiting threads.
 		void increment(uint64_t more = 1);
 
-		// Convert counts to chrono types
+		/// Estimate the wall-clock time when the count will reach @p absolute_count.
 		chrono::high_resolution_clock::time_point time_point(uint64_t absolute_count) const;
+		/// Estimate the time duration for the count to increase by @p relative_count.
 		chrono::duration<double> duration(uint64_t relative_count) const;
 
-		// Polling delay until count reached (limited by min/max delay)
+		/// Estimate seconds until the count increases by @p new_count_relative,
+		/// clamped to [min_delay, max_delay].
 		double seconds_for(uint64_t new_count_relative) const;
+		/// Estimate seconds until the count reaches @p new_count_absolute,
+		/// clamped to [min_delay, max_delay].
 		double seconds_until(uint64_t new_count_absolute) const;
 	};
 
+	/// Format the RateEstimator state as a human-readable string.
 	ostream &
 	operator<<(ostream &os, const RateEstimator &re);
 

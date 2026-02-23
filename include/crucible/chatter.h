@@ -92,6 +92,11 @@ namespace crucible {
 		}
 	};
 
+	/// Per-call-site logging gate, typically stored as a static local variable.
+	/// Wraps a source location (file, line, function name) and an enabled/disabled
+	/// state.  When enabled, operator<< constructs a Chatter and emits the message.
+	/// All ChatterBox instances are registered in a global set, allowing runtime
+	/// enable/disable of individual call sites.
 	class ChatterBox {
 		string m_file;
 		int m_line;
@@ -112,12 +117,18 @@ namespace crucible {
 			return c;
 		}
 
+		/// Return true if this call site is currently enabled.
 		bool enabled() const { return m_enabled; }
+		/// Enable or disable logging at this call site.
 		void set_enable(bool en);
 
+		/// Return the global set of all registered ChatterBox instances.
 		static set<ChatterBox*>& all_boxes();
 	};
 
+	/// RAII helper that invokes a callback on destruction.
+	/// Used with CHATTER_UNWIND to log a message when leaving a scope,
+	/// typically to record what was happening when an exception was thrown.
 	class ChatterUnwinder {
 		function<void()> m_func;
 	public:
@@ -126,6 +137,9 @@ namespace crucible {
 	};
 };
 
+/// Log a message at the current call site if the site is enabled.
+/// @p x is an expression chain suitable for operator<< on a stream.
+/// Example: CHATTER("value is " << v);
 #define CHATTER(x) do { \
 	using namespace crucible; \
 	static ChatterBox crucible_chatterbox_cb(__FILE__, __LINE__, __func__); \
@@ -134,6 +148,7 @@ namespace crucible {
 	} \
 } while (0)
 
+/// Like CHATTER but prepends "file:line: " to the message.
 #define CHATTER_TRACE(x) do { \
 	using namespace crucible; \
 	static ChatterBox crucible_chatterbox_cb(__FILE__, __LINE__, __func__); \
@@ -144,6 +159,9 @@ namespace crucible {
 
 #define WTF_C(x, y) x##y
 #define SRSLY_WTF_C(x, y) WTF_C(x, y)
+/// Register a CHATTER_TRACE message to be emitted when the current scope exits.
+/// Useful for logging context when an exception propagates out of a function.
+/// @p x is an expression chain suitable for operator<< on a stream.
 #define CHATTER_UNWIND(x) \
 	crucible::ChatterUnwinder SRSLY_WTF_C(chatterUnwinder_, __LINE__) ([&]() { \
 		CHATTER_TRACE(x); \

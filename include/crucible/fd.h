@@ -117,19 +117,25 @@ namespace crucible {
 		return pread_or_die(fd, static_cast<void *>(&buf), sizeof(buf), offset);
 	}
 
+	/// Attempt write by pointer and length, throw exception on IO error or short write.
 	void write_or_die(int fd, const void *buf, size_t size);
+	/// Attempt write of a POD struct, throw exception on IO error or short write.
 	template <class T> void write_or_die(int fd, const T& buf)
 	{
 		return write_or_die(fd, static_cast<const void *>(&buf), sizeof(buf));
 	}
 
+	/// Attempt write by pointer and length, throw exception on IO error but not short write.
 	void write_partial_or_die(int fd, const void *buf, size_t size_wanted, size_t &size_written);
+	/// Attempt write of a POD struct, throw exception on IO error but not short write.
 	template <class T> void write_partial_or_die(int fd, const T& buf, size_t &size_written)
 	{
 		return write_partial_or_die(fd, static_cast<const void *>(&buf), sizeof(buf), size_written);
 	}
 
+	/// Attempt write at position by pointer and length, throw exception on IO error or short write.
 	void pwrite_or_die(int fd, const void *buf, size_t size, off_t offset);
+	/// Attempt write at position of a POD struct, throw exception on IO error or short write.
 	template <class T> void pwrite_or_die(int fd, const T& buf, off_t offset)
 	{
 		return pwrite_or_die(fd, static_cast<const void *>(&buf), sizeof(buf), offset);
@@ -150,22 +156,27 @@ namespace crucible {
 	/// Read a simple string.
 	string read_string(int fd, size_t size);
 
-	/// A lot of Unix API wants you to initialize a struct and call
-	/// one function to fill it, another function to throw it away,
-	/// and has some unknown third thing you have to do when there's
-	/// an error.  That's also a C++ object with an exception-throwing
-	/// constructor.
+	/// RAII wrapper for struct stat.  Constructor calls fstat() or stat()
+	/// and throws on error, eliminating the init/fill/cleanup pattern.
 	struct Stat : public stat {
+		/// Default-construct an empty Stat (all fields zero).
 		Stat();
+		/// Construct by calling fstat() on @p f; throws on error.
 		Stat(int f);
+		/// Construct by calling stat() on @p filename; throws on error.
 		Stat(const string &filename);
+		/// Fill from fstat() on @p fd; throws on error.
 		Stat &fstat(int fd);
+		/// Fill from lstat() on @p filename (does not follow symlinks); throws on error.
 		Stat &lstat(const string &filename);
 	};
 
+	/// Get inode flags (FS_IOC_GETFLAGS); throws on error.
 	int ioctl_iflags_get(int fd);
+	/// Set inode flags (FS_IOC_SETFLAGS); throws on error.
 	void ioctl_iflags_set(int fd, int attr);
 
+	/// Decode a stat mode bitmask to a human-readable string (e.g. "rwxr-xr-x").
 	string st_mode_ntoa(mode_t mode);
 
 	/// Because it's not trivial to do correctly
@@ -177,8 +188,9 @@ namespace crucible {
 	/// Returns Fd objects because it does own them.
 	pair<Fd, Fd> socketpair_or_die(int domain = AF_UNIX, int type = SOCK_STREAM, int protocol = 0);
 
-	/// like unique_lock but for flock instead of mutexes...and not trying
-	/// to hide the many and subtle differences between those two things *at all*.
+	/// RAII advisory lock (flock) guard, analogous to unique_lock for mutexes.
+	/// Note that flock and mutex semantics differ significantly: flock locks are
+	/// per open-file-description, not per-thread, and are not recursive.
 	class Flock {
 		int	m_fd;
 		bool	m_locked;
@@ -187,15 +199,25 @@ namespace crucible {
 		Flock &operator=(const Flock &) = delete;
 		Flock &operator=(Flock &&) = delete;
 	public:
+		/// Construct an unowned Flock not associated with any fd.
 		Flock();
+		/// Construct and acquire an exclusive flock on @p fd; blocks until available.
 		Flock(int fd);
+		/// Construct a Flock on @p fd with an explicitly specified initial lock state.
 		Flock(int fd, bool init_locked_state);
+		/// Release the lock if held, then destroy.
 		~Flock();
+		/// Acquire an exclusive flock; blocks until available.
 		void lock();
+		/// Attempt to acquire an exclusive flock; throws if not immediately available.
 		void try_lock();
+		/// Release the flock.
 		void unlock();
+		/// Return true if the lock is currently held.
 		bool owns_lock();
+		/// Return true if the lock is currently held.
 		operator bool();
+		/// Return the associated file descriptor.
 		int fd();
 	};
 
