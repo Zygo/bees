@@ -44,6 +44,13 @@ namespace crucible {
 		bool operator!=(const Extent &that) const { return !(*this == that); }
 	};
 
+	/// @deprecated Use the btrfs tree classes in btrfs-tree.h directly instead.
+	/// ExtentWalker is kept for compatibility but carries FIEMAP legacy
+	/// that complicates the implementation.  New code should not use it.
+	///
+	/// Cursor for iterating over the extents of an open file.
+	/// Wraps FIEMAP queries with a cache and provides forward/backward
+	/// navigation and random-access seeking by file offset.
 	class ExtentWalker {
 	public:
 		using Vec = vector<Extent>;
