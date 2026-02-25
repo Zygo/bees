@@ -3,6 +3,8 @@
 #include "crucible/error.h"
 #include "crucible/process.h"
 
+#include <cmath>
+
 #include <algorithm>
 #include <thread>
 
@@ -174,23 +176,29 @@ namespace crucible {
 		return m_rate;
 	}
 
-	RateEstimator::RateEstimator(double min_delay, double max_delay) :
+	RateEstimator::RateEstimator(double min_delay, double max_delay, double decay) :
+		m_decay(decay),
 		m_min_delay(min_delay),
 		m_max_delay(max_delay)
 	{
 		THROW_CHECK1(invalid_argument, min_delay, min_delay > 0);
 		THROW_CHECK1(invalid_argument, max_delay, max_delay > 0);
 		THROW_CHECK2(invalid_argument, min_delay, max_delay, max_delay > min_delay);
+		THROW_CHECK1(invalid_argument, decay, decay > 0);
+		THROW_CHECK1(invalid_argument, decay, decay < 1);
 	}
 
 	void
 	RateEstimator::update_unlocked(uint64_t new_count)
 	{
-		// Gradually reduce the effect of previous updates
-		if (m_last_decay.age() > 1) {
-			m_num *= m_decay;
-			m_den *= m_decay;
-			m_last_decay.reset();
+		// Gradually reduce the effect of previous updates.
+		// Apply pow(m_decay, elapsed) so the half-life is independent of
+		// how frequently update() is called.
+		const double elapsed = m_last_decay.lap();
+		if (elapsed > 0) {
+			const double factor = pow(m_decay, elapsed);
+			m_num *= factor;
+			m_den *= factor;
 		}
 		// Add units over time to running totals
 		auto increment = new_count - min(new_count, m_last_count);

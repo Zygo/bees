@@ -75,8 +75,15 @@ namespace crucible {
 	/// Adaptive rate estimator for a monotonically increasing integer counter.
 	/// Tracks a decaying weighted average of the counter's rate of change and
 	/// provides blocking waits and time estimates for future count values.
-	/// The decay constant (0.99) produces a smooth estimate that adapts
-	/// to changes in rate over time.
+	///
+	/// Decay is applied continuously in wall-clock time: each call to update()
+	/// applies a factor of @c pow(decay, elapsed_seconds) to the accumulated
+	/// numerator and denominator, where @c elapsed_seconds is the time since the
+	/// previous update.  This ensures that the effective half-life of the
+	/// estimate is independent of how frequently update() is called.
+	///
+	/// The @p decay parameter is the per-second decay factor.  The default 0.99
+	/// gives a time constant of ~100 seconds (half-life ~69 seconds).
 	class RateEstimator {
 		mutable mutex m_mutex;
 		mutable condition_variable m_condvar;
@@ -85,7 +92,7 @@ namespace crucible {
 		double m_den = 0.0;
 		uint64_t m_last_count = numeric_limits<uint64_t>::max();
 		Timer m_last_update;
-		const double m_decay = 0.99;
+		double m_decay;
 		Timer m_last_decay;
 		double m_min_delay;
 		double m_max_delay;
@@ -97,8 +104,9 @@ namespace crucible {
 		void update_unlocked(uint64_t new_count);
 	public:
 		/// Construct with @p min_delay and @p max_delay bounding the polling
-		/// interval in seconds used by wait_for() and wait_until().
-		RateEstimator(double min_delay = 1, double max_delay = 3600);
+		/// interval in seconds used by wait_for() and wait_until(), and
+		/// @p decay as the per-second exponential decay factor (default 0.99).
+		RateEstimator(double min_delay = 1, double max_delay = 3600, double decay = 0.99);
 
 		/// Block until the count has increased by at least @p new_count_relative.
 		void wait_for(uint64_t new_count_relative) const;
