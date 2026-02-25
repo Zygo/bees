@@ -207,7 +207,7 @@ namespace crucible {
 		m_den += delta;
 		m_last_count = new_count;
 		// If count increased, wake up any waiters
-		if (delta > 0) {
+		if (increment > 0) {
 			m_condvar.notify_all();
 		}
 	}
