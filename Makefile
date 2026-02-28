@@ -55,8 +55,16 @@ install_bees: ## Install bees + libs
 install_bees: src $(RUN_INSTALL_TESTS)
 	install -Dm755 bin/bees	$(DESTDIR)$(LIBEXEC_PREFIX)/bees
 
-install_scripts: ## Install scipts
+install_scripts: ## Install scripts
 install_scripts: scripts
+	@if [ -n "$(SYSTEMD_SYSTEM_UNIT_DIR)" ] && [ -n "$(OPENRC_INITD_DIR)" ]; then \
+		echo "ERROR: Both SYSTEMD_SYSTEM_UNIT_DIR and OPENRC_INITD_DIR are set." >&2; \
+		echo "  Installing both init systems on the same host would cause bees" >&2; \
+		echo "  to start twice on the same filesystem.  Set only one." >&2; \
+		echo "  SYSTEMD_SYSTEM_UNIT_DIR=$(SYSTEMD_SYSTEM_UNIT_DIR)" >&2; \
+		echo "  OPENRC_INITD_DIR=$(OPENRC_INITD_DIR)" >&2; \
+		exit 1; \
+	fi
 	install -Dm755 scripts/beesd $(DESTDIR)$(PREFIX)/$(BINDIR)/beesd
 	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(ETC_PREFIX)/bees/beesd.conf.sample
 ifneq ($(SYSTEMD_SYSTEM_UNIT_DIR),)
