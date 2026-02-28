@@ -591,7 +591,6 @@ class BeesRoots : public enable_shared_from_this<BeesRoots> {
 	void writeback_thread();
 	uint64_t next_root(uint64_t root = 0);
 	void current_state_set(const BeesCrawlState &bcs);
-	bool crawl_batch(shared_ptr<BeesCrawl> crawl);
 	void clear_caches();
 	shared_ptr<BeesCrawl> insert_root(const BeesCrawlState &bcs);
 	bool up_to_date(const BeesCrawlState &bcs);
