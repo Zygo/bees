@@ -12,7 +12,11 @@ rundir="/run/bees"
 logdir="/var/log/bees"
 mnt="${rundir}/mnt/${fsuuid}"
 device="/dev/disk/by-uuid/${fsuuid}"
-: "${beeshome:="${mnt}/.beeshome"}"
+: "${beeshome:=".beeshome"}"
+case "${beeshome}" in
+	/*) ;;                                      # absolute: use as-is
+	*)  beeshome="${mnt}/${beeshome}" ;;        # relative: resolve from filesystem root
+esac
 hashfile="${beeshome}/beeshash.dat"
 : "${logfile:="${logdir}/${RC_SVCNAME}.log"}"
 : "${loglevel:=5}"

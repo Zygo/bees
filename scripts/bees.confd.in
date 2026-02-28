@@ -74,9 +74,9 @@ logfile="/var/log/bees/${RC_SVCNAME}.log"
 # Exported as BEESSTATUS.
 statusfile="/run/bees/${fsuuid}.status"
 
-# BEESHOME directory, relative to the root of the btrfs filesystem.
+# BEESHOME directory.  Relative paths are resolved from the root of the
+# target btrfs filesystem (subvolid=5); absolute paths are used as-is.
 # Contains beeshash.dat (hash table) and beescrawl.dat (scan checkpoint).
-# Default: .beeshome at the root of the filesystem.
 #beeshome=".beeshome"
 
 # CPU scheduler.  "batch" and "idle" reduce impact on other processes.
