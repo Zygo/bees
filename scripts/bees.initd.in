@@ -2,6 +2,11 @@
 # bees OpenRC init script
 # https://github.com/Zygo/bees
 
+## Accept both 'hashsize' (legacy name used by earlier OpenRC scripts) and
+## 'DB_SIZE' (name used by beesd and beesd.conf.sample).  DB_SIZE wins if
+## both are set.
+: "${DB_SIZE:=${hashsize}}"
+
 ## Internal variables derived from configuration
 rundir="/run/bees"
 logdir="/var/log/bees"
@@ -52,21 +57,21 @@ _check_fsuuid() {
 	fi
 }
 
-_check_hashsize() {
-	if [ -z "${hashsize}" ]; then
-		eerror "hashsize is not set in /etc/conf.d/${RC_SVCNAME}"
+_check_db_size() {
+	if [ -z "${DB_SIZE}" ]; then
+		eerror "DB_SIZE is not set in /etc/conf.d/${RC_SVCNAME}"
 		return 1
 	fi
 	local AL128K=$((128*1024))
-	if [ $(( hashsize % AL128K )) -ne 0 ]; then
-		eerror "hashsize ${hashsize} is not a multiple of 128 KiB"
+	if [ $(( DB_SIZE % AL128K )) -ne 0 ]; then
+		eerror "DB_SIZE ${DB_SIZE} is not a multiple of 128 KiB"
 		return 1
 	fi
 }
 
 start_pre() {
 	_check_fsuuid || return 1
-	_check_hashsize || return 1
+	_check_db_size || return 1
 
 	checkpath -d -m 0700 -o root:root "${logdir}"
 	checkpath -d -m 0700 -o root:root "${rundir}"
@@ -93,14 +98,14 @@ start_pre() {
 	fi
 
 	checkpath -f -m 0600 -o root:root "${hashfile}"
-	local old_hashsize
-	old_hashsize="$(stat -c %s "${hashfile}")"
-	if [ "${old_hashsize}" -eq 0 ]; then
-		ebegin "Initialising hash table (${hashsize} bytes)"
-		truncate -s "${hashsize}" "${hashfile}"
+	local old_db_size
+	old_db_size="$(stat -c %s "${hashfile}")"
+	if [ "${old_db_size}" -eq 0 ]; then
+		ebegin "Initialising hash table (${DB_SIZE} bytes)"
+		truncate -s "${DB_SIZE}" "${hashfile}"
 		eend $? || return 1
-	elif [ "${old_hashsize}" -ne "${hashsize}" ]; then
-		eerror "Hash table size mismatch: found ${old_hashsize} bytes, expected ${hashsize} bytes"
+	elif [ "${old_db_size}" -ne "${DB_SIZE}" ]; then
+		eerror "Hash table size mismatch: found ${old_db_size} bytes, expected ${DB_SIZE} bytes"
 		eerror "To resize: stop bees, remove ${hashfile} and ${beeshome}/beescrawl.dat, then start bees"
 		return 1
 	fi
