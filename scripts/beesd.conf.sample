@@ -12,7 +12,7 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # Change carefully
 # WORK_DIR=/run/bees/
 # MNT_DIR="$WORK_DIR/mnt/$UUID"
-# BEESHOME="$MNT_DIR/.beeshome"
+# BEESHOME=.beeshome     # relative to filesystem root, or absolute path
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
 ## Options to apply, see `beesd --help` for details

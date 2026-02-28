@@ -110,7 +110,11 @@ fi
 
 WORK_DIR="${WORK_DIR:-/run/bees/}"
 MNT_DIR="${MNT_DIR:-$WORK_DIR/mnt/$UUID}"
-BEESHOME="${BEESHOME:-$MNT_DIR/.beeshome}"
+BEESHOME="${BEESHOME:-.beeshome}"
+case "$BEESHOME" in
+    /*) BEESHOME_PATH="$BEESHOME" ;;                # absolute: shell path same as exported value
+    *)  BEESHOME_PATH="$MNT_DIR/$BEESHOME" ;;       # relative: resolve for shell use only; pass
+esac                                                # original to bees so openat(root_fd()) resolves it
 BEESSTATUS="${BEESSTATUS:-$WORK_DIR/$UUID.status}"
 DB_SIZE="${DB_SIZE:-$((8192*AL128K))}"
 
@@ -135,19 +139,19 @@ mkdir -p "$MNT_DIR" || exit 1
 
 mount --make-private -osubvolid=5,nodev,noexec /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
-if [ ! -d "$BEESHOME" ]; then
-    if path_is_btrfs "$(dirname "$BEESHOME")"; then
-        INFO "Create subvol $BEESHOME for bees data"
-        btrfs sub cre "$BEESHOME"
+if [ ! -d "$BEESHOME_PATH" ]; then
+    if path_is_btrfs "$(dirname "$BEESHOME_PATH")"; then
+        INFO "Create subvol $BEESHOME_PATH for bees data"
+        btrfs sub cre "$BEESHOME_PATH"
     else
-        INFO "Create directory $BEESHOME for bees data (non-btrfs filesystem)"
-        mkdir "$BEESHOME" || ERRO "Failed to create $BEESHOME (parent directory must exist)"
+        INFO "Create directory $BEESHOME_PATH for bees data (non-btrfs filesystem)"
+        mkdir "$BEESHOME_PATH" || ERRO "Failed to create $BEESHOME_PATH (parent directory must exist)"
     fi
 fi
 
 # Check DB size
 {
-    DB_PATH="$BEESHOME/beeshash.dat"
+    DB_PATH="$BEESHOME_PATH/beeshash.dat"
     touch "$DB_PATH"
     OLD_SIZE="$(du -b "$DB_PATH" | sed 's/\t/ /g' | cut -d' ' -f1)"
     NEW_SIZE="$DB_SIZE"
@@ -156,7 +160,7 @@ fi
     fi
     if (( "$OLD_SIZE" != "$NEW_SIZE" )); then
         INFO "Resize db: $OLD_SIZE -> $NEW_SIZE"
-        rm -f "$BEESHOME/beescrawl.dat"
+        rm -f "$BEESHOME_PATH/beescrawl.dat"
         truncate -s $NEW_SIZE $DB_PATH
     fi
     chmod 700 "$DB_PATH"
