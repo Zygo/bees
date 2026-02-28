@@ -109,6 +109,7 @@ if [ ! -b "/dev/disk/by-uuid/$UUID" ]; then
 fi
 
 is_btrfs(){ [ "$(blkid -s TYPE -o value "$1")" == "btrfs" ]; }
+path_is_btrfs(){ [ "$(stat -f -c %T "$1")" == "btrfs" ]; }
 
 INFO "Check: Disk with btrfs"
 if ! is_btrfs "/dev/disk/by-uuid/$UUID"; then
@@ -124,8 +125,13 @@ mkdir -p "$MNT_DIR" || exit 1
 mount --make-private -osubvolid=5,nodev,noexec /dev/disk/by-uuid/$UUID "$MNT_DIR" || exit 1
 
 if [ ! -d "$BEESHOME" ]; then
-    INFO "Create subvol $BEESHOME for store bees data"
-    btrfs sub cre "$BEESHOME"
+    if path_is_btrfs "$(dirname "$BEESHOME")"; then
+        INFO "Create subvol $BEESHOME for bees data"
+        btrfs sub cre "$BEESHOME"
+    else
+        INFO "Create directory $BEESHOME for bees data (non-btrfs filesystem)"
+        mkdir "$BEESHOME" || ERRO "Failed to create $BEESHOME (parent directory must exist)"
+    fi
 fi
 
 # Check DB size
