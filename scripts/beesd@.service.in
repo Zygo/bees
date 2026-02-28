@@ -37,6 +37,14 @@ PrivateTmp=true
 # Disable network access
 PrivateNetwork=true
 
+# Run in a private mount namespace with slave propagation.  beesd mounts
+# the btrfs root subvolume inside this namespace; the mount is invisible
+# to other processes and automatically cleaned up when bees exits for
+# any reason.  Unmounts performed in the parent namespace (e.g. removable
+# media detached by the administrator) propagate into bees's namespace.
+# beesd detects this via SYSTEMD_EXEC_PID and skips its own unshare(1).
+PrivateMounts=yes
+
 # Use private IPC namespace, utc namespace
 PrivateIPC=true
 ProtectHostname=true
