@@ -2008,8 +2008,7 @@ BeesRoots::stop_wait()
 	BEESLOGDEBUG("BeesRoots stopped");
 }
 
-static
-Fd
+int
 bees_openat(int const parent_fd, const char *const pathname, uint64_t const flags)
 {
 	// Never O_CREAT so we don't need a mode argument
@@ -2018,7 +2017,7 @@ bees_openat(int const parent_fd, const char *const pathname, uint64_t const flag
 	// Try openat2 if the kernel has it
 	static bool can_openat2 = true;
 	if (can_openat2) {
-		open_how how {
+		const open_how how {
 			.flags = flags,
 			.resolve = RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV,
 		};
@@ -2027,12 +2026,12 @@ bees_openat(int const parent_fd, const char *const pathname, uint64_t const flag
 			BEESLOGWARN("openat2 returns ENOSYS, falling back to openat");
 			can_openat2 = false;
 		} else {
-			return Fd(rv);
+			return rv;
 		}
 	}
 
 	// No kernel support, use openat instead
-	return Fd(openat(parent_fd, pathname, flags));
+	return openat(parent_fd, pathname, flags);
 }
 
 Fd

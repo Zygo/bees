@@ -899,7 +899,13 @@ extern int bees_log_level;
 extern const char *BEES_USAGE;
 extern const char *BEES_VERSION;
 extern thread_local default_random_engine bees_generator;
+
 string pretty(double d);
+/// open(2) with bees flag conventions; returns the raw fd or throws.
+/// @p flags is @c uint64_t because @c openat2() (the preferred call) uses
+/// @c uint64_t in @c open_how.  Falls back to @c openat() when @c openat2()
+/// is unavailable; callers must ensure flags fit in @c int in that case.
+int bees_openat(int const parent_fd, const char *const pathname, uint64_t const flags);
 void bees_readahead(int fd, off_t offset, size_t size);
 void bees_readahead_pair(int fd, off_t offset, size_t size, int fd2, off_t offset2, size_t size2);
 void bees_unreadahead(int fd, off_t offset, size_t size);
