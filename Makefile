@@ -7,6 +7,7 @@ LIB_PREFIX ?= $(PREFIX)/$(LIBDIR)
 LIBEXEC_PREFIX ?= $(LIB_PREFIX)/bees
 
 SYSTEMD_SYSTEM_UNIT_DIR ?= $(shell pkg-config systemd --variable=systemdsystemunitdir)
+OPENRC_INITD_DIR ?=
 
 BEES_VERSION ?= $(shell git describe --always --dirty || echo UNKNOWN)
 
@@ -48,7 +49,7 @@ doc: ## Build docs
 scripts/%: scripts/%.in
 	$(TEMPLATE_COMPILER)
 
-scripts: scripts/beesd scripts/beesd@.service
+scripts: scripts/beesd scripts/beesd@.service scripts/bees.initd scripts/bees.confd
 
 install_bees: ## Install bees + libs
 install_bees: src $(RUN_INSTALL_TESTS)
@@ -60,6 +61,10 @@ install_scripts: scripts
 	install -Dm644 scripts/beesd.conf.sample $(DESTDIR)$(ETC_PREFIX)/bees/beesd.conf.sample
 ifneq ($(SYSTEMD_SYSTEM_UNIT_DIR),)
 	install -Dm644 scripts/beesd@.service $(DESTDIR)$(SYSTEMD_SYSTEM_UNIT_DIR)/beesd@.service
+endif
+ifneq ($(OPENRC_INITD_DIR),)
+	install -Dm755 scripts/bees.initd $(DESTDIR)$(OPENRC_INITD_DIR)/bees
+	install -Dm644 scripts/bees.confd $(DESTDIR)$(ETC_PREFIX)/conf.d/bees
 endif
 
 install: ## Install distribution

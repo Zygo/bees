@@ -1,0 +1,96 @@
+########
+# bees configuration file
+#
+# Documentation is available at:
+# https://zygo.github.io/bees/config.html
+#
+# Important gotchas and kernel bugs:
+# https://zygo.github.io/bees/btrfs-kernel.html
+########
+# Multiple instances of bees
+#
+# It is possible to run multiple instances of bees, one per filesystem,
+# by creating named service instances:
+#
+#  bees.foo (first filesystem)
+# * cp /etc/conf.d/bees /etc/conf.d/bees.foo
+# * ln -s /etc/init.d/bees /etc/init.d/bees.foo
+# * set 'fsuuid' and 'hashsize' in /etc/conf.d/bees.foo
+# * rc-service bees.foo start
+#
+#  bees.bar (second filesystem)
+# * cp /etc/conf.d/bees /etc/conf.d/bees.bar
+# * ln -s /etc/init.d/bees /etc/init.d/bees.bar
+# * set 'fsuuid' and 'hashsize' in /etc/conf.d/bees.bar
+# * rc-service bees.bar start
+########
+
+# The filesystem's unique UUID.  bees works on one filesystem at a time;
+# the UUID is used to locate the correct block device.  Use
+# `btrfs filesystem show` to list known btrfs filesystems and their UUIDs.
+fsuuid="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# The size of the bees hash table in bytes.  Larger tables produce better
+# deduplication, but consume more RAM (the entire table is memory-mapped).
+# The size must be a multiple of 128 KiB.
+#
+# Hash table sizing guide (assuming 128 KiB average dedupe extent size):
+#
+# Unique data size | hashsize
+# -------------------------
+#         256 GiB | $((32*1024*1024))    #  32 MiB
+#         512 GiB | $((64*1024*1024))    #  64 MiB
+#           1 TiB | $((128*1024*1024))   # 128 MiB
+#           2 TiB | $((256*1024*1024))   # 256 MiB
+#           4 TiB | $((512*1024*1024))   # 512 MiB
+#           8 TiB | $((1024*1024*1024))  #   1 GiB
+#          16 TiB | $((2048*1024*1024))  #   2 GiB
+#
+# The relationship between table size, data size, and average extent size:
+#
+# Unique data size | hashsize | Average dedupe extent size
+# -------------------------------------------------------
+#            1 TiB |      4GB |    4 KiB  (minimum)
+#            1 TiB |      1GB |   16 KiB
+#            1 TiB |    256MB |   64 KiB
+#            1 TiB |    128MB |  128 KiB  (recommended)
+#            1 TiB |     16MB | 1024 KiB
+#           64 TiB |      1GB | 1024 KiB
+hashsize="$((128*1024*1024))"  # 128 MiB; adjust to suit your data size
+
+# Extra bees command-line arguments.  See `bees --help` and the
+# documentation at https://zygo.github.io/bees/options.html
+bees_args="--scan-mode 4 --strip-paths"
+
+# Bees log verbosity level (1 = minimal, 8 = most verbose).
+# Higher levels increase log file size significantly.
+loglevel="5"
+
+# Log file location.  Logging is directed here by the init script.
+# Set to empty to use the system logger only (syslog via stderr).
+logfile="/var/log/bees/${RC_SVCNAME}.log"
+
+# Location of the bees status file (human-readable progress summary).
+# Exported as BEESSTATUS.
+statusfile="/run/bees/${fsuuid}.status"
+
+# BEESHOME directory, relative to the root of the btrfs filesystem.
+# Contains beeshash.dat (hash table) and beescrawl.dat (scan checkpoint).
+# Default: .beeshome at the root of the filesystem.
+#beeshome=".beeshome"
+
+# CPU scheduler.  "batch" and "idle" reduce impact on other processes.
+# Use "batch" to allow occasional bursts; "idle" for strict background-only.
+scheduler="batch"
+
+# I/O scheduling class and priority in "class:data" format.
+# Class 2 = best-effort, class 3 = idle.  Data is the priority within the class.
+# Example: "2:7" = best-effort at lowest priority; "3:0" = idle.
+SSD_IONICELEVEL="3:0"
+
+# CPU nice level: 19 is the lowest priority.
+SSD_NICELEVEL=19
+
+# OOM score adjustment.  Higher values increase the chance that the kernel
+# will kill bees first under memory pressure.  Range: -1000 to 1000.
+SSD_OOM_SCORE_ADJ=500

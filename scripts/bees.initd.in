@@ -1,0 +1,132 @@
+#!/sbin/openrc-run
+# bees OpenRC init script
+# https://github.com/Zygo/bees
+
+## Internal variables derived from configuration
+rundir="/run/bees"
+logdir="/var/log/bees"
+mnt="${rundir}/mnt/${fsuuid}"
+device="/dev/disk/by-uuid/${fsuuid}"
+: "${beeshome:="${mnt}/.beeshome"}"
+hashfile="${beeshome}/beeshash.dat"
+: "${logfile:="${logdir}/${RC_SVCNAME}.log"}"
+: "${loglevel:=5}"
+: "${bees_args:="--scan-mode 4"}"
+: "${scheduler:="batch"}"
+export BEESSTATUS="${statusfile:-${rundir}/${fsuuid}.status}"
+
+## OpenRC service definition
+name="${RC_SVCNAME}"
+description="Best-Effort Extent-Same, a btrfs dedupe agent"
+command="@LIBEXEC_PREFIX@/bees"
+command_args="-v ${loglevel} ${bees_args} ${mnt}"
+command_background="true"
+command_progress="true"
+extra_started_commands="suspend resume"
+description_suspend="Suspend bees without unloading it (e.g. before btrfs-send)."
+description_resume="Resume bees after a suspend."
+
+# SSD_NICELEVEL, SSD_IONICELEVEL, SSD_OOM_SCORE_ADJ are picked up
+# automatically from the environment by start-stop-daemon.
+start_stop_daemon_args="--scheduler ${scheduler} --stdout ${logfile} --stderr ${logfile}"
+pidfile="/run/${RC_SVCNAME}.pid"
+# Give bees time to flush its hash table before killing it.
+retry="TERM/${GRACEFUL_TIMEOUT:-120}/KILL/1"
+
+depend() {
+	use lvm device-mapper localmount
+}
+
+_check_fsuuid() {
+	if [ -z "${fsuuid}" ]; then
+		eerror "fsuuid is not set in /etc/conf.d/${RC_SVCNAME}"
+		return 1
+	fi
+	if [ ! -b "${device}" ]; then
+		eerror "Block device ${device} not found"
+		return 1
+	fi
+	if [ "$(blkid -s TYPE -o value "${device}")" != "btrfs" ]; then
+		eerror "${device} is not a btrfs filesystem"
+		return 1
+	fi
+}
+
+_check_hashsize() {
+	if [ -z "${hashsize}" ]; then
+		eerror "hashsize is not set in /etc/conf.d/${RC_SVCNAME}"
+		return 1
+	fi
+	local AL128K=$((128*1024))
+	if [ $(( hashsize % AL128K )) -ne 0 ]; then
+		eerror "hashsize ${hashsize} is not a multiple of 128 KiB"
+		return 1
+	fi
+}
+
+start_pre() {
+	_check_fsuuid || return 1
+	_check_hashsize || return 1
+
+	checkpath -d -m 0700 -o root:root "${logdir}"
+	checkpath -d -m 0700 -o root:root "${rundir}"
+	checkpath -d -m 0700 -o root:root "${rundir}/mnt"
+	checkpath -d -m 0700 -o root:root "${mnt}"
+
+	if [ -n "${logfile}" ]; then
+		checkpath -f -m 0600 -o root:root "${logfile}"
+	fi
+
+	ebegin "Mounting btrfs filesystem ${fsuuid}"
+	mount -o subvolid=5,noatime,nodev,noexec "${device}" "${mnt}"
+	eend $? || return 1
+
+	if [ ! -d "${beeshome}" ]; then
+		ebegin "Creating ${beeshome}"
+		if [ "$(stat -f -c %T "${mnt}")" = "btrfs" ]; then
+			btrfs subvolume create "${beeshome}"
+		else
+			mkdir "${beeshome}"
+		fi
+		eend $? || return 1
+		chmod 700 "${beeshome}"
+	fi
+
+	checkpath -f -m 0600 -o root:root "${hashfile}"
+	local old_hashsize
+	old_hashsize="$(stat -c %s "${hashfile}")"
+	if [ "${old_hashsize}" -eq 0 ]; then
+		ebegin "Initialising hash table (${hashsize} bytes)"
+		truncate -s "${hashsize}" "${hashfile}"
+		eend $? || return 1
+	elif [ "${old_hashsize}" -ne "${hashsize}" ]; then
+		eerror "Hash table size mismatch: found ${old_hashsize} bytes, expected ${hashsize} bytes"
+		eerror "To resize: stop bees, remove ${hashfile} and ${beeshome}/beescrawl.dat, then start bees"
+		return 1
+	fi
+}
+
+stop_pre() {
+	# Ensure bees is not suspended; a suspended process ignores SIGTERM.
+	start-stop-daemon --signal SIGCONT --pidfile "${pidfile}" 2>/dev/null || true
+}
+
+stop_post() {
+	ebegin "Unmounting btrfs filesystem ${fsuuid}"
+	umount "${mnt}"
+	eend $?
+}
+
+suspend() {
+	# Suspending bees avoids a btrfs send/receive kernel bug on some kernels.
+	# See https://zygo.github.io/bees/btrfs-kernel.html
+	ebegin "Suspending ${RC_SVCNAME}"
+	start-stop-daemon --signal SIGSTOP --pidfile "${pidfile}"
+	eend $?
+}
+
+resume() {
+	ebegin "Resuming ${RC_SVCNAME}"
+	start-stop-daemon --signal SIGCONT --pidfile "${pidfile}"
+	eend $?
+}
