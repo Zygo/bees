@@ -98,6 +98,10 @@ is_subvol_tree(uint64_t objectid)
 	return (objectid == BTRFS_FS_TREE_OBJECTID) || (objectid >= BTRFS_FIRST_FREE_OBJECTID);
 }
 
+/// Abstract base class for bees scan modes.
+/// Each subclass implements a different strategy for ordering the traversal
+/// of subvolumes and extents.  The active scan mode is created by
+/// BeesRoots based on the configured scan mode number.
 class BeesScanMode : public enable_shared_from_this<BeesScanMode> {
 protected:
 	shared_ptr<BeesContext>	m_ctx;
@@ -140,6 +144,10 @@ BeesScanMode::start_scan()
 	m_scan_task.idle();
 }
 
+/// Per-inode work item for subvol scan modes.
+/// Holds the context needed to scan one file's extents as a series of Tasks.
+/// Each call to scan_one_ref() processes one block-aligned chunk of the file
+/// and returns true if more work remains (causing the Task to requeue itself).
 struct BeesFileCrawl {
 	shared_ptr<BeesContext>				m_ctx;
 	shared_ptr<BeesCrawl>				m_crawl;
@@ -155,6 +163,9 @@ struct BeesFileCrawl {
 	bool scan_one_ref();
 };
 
+/// Base class for subvolume-oriented scan modes (modes 0–3).
+/// Provides shared helpers for retrieving the crawl map and scanning one inode.
+/// All subvol scan modes are deprecated in favour of BeesScanModeExtent (mode 4).
 class BeesScanModeSubvol : public BeesScanMode {
 protected:
 	using CrawlMap = BeesRoots::CrawlMap;
@@ -232,8 +243,10 @@ BeesScanModeSubvol::crawl_one_inode(const shared_ptr<BeesCrawl>& this_crawl)
 	return true;
 }
 
-/// Scan the same inode/offset tuple in each subvol.  Good for caching and space saving,
-/// bad for filesystems with rotating snapshots.
+/// Scan mode 1: scan the same inode/offset position across all subvols before advancing.
+/// Good for caching and dedup hit rate when subvols are nearly identical snapshots;
+/// bad for filesystems with rotating snapshots where subvol contents diverge rapidly.
+/// @deprecated Use BeesScanModeExtent (mode 4) instead.
 class BeesScanModeLockstep : public BeesScanModeSubvol {
 	using SortKey = tuple<uint64_t, uint64_t, uint64_t>;
 	using Map = map<SortKey, CrawlMap::mapped_type>;
@@ -304,8 +317,9 @@ BeesScanModeLockstep::next_transid()
 	start_scan();
 }
 
-/// Scan each subvol in round-robin with no synchronization.
-/// Good for continuous forward progress while avoiding lock contention.
+/// Scan mode 2: scan each subvol in round-robin order with no cross-subvol synchronization.
+/// Good for continuous forward progress while avoiding lock contention between subvols.
+/// @deprecated Use BeesScanModeExtent (mode 4) instead.
 class BeesScanModeIndependent : public BeesScanModeSubvol {
 	using List = list<CrawlMap::mapped_type>;
 	mutex m_mutex;
@@ -366,9 +380,11 @@ BeesScanModeIndependent::next_transid()
 	start_scan();
 }
 
-/// Scan each subvol completely, in numerical order, before moving on to the next.
-/// This was an experimental mode that requires large amounts of temporary space
-/// and has the lowest hit rate.
+/// Scan mode 3: scan each subvol completely in numerical (root ID) order before moving on.
+/// Experimental mode with poor dedup hit rate — completing one subvol before starting the
+/// next means that data shared across subvols is encountered only after a long delay.
+/// Also requires large amounts of temporary space.
+/// @deprecated Use BeesScanModeExtent (mode 4) instead.
 class BeesScanModeSequential : public BeesScanModeSubvol {
 	using SortKey = uint64_t;
 	using Map = map<SortKey, CrawlMap::mapped_type>;
@@ -433,9 +449,12 @@ BeesScanModeSequential::next_transid()
 	start_scan();
 }
 
-/// Scan the most recently completely scanned subvols first.  Keeps recently added data
-/// from accumulating in small subvols while large subvols are still undergoing their first scan.
+/// Scan mode 0: prioritise subvols by min_transid, scanning the most recently completed
+/// subvols first.  Keeps recently added data in small subvols from accumulating while large
+/// subvols are still undergoing their first scan.
+/// @deprecated Use BeesScanModeExtent (mode 4) instead.
 class BeesScanModeRecent : public BeesScanModeSubvol {
+	/// Sort key: orders subvols by (min_transid desc) so lower-transid (older) scans run first.
 	struct SortKey {
 		uint64_t min_transid, max_transid;
 		bool operator<(const SortKey &that) const {
@@ -514,11 +533,17 @@ BeesScanModeRecent::next_transid()
 	start_scan();
 }
 
-/// Scan the extent tree and submit each extent's references in a single batch.
+/// Scan mode 4 (default): walk the btrfs extent tree in physical bytenr order and submit
+/// each data extent's back-references as a dedup batch.  Physical-order traversal is optimal
+/// for sequential read performance and dedup hit rate on both initial and ongoing scans.
+/// Extents are partitioned into size tiers so that small and large extents do not starve
+/// each other; each tier has its own BeesCrawl position and Task.
 class BeesScanModeExtent : public BeesScanMode {
 	mutex m_mutex;
 	mutex m_insert_root_mutex;
 
+	/// Size range [m_min_size, m_max_size] for one extent size tier.
+	/// The tier's virtual subvol objectid is used as its map key in s_magic_crawl_map.
 	struct MagicCrawl {
 		uint64_t m_min_size;
 		uint64_t m_max_size;
@@ -526,8 +551,12 @@ class BeesScanModeExtent : public BeesScanMode {
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& magic);
 
 	using MagicCrawlMap = map<uint64_t, BeesScanModeExtent::MagicCrawl>;
+	/// Static table mapping virtual subvol objectids to MagicCrawl size ranges.
+	/// Objectids use the reserved range just below BTRFS_FIRST_FREE_OBJECTID.
 	static MagicCrawlMap s_magic_crawl_map;
 
+	/// One back-reference to be deduplicated: a (root, inode, offset, length) tuple
+	/// together with a progress hold and an age timer for diagnostics.
 	struct ExtentRef {
 		uint64_t m_root;
 		uint64_t m_inum;
@@ -538,14 +567,19 @@ friend ostream& operator<<(ostream &os, const BeesScanModeExtent::MagicCrawl& ma
 	};
 friend ostream& operator<<(ostream &os, const BeesScanModeExtent::ExtentRef& todo);
 
+	/// Per-size-tier byte counter, used for progress reporting.
 	struct ExtentSizeCount {
 		uint64_t m_bytes = 0;
 	};
+	/// Aggregate extent-size histogram across all tiers, updated by count_extent_size().
 	struct ExtentSizeMap {
 		map<uint64_t, ExtentSizeCount> m_map;
 		uint64_t m_total = 0;
 	} m_extent_size;
 
+	/// One size tier within BeesScanModeExtent.
+	/// Owns a BeesCrawl (scan position), a Task, and a BtrfsDataExtentTreeFetcher.
+	/// Iterates over the extent tree in bytenr order, filtered to the tier's size range.
 	class SizeTier : public enable_shared_from_this<SizeTier> {
 		shared_ptr<BeesScanModeExtent> m_bsme;
 		shared_ptr<BeesCrawl> m_crawl;
