@@ -191,14 +191,31 @@ BeesContext::home_fd()
 		return m_home_fd;
 	}
 
-	const char *base_dir = getenv("BEESHOME");
-	if (!base_dir) {
-		base_dir = ".beeshome";
+	BEESTRACE("Opening home directory");
+	const char *home_var = getenv("BEESHOME");
+	if (!home_var) {
+		home_var = ".beeshome";
 	}
-	m_home_fd = openat(root_fd(), base_dir, FLAGS_OPEN_DIR);
-	if (!m_home_fd) {
-		THROW_ERRNO("openat: " << name_fd(root_fd()) << " / " << base_dir);
+	const string home_dir = home_var;
+	BEESTRACE("Opening home directory '" << home_dir << "'");
+	// Use an anonymous Fd here because the absolute/relative Fd path
+	// code will be confused if it's not under the root
+	if (home_dir.at(0) == '/') {
+		// Absolute paths use plain openat (dirfd is ignored for absolute paths).
+		m_home_fd = openat(root_fd(), home_dir.c_str(), FLAGS_OPEN_DIR);
+		if (!m_home_fd) {
+			THROW_ERRNO("openat: " << home_dir);
+		}
+	} else {
+		// Relative paths use bees_openat, which tries openat2(RESOLVE_BENEATH |
+		// RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV) and silently falls back to
+		// openat on kernels that predate openat2 (< 5.6).
+		m_home_fd = bees_openat(root_fd(), home_dir.c_str(), FLAGS_OPEN_DIR);
+		if (!m_home_fd) {
+			THROW_ERRNO("openat: " << name_fd(root_fd()) << "/" << home_dir);
+		}
 	}
+	BEESLOGDEBUG("opened home dir at '" << name_fd(m_home_fd) << "'");
 	return m_home_fd;
 }
 
