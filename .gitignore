@@ -16,3 +16,5 @@ localconf
 lib/configure.h
 scripts/beesd
 scripts/beesd@.service
+scripts/bees.initd
+scripts/bees.confd
