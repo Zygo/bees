@@ -23,6 +23,8 @@ readonly AL128K="$((128*1024))"
 readonly AL16M="$((16*1024*1024))"
 readonly CONFIG_DIR=@ETC_PREFIX@/bees/
 
+ENV_CONFIG=false
+
 readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
 
 command -v "$bees_bin" &> /dev/null || ERRO "Missing 'bees' agent"
@@ -35,6 +37,8 @@ uuid_valid(){
 
 help(){
     echo "Usage: beesd [options] <btrfs_uuid>"
+    echo "  --env-config    read configuration from environment variables"
+    echo "                  instead of $CONFIG_DIR/<uuid>.conf"
     echo "- - -"
     exec "$bees_bin" --help
 }
@@ -75,24 +79,31 @@ for arg in "${ARGUMENTS[@]}"; do
 done
 
 for arg in "${NOT_SUPPORTED_ARGS[@]}"; do
-    if uuid_valid $arg; then
-        [ ! -z "$UUID" ] && help
-        UUID=$arg
-    fi
+    case $arg in
+        --env-config) ENV_CONFIG=true ;;
+        *)
+            if uuid_valid $arg; then
+                [ ! -z "$UUID" ] && help
+                UUID=$arg
+            fi
+            ;;
+    esac
 done
 
 [ -z "$UUID" ] && help
 
 
-FILE_CONFIG="$(grep -E -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
-[ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
-INFO "Find $UUID in $FILE_CONFIG, use as conf"
-source "$FILE_CONFIG"
+if ! $ENV_CONFIG; then
+    FILE_CONFIG="$(grep -E -l '^[^#]*UUID\s*=\s*"?'"$UUID" "$CONFIG_DIR"/*.conf | head -1)"
+    [ ! -f "$FILE_CONFIG" ] && ERRO "No config for $UUID"
+    INFO "Find $UUID in $FILE_CONFIG, use as conf"
+    source "$FILE_CONFIG"
+fi
 
 
 ## Pre checks
 {
-    [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
+    ! $ENV_CONFIG && [ ! -d "$CONFIG_DIR" ] && ERRO "Missing: $CONFIG_DIR"
     [ "$UID" == "0" ] || ERRO "Must be run as root"
 }
 
