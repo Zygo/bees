@@ -16,6 +16,10 @@
 namespace crucible {
 	using namespace std;
 
+	/// A mutex-like primitive that guards a set of named keys rather than a
+	/// single resource.  Callers block until the desired key is not held by
+	/// any other thread.  An optional capacity limit causes callers to block
+	/// when too many keys are locked simultaneously.
 	template <class T>
 	class LockSet {
 
@@ -55,15 +59,23 @@ namespace crucible {
 		~LockSet();
 		LockSet() = default;
 
+		/// Block until @p name is available, then lock it.
 		void lock(const key_type &name);
+		/// Release the lock on @p name and wake waiting threads.
 		void unlock(const key_type &name);
+		/// Lock @p name if it is available; returns false immediately if not.
 		bool try_lock(const key_type &name);
+		/// Return the number of currently locked keys.
 		size_t size();
+		/// Return true if no keys are currently locked.
 		bool empty();
+		/// Return a snapshot copy of the locked-key map.
 		set_type copy();
 
+		/// Set the maximum number of simultaneously locked keys.
 		void max_size(size_t max);
 
+		/// RAII handle that holds a lock on a single key and releases it on destruction.
 		class LockHandle {
 			shared_ptr<Lock> m_lock;
 
@@ -75,6 +87,7 @@ namespace crucible {
 			bool try_lock() { return m_lock->try_lock(); }
 		};
 
+		/// Create a LockHandle for @p name, blocking until the key is available if @p start_locked is true.
 		LockHandle make_lock(const key_type &name, bool start_locked = true);
 	};
 

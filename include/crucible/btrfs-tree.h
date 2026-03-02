@@ -8,6 +8,11 @@
 namespace crucible {
 	using namespace std;
 
+	/// A single item returned by a btrfs kernel tree search.
+	/// Carries the key triple (objectid, type, offset), the transaction ID,
+	/// and the raw payload bytes.  Typed accessor methods decode the payload
+	/// into the appropriate kernel structure; calling the wrong accessor for
+	/// the item's type throws an exception.
 	class BtrfsTreeItem {
 		uint64_t m_objectid = 0;
 		uint64_t m_offset = 0;
@@ -15,14 +20,22 @@ namespace crucible {
 		ByteVector m_data;
 		uint8_t m_type = 0;
 	public:
+		/// Key component: object identifier.
 		uint64_t objectid() const { return m_objectid; }
+		/// Key component: item offset (meaning depends on @p type).
 		uint64_t offset() const { return m_offset; }
+		/// Transaction ID at which this item was last modified.
 		uint64_t transid() const { return m_transid; }
+		/// Key component: item type (one of the BTRFS_*_KEY constants).
 		uint8_t type() const { return m_type; }
+		/// Raw payload bytes for this item.
 		const ByteVector data() const { return m_data; }
 		BtrfsTreeItem() = default;
+		/// Construct from a raw search result header (including its payload).
 		BtrfsTreeItem(const BtrfsIoctlSearchHeader &bish);
+		/// Assign from a raw search result header (including its payload).
 		BtrfsTreeItem& operator=(const BtrfsIoctlSearchHeader &bish);
+		/// True if this item is empty (default-constructed or null result).
 		bool operator!() const;
 
 		/// Member access methods.  Invoking a method on the
@@ -83,6 +96,10 @@ namespace crucible {
 
 	ostream &operator<<(ostream &os, const BtrfsTreeItem &bti);
 
+	/// Abstract base for btrfs kernel tree search helpers.
+	/// Subclasses implement the mapping between a logical position (objectid or
+	/// offset) and the search key, enabling prev/next/at/lower_bound lookups
+	/// over any btrfs tree.
 	class BtrfsTreeFetcher {
 	protected:
 		Fd m_fd;
@@ -110,10 +127,15 @@ namespace crucible {
 	public:
 		virtual ~BtrfsTreeFetcher() = default;
 		BtrfsTreeFetcher(Fd new_fd);
+		/// Set the item type filter (BTRFS_*_KEY constant).
 		void type(uint8_t type);
+		/// Return the current item type filter.
 		uint8_t type();
+		/// Set the tree ID to search (e.g. BTRFS_EXTENT_TREE_OBJECTID).
 		void tree(uint64_t tree);
+		/// Return the current tree ID.
 		uint64_t tree();
+		/// Restrict results to items whose transaction ID is in [@p min_transid, @p max_transid].
 		void transid(uint64_t min_transid, uint64_t max_transid = numeric_limits<uint64_t>::max());
 		/// Block size (sectorsize) of filesystem
 		uint64_t block_size() const;
@@ -137,6 +159,8 @@ namespace crucible {
 		void scale_size(uint64_t);
 	};
 
+	/// BtrfsTreeFetcher variant that uses the objectid field as the logical position.
+	/// Suitable for trees indexed primarily by objectid (e.g. extent tree, inode tree).
 	class BtrfsTreeObjectFetcher : public BtrfsTreeFetcher {
 	protected:
 		virtual void fill_sk(BtrfsIoctlSearchKey &key, uint64_t logical) override;
@@ -147,6 +171,9 @@ namespace crucible {
 		using BtrfsTreeFetcher::BtrfsTreeFetcher;
 	};
 
+	/// BtrfsTreeFetcher variant that uses the offset field as the logical position.
+	/// The objectid is fixed and set via objectid(); suitable for per-inode trees
+	/// such as EXTENT_DATA items within a subvolume tree.
 	class BtrfsTreeOffsetFetcher : public BtrfsTreeFetcher {
 	protected:
 		uint64_t m_objectid = 0;
@@ -156,10 +183,14 @@ namespace crucible {
 		virtual bool hdr_stop(const BtrfsIoctlSearchHeader &hdr) override;
 	public:
 		using BtrfsTreeFetcher::BtrfsTreeFetcher;
+		/// Set the fixed objectid used for all searches.
 		void objectid(uint64_t objectid);
+		/// Return the fixed objectid.
 		uint64_t objectid() const;
 	};
 
+	/// Fetcher for checksum tree items.  Automatically queries the filesystem
+	/// to determine the checksum algorithm and per-checksum byte size.
 	class BtrfsCsumTreeFetcher : public BtrfsTreeOffsetFetcher {
 	public:
 		const uint32_t BTRFS_CSUM_TYPE_UNKNOWN = uint32_t(1) << 16;
@@ -169,8 +200,11 @@ namespace crucible {
 	public:
 		BtrfsCsumTreeFetcher(const Fd &fd);
 
+		/// Return the filesystem's checksum algorithm type code.
 		uint32_t sum_type() const;
+		/// Return the size in bytes of a single checksum.
 		size_t sum_size() const;
+		/// Retrieve @p count checksums starting at @p logical and deliver them via @p output.
 		void get_sums(uint64_t logical, size_t count, function<void(uint64_t logical, const uint8_t *buf, size_t count)> output);
 	};
 

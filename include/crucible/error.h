@@ -17,6 +17,7 @@ namespace crucible {
 
 	// Common error-handling idioms for C library calls
 
+	/// Throw `system_error` if @p rv < 0, treating @p rv as a negated errno value (e.g. pthread return values).
         template <class T> T die_if_minus_errno(const char *expr, T rv)
 	{
 		if (rv < 0) {
@@ -25,6 +26,7 @@ namespace crucible {
 		return rv;
 	}
 
+	/// Throw `system_error` (using `errno`) if @p rv == -1.
         template <class T> T die_if_minus_one(const char *expr, T rv)
 	{
 		if (rv == -1) {
@@ -33,6 +35,7 @@ namespace crucible {
 		return rv;
 	}
 
+	/// Throw `system_error` (using `errno`) if @p rv == 0 (e.g. fopen-style return values).
         template <class T> T die_if_zero(const char *expr, T rv)
 	{
 		if (rv == 0) {
@@ -41,6 +44,7 @@ namespace crucible {
 		return rv;
 	}
 
+	/// Throw `system_error` (using `errno`) if @p rv != 0.
         template <class T> T die_if_non_zero(const char *expr, T rv)
 	{
 		if (rv != 0) {
@@ -57,11 +61,15 @@ namespace crucible {
 	//	-1 for unknown exception
 	//	1 for std::exception or class derived thereof
 
+	/// Replace the global exception explainer used by catch_all() and catch_and_explain().
 	void set_catch_explainer(function<void(string s)> f);
+	/// Default explainer: writes the exception message to cerr.
 	void default_catch_explainer(string s);
+	/// Execute @p f, catching and reporting all exceptions via @p explainer.
+	/// Returns 0 on clean return, 1 for std::exception, -1 for unknown exception.
 	int catch_all(const function<void()> &f, const function<void(string)> &explainer = default_catch_explainer);
 
-	// catch_and_explain traps the exception, calls the explainer, then rethrows the original exception
+	/// Execute @p f; if an exception is thrown, call @p explainer then rethrow.
 	void catch_and_explain(const function<void()> &f, const function<void(string)> &explainer = default_catch_explainer);
 };
 

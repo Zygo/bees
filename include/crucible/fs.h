@@ -24,13 +24,18 @@
 namespace crucible {
 	using namespace std;
 
-	// wrapper around fallocate(...FALLOC_FL_PUNCH_HOLE...)
+	/// Punch a hole (deallocate) [@p offset, @p offset + @p len) in the file @p fd.
 	void punch_hole(int fd, off_t offset, off_t len);
 
+	/// Wrapper around the BTRFS_IOC_FILE_EXTENT_SAME ioctl.
+	/// Deduplicates a source byte range into one or more destination files.
 	struct BtrfsExtentSame {
 		virtual ~BtrfsExtentSame();
+		/// Specify the source file and byte range to deduplicate.
 		BtrfsExtentSame(int src_fd, off_t src_offset, off_t src_length);
+		/// Add a destination file and offset to the deduplication request.
 		void add(int fd, uint64_t offset);
+		/// Execute the ioctl against the source fd.
 		virtual void do_ioctl();
 
 		uint64_t m_logical_offset = 0;
@@ -43,6 +48,8 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const btrfs_ioctl_same_args *info);
 	ostream & operator<<(ostream &os, const BtrfsExtentSame &bes);
 
+	/// A single result entry from BTRFS_IOC_LOGICAL_INO: an inode number,
+	/// file offset, and subvolume root ID that reference a given logical address.
 	struct BtrfsInodeOffsetRoot {
 		uint64_t m_inum;
 		uint64_t m_offset;
@@ -51,8 +58,11 @@ namespace crucible {
 
 	ostream & operator<<(ostream &os, const BtrfsInodeOffsetRoot &p);
 
+	/// Variable-length buffer for btrfs ioctls that return a `btrfs_data_container`.
+	/// Manages the backing ByteVector and provides typed accessors for the header fields.
 	struct BtrfsDataContainer {
 		BtrfsDataContainer(size_t size = 64 * 1024);
+		/// Resize the buffer to @p size bytes and return a pointer to the btrfs_data_container header.
 		void *prepare(size_t size);
 
 		size_t get_size() const;
@@ -64,6 +74,9 @@ namespace crucible {
 		ByteVector m_data;
 	};
 
+	/// Wrapper around BTRFS_IOC_LOGICAL_INO (and the v2 variant).
+	/// Given a logical byte address, returns all (inode, offset, root) tuples
+	/// that reference that address via the m_iors span.
 	struct BtrfsIoctlLogicalInoArgs {
 		BtrfsIoctlLogicalInoArgs(uint64_t logical, size_t buf_size = 16 * 1024 * 1024);
 
@@ -100,6 +113,8 @@ namespace crucible {
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlLogicalInoArgs &p);
 
+	/// Wrapper around BTRFS_IOC_INO_PATHS.
+	/// Resolves an inode number to a list of filesystem paths within its subvolume.
 	struct BtrfsIoctlInoPathArgs : public btrfs_ioctl_ino_path_args {
 		BtrfsIoctlInoPathArgs(uint64_t inode, size_t buf_size = 64 * 1024);
 		virtual void do_ioctl(int fd);
@@ -111,6 +126,9 @@ namespace crucible {
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlInoPathArgs &p);
 
+	/// Wrapper around BTRFS_IOC_INO_LOOKUP.
+	/// Given an objectid (typically BTRFS_FIRST_FREE_OBJECTID), resolves the
+	/// subvolume tree ID and relative path stored in the base struct fields.
 	struct BtrfsIoctlInoLookupArgs : public btrfs_ioctl_ino_lookup_args {
 		BtrfsIoctlInoLookupArgs(uint64_t objectid);
 		virtual void do_ioctl(int fd);
@@ -119,6 +137,7 @@ namespace crucible {
 		// this->treeid is the rootid for the path (we get the path too)
 	};
 
+	/// Wrapper around BTRFS_IOC_DEFRAG_RANGE with sensible default flags.
 	struct BtrfsIoctlDefragRangeArgs : public btrfs_ioctl_defrag_range_args {
 		BtrfsIoctlDefragRangeArgs();
 		virtual void do_ioctl(int fd);
@@ -127,14 +146,19 @@ namespace crucible {
 
 	ostream & operator<<(ostream &os, const BtrfsIoctlDefragRangeArgs *p);
 
+	/// A single extent entry returned by a FIEMAP ioctl, with typed begin/end accessors.
 	struct FiemapExtent : public fiemap_extent {
 		FiemapExtent();
 		FiemapExtent(const fiemap_extent &that);
+		/// True if this extent is valid (non-zero length or non-zero flags).
 		operator bool() const;
+		/// Logical start offset of this extent in the file.
 		off_t begin() const;
+		/// Logical end offset (exclusive) of this extent in the file.
 		off_t end() const;
 	};
 
+	/// Wrapper around the FIEMAP ioctl that collects all extent entries for a byte range.
 	struct Fiemap {
 
 		// because fiemap.h insists on giving FIEMAP_MAX_OFFSET
@@ -144,6 +168,7 @@ namespace crucible {
 		// Get entire file
 		Fiemap(uint64_t start = 0, uint64_t length = s_fiemap_max_offset);
 
+		/// Execute FIEMAP on @p fd and populate m_extents.
 		void do_ioctl(int fd);
 
 		vector<FiemapExtent> m_extents;
@@ -165,12 +190,17 @@ namespace crucible {
 	string fiemap_extent_flags_ntoa(unsigned long flags);
 
 	// Helper functions
+	/// Clone a byte range from @p src_fd into @p dst_fd using BTRFS_IOC_CLONE_RANGE.
 	void btrfs_clone_range(int src_fd, off_t src_offset, off_t src_length, int dst_fd, off_t dst_offset);
+	/// Attempt to deduplicate a byte range; returns true if the ioctl succeeded.
 	bool btrfs_extent_same(int src_fd, off_t src_offset, off_t src_length, int dst_fd, off_t dst_offset);
 
+	/// A single btrfs tree search result header plus its variable-length payload.
+	/// Used as the element type in BtrfsIoctlSearchKey::m_result.
 	struct BtrfsIoctlSearchHeader : public btrfs_ioctl_search_header {
 		BtrfsIoctlSearchHeader();
 		ByteVector m_data;
+		/// Copy the payload for this header out of the raw ioctl buffer @p v at @p offset.
 		size_t set_data(const ByteVector &v, size_t offset);
 		bool operator<(const BtrfsIoctlSearchHeader &that) const;
 	};
@@ -184,15 +214,19 @@ namespace crucible {
 	ostream & operator<<(ostream &os, const btrfs_ioctl_search_header &hdr);
 	ostream & operator<<(ostream &os, const BtrfsIoctlSearchHeader &hdr);
 
+	/// Wrapper around BTRFS_IOC_TREE_SEARCH_V2.
+	/// Holds the search key (including min/max bounds), issues the ioctl, and
+	/// collects results into m_result.  Call next_min() after each batch to
+	/// advance the search key past the last returned item.
 	struct BtrfsIoctlSearchKey : public btrfs_ioctl_search_key {
 		BtrfsIoctlSearchKey(size_t buf_size = 1024);
 		bool do_ioctl_nothrow(int fd);
 		void do_ioctl(int fd);
 
-		// Copy objectid/type/offset so we move forward
+		/// Advance the minimum key past @p ref so the next ioctl call returns subsequent items.
 		void next_min(const BtrfsIoctlSearchHeader& ref);
 
-		// move forward to next object of a single type
+		/// Advance the minimum key past @p ref, keeping the type filter fixed at @p type.
 		void next_min(const BtrfsIoctlSearchHeader& ref, const uint8_t type);
 
 		size_t m_buf_size;
@@ -216,6 +250,7 @@ namespace crucible {
 	uint64_t btrfs_get_root_id(int fd);
 	uint64_t btrfs_get_root_transid(int fd);
 
+	/// Return a typed pointer into byte buffer @p v at @p offset, bounds-checking the access.
 	template<class T, class V>
 	const T*
 	get_struct_ptr(const V &v, size_t offset = 0)
@@ -225,6 +260,8 @@ namespace crucible {
 		return reinterpret_cast<const T*>(data_ptr + offset);
 	}
 
+	/// Read a little-endian struct member from byte buffer @p v at @p offset,
+	/// handling unaligned access correctly.
 	template<class S, class T, class V>
 	T
 	btrfs_get_member(T S::* member, V &v, size_t offset = 0)
@@ -237,22 +274,34 @@ namespace crucible {
 		return le_to_cpu(unaligned_t);
 	}
 
+	/// Wrapper around statvfs(2) / fstatvfs(2) with typed size accessors.
 	struct Statvfs : public statvfs {
 		Statvfs();
+		/// Populate from the filesystem containing @p path.
 		Statvfs(string path);
+		/// Populate from the filesystem containing the open file @p fd.
 		Statvfs(int fd);
+		/// Total filesystem size in bytes.
 		unsigned long size() const;
+		/// Free bytes on the filesystem (privileged view).
 		unsigned long free() const;
+		/// Free bytes available to unprivileged users.
 		unsigned long available() const;
 	};
 
+	/// Wrapper around BTRFS_IOC_FS_INFO (v3 variant).
+	/// Provides filesystem-wide metadata: checksum algorithm, generation, and UUIDs.
 	struct BtrfsIoctlFsInfoArgs : public btrfs_ioctl_fs_info_args_v3 {
 		BtrfsIoctlFsInfoArgs();
 		void do_ioctl(int fd);
 		bool do_ioctl_nothrow(int fd);
+		/// Checksum algorithm type code for this filesystem.
 		uint16_t csum_type() const;
+		/// Byte size of a single checksum for this filesystem.
 		uint16_t csum_size() const;
+		/// Current btrfs generation number.
 		uint64_t generation() const;
+		/// Filesystem UUID as a byte vector.
 		vector<uint8_t> fsid() const;
 	};
 

@@ -45,6 +45,11 @@ namespace crucible {
 	// - returned key value may not be part of most recent Fetch result
 	// - 1 loop iteration when target_pos exists
 
+	/// Binary search that finds the highest key value less than or equal to @p target_pos.
+	/// @p fetch is a callable of the form `Container<Pos>(Pos lower, Pos upper)` that
+	/// returns items in ascending order starting from @p lower.  The search first
+	/// expands a lower bound by doubling, then narrows with binary search.
+	/// Returns the lowest representable Pos value when no key <= @p target_pos exists.
 	template <class Fetch, class Pos = uint64_t>
 	Pos
 	seek_backward(Pos const target_pos, Fetch fetch, Pos min_step = 1, size_t max_loops = numeric_limits<size_t>::max())

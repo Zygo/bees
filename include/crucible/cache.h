@@ -12,6 +12,11 @@
 namespace crucible {
 	using namespace std;
 
+	/// Thread-safe LRU memoization cache.
+	/// Wraps a user-supplied function and caches its return values keyed on the
+	/// argument tuple.  Concurrent calls for the same key are serialized via
+	/// LockSet so the backing function is called at most once per key at a time.
+	/// The least-recently-used entry is evicted when the cache exceeds @p max_size.
 	template <class Return, class... Arguments>
 	class LRUCache {
 	public:
@@ -38,16 +43,25 @@ namespace crucible {
 		void erase_key(const Key &k);
 		Return insert_item(Func fn, Arguments... args);
 	public:
+		/// Construct with backing function @p f and maximum cache size @p max_size.
 		LRUCache(Func f = Func(), size_t max_size = 100);
 
+		/// Replace the backing function.
 		void func(Func f);
+		/// Set the maximum number of cached entries, evicting cold entries if needed.
 		void max_size(size_t new_max_size);
 
+		/// Return the cached value for the given arguments, calling the backing function if not cached.
 		Return operator()(Arguments... args);
+		/// Evict the cached value for the given arguments and recompute it.
 		Return refresh(Arguments... args);
+		/// Evict the cached value for the given arguments without recomputing.
 		void expire(Arguments... args);
+		/// Insert @p r as the cached value for the given arguments without calling the backing function.
 		void insert(const Return &r, Arguments... args);
+		/// Remove all cached entries.
 		void clear();
+		/// Return the current number of cached entries.
 		size_t size() const;
 	};
 
