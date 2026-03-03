@@ -9,7 +9,7 @@ This issue is fixed in version 5.4.14 and later.
 
 **Recommended Linux kernel versions for bees are 5.4, 5.10, 5.15, 6.1,
 6.6, or 6.12 with recent LTS and -stable updates.**  The latest released
-kernel as of this writing is 6.12.9, and the earliest supported LTS
+kernel as of this writing is 6.19, and the earliest supported LTS
 kernel is 5.4.
 
 Some optional bees features use kernel APIs introduced in kernel 4.15

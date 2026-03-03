@@ -35,9 +35,9 @@ one block in common between two extents in order to be able to dedupe
 the entire extents.  This provides significantly more dedupe hit rate
 per hash table byte than other dedupe tools.
 
- * There is a fairly wide range of usable hash sizes, and performances
+ * There is a fairly wide range of usable hash sizes, and performance
 degrades according to a smooth probabilistic curve in both directions.
-Double or half the optimium size usually works just as well.
+Double or half the optimum size usually works just as well.
 
  * When counting unique data in compressed data blocks to estimate
 optimum hash table size, count the *uncompressed* size of the data.

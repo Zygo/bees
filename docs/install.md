@@ -37,7 +37,7 @@ Dependencies
 Installation
 ============
 
-bees can be installed by following one these instructions:
+bees can be installed by following one of these instructions:
 
 Arch package
 ------------

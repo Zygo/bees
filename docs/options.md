@@ -69,7 +69,6 @@
 * `--scan-mode MODE` or `-m`
 
  Specify extent scanning algorithm.
- **EXPERIMENTAL** feature that may go away.
 
   * Mode 0: lockstep
   * Mode 1: independent

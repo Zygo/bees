@@ -159,7 +159,7 @@ The `dedup` (sic) event group consists of operations that deduplicate data.
  * `dedup_ms`: Total time spent running the `FILE_EXTENT_SAME` (aka `FI_DEDUPERANGE` or `dedupe_file_range`) ioctl.
  * `dedup_prealloc_bytes`: Total bytes in eliminated `PREALLOC` extent references.
  * `dedup_prealloc_hit`: Total number of successfully eliminated `PREALLOC` extent references.
- * `dedup_prealloc_hit`: Total number of unsuccessfully eliminated `PREALLOC` extent references (i.e. filesystem data changed between scan and dedupe).
+ * `dedup_prealloc_miss`: Total number of unsuccessfully eliminated `PREALLOC` extent references (i.e. filesystem data changed between scan and dedupe).
  * `dedup_try`: Total number of pairs of extent references submitted for deduplication.
  * `dedup_workaround_btrfs_send`: Total number of extent reference pairs submitted for deduplication that were discarded to workaround `btrfs send` bugs.
 
@@ -418,7 +418,7 @@ The `sync` event group consists of operations related to the `fsync` workarounds
 tmp
 ---
 
-The `sync` event group consists of operations related temporary files and the data within them.
+The `tmp` event group consists of operations related to temporary files and the data within them.
 
  * `tmp_aligned`: A temporary extent was allocated on a block boundary.
  * `tmp_block`: Total number of temporary blocks copied.
