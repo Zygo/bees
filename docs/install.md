@@ -4,14 +4,24 @@ Building bees
 Dependencies
 ------------
 
-* C++11 compiler (tested with GCC 8.1.0, 12.2.0)
+* C++17 compiler (tested with GCC 11 through 14)
 
-  Sorry.  I really like closures and shared_ptr, so support
-  for earlier compiler versions is unlikely.
+  bees uses `-Wall -Wextra -Werror -O3` and no other compiler flags.
+  Be careful when adding extra flags such as `-flto` or
+  `-D_GLIBCXX_ASSERTIONS` when building bees for distribution; these
+  interact with known GCC bugs that produce false-positive warnings,
+  breaking the build or crashing at runtime.  Known-broken combinations:
 
-  Note that the C++ standard--and GCC's implementation of it--is evolving.
-  There may be problems when building with newer compiler versions.
-  Build failure reports welcome!
+  | GCC version | Flag(s) | Notes |
+  |---|---|---|
+  | 12 | `-flto=auto` | False-positive `-Wmaybe-uninitialized`; toolchain bug, not a bees bug |
+  | 12 | `-D_GLIBCXX_ASSERTIONS` | Separate bug, possibly in libstdc++ |
+  | 13 | — | All flags work correctly |
+  | 14 | `-flto=auto` | Same `-Wmaybe-uninitialized` regression as GCC 12 |
+
+  If your distribution's build system adds LTO or assertion flags by
+  default, you may need to disable them for bees (e.g. with a `%define
+  _lto_cflags %nil` spec override on RPM-based distros).
 
 * btrfs-progs
 
