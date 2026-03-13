@@ -118,14 +118,11 @@ const size_t BEES_READAHEAD_SIZE = 1024 * 1024;
 
 // Flags
 const int FLAGS_OPEN_COMMON   = O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC | O_NOATIME | O_LARGEFILE | O_NOCTTY;
-const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;
-const int FLAGS_OPEN_FILE     = FLAGS_OPEN_COMMON | O_RDONLY;
-const int FLAGS_OPEN_FILE_RW  = FLAGS_OPEN_COMMON | O_RDWR;
-const int FLAGS_OPEN_TMPFILE  = FLAGS_OPEN_FILE_RW | O_TMPFILE | O_TRUNC | O_EXCL;
-const int FLAGS_CREATE_FILE   = FLAGS_OPEN_COMMON | O_WRONLY | O_CREAT | O_EXCL;
-
-// Fanotify allows O_APPEND, O_DSYNC, O_NOATIME, O_NONBLOCK, O_CLOEXEC, O_LARGEFILE
-const int FLAGS_OPEN_FANOTIFY = O_RDWR | O_NOATIME | O_CLOEXEC | O_LARGEFILE;
+const int FLAGS_OPEN_DIR      = FLAGS_OPEN_COMMON | O_RDONLY | O_DIRECTORY;  ///< Open a directory read-only.
+const int FLAGS_OPEN_FILE     = FLAGS_OPEN_COMMON | O_RDONLY;                ///< Open a regular file read-only.
+const int FLAGS_OPEN_FILE_RW  = FLAGS_OPEN_COMMON | O_RDWR;                  ///< Open a regular file read-write.
+const int FLAGS_OPEN_TMPFILE  = FLAGS_OPEN_FILE_RW | O_TMPFILE | O_TRUNC | O_EXCL; ///< Create an anonymous temp file.
+const int FLAGS_CREATE_FILE   = FLAGS_OPEN_COMMON | O_RDWR   | O_CREAT | O_EXCL;   ///< Create a new file exclusively.
 
 // macros ----------------------------------------
 
