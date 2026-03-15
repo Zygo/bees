@@ -200,12 +200,17 @@ BeesScanModeSubvol::crawl_one_inode(const shared_ptr<BeesCrawl>& this_crawl)
 		ostringstream oss;
 		oss << "crawl_" << subvol << "_" << inode;
 		const auto task_title = oss.str();
+		// this_state.m_objectid was advanced to inode+1 by peek_front()->fetch_extents().
+		// Fix: use the actual inode from this_range so BtrfsExtentDataFetcher finds
+		// the correct inode (exact-match search).
+		auto bfc_state = this_state;
+		bfc_state.m_objectid = inode;
 		const auto bfc = make_shared<BeesFileCrawl>((BeesFileCrawl) {
 			.m_ctx = m_ctx,
 			.m_crawl = this_crawl,
 			.m_roots = m_roots,
 			.m_hold = this_crawl->hold_state(this_state),
-			.m_state = this_state,
+			.m_state = bfc_state,
 			.m_offset = this_range.begin(),
 		});
 		BEESNOTE("Starting task " << this_range);
