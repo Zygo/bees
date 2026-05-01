@@ -794,6 +794,7 @@ public:
 	bool is_root_ro(uint64_t root);
 	BeesRangePair dup_extent(const BeesFileRange &src, const shared_ptr<BeesTempFile> &tmpfile);
 	bool dedup(const BeesRangePair &brp);
+	void consolidate_snapshot_refs(const BeesRangePair &brp, uint64_t old_physical);
 
 	void blacklist_insert(const BeesFileId &fid);
 	void blacklist_erase(const BeesFileId &fid);

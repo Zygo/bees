@@ -208,6 +208,97 @@ BeesContext::is_root_ro(uint64_t const root)
 	return roots()->is_root_ro(root);
 }
 
+void
+BeesContext::consolidate_snapshot_refs(const BeesRangePair &brp, uint64_t old_physical)
+{
+	// After a successful 1:1 dedup, find all other inodes that still
+	// reference the OLD physical extent of dst, and dedup them too.
+	// This consolidates snapshot copies in a single pass.
+
+	static const size_t MAX_DESTS_PER_IOCTL = 120;
+
+	BEESNOTE("consolidate_snapshot_refs for old physical " << to_hex(old_physical));
+
+	// LOGICAL_INO: find all inodes referencing the old extent
+	BtrfsIoctlLogicalInoArgs logical_ino(old_physical);
+	if (!logical_ino.do_ioctl_nothrow(root_fd())) {
+		BEESLOGDEBUG("LOGICAL_INO failed for " << to_hex(old_physical));
+		return;
+	}
+
+	if (logical_ino.m_iors.size() == 0) {
+		// No more references to old extent — already fully consolidated
+		return;
+	}
+
+	BEESLOGINFO("snapshot consolidation: " << logical_ino.m_iors.size()
+		<< " refs to old extent " << to_hex(old_physical));
+
+	// Open each referenced inode and collect fds for multi-dest dedup
+	struct SnapDest {
+		Fd fd;
+		off_t offset;
+	};
+	vector<SnapDest> dests;
+
+	for (const auto &ior : logical_ino.m_iors) {
+		try {
+			// Open the inode via its subvolume root
+			BtrfsIoctlInoLookupArgs ino_lookup(BTRFS_FIRST_FREE_OBJECTID);
+			ino_lookup.treeid = ior.m_root;
+			ino_lookup.objectid = ior.m_inum;
+			if (!ino_lookup.do_ioctl_nothrow(root_fd())) {
+				continue;
+			}
+
+			// Build path relative to mount and open
+			string relpath(ino_lookup.name);
+			Fd snap_fd(openat(root_fd(), relpath.c_str(), O_RDONLY));
+			if (!snap_fd) {
+				continue;
+			}
+
+			dests.push_back(SnapDest { .fd = snap_fd, .offset = static_cast<off_t>(ior.m_offset) });
+		} catch (const exception &e) {
+			BEESLOGDEBUG("consolidate: skip inode " << ior.m_inum
+				<< " root " << ior.m_root << ": " << e.what());
+		}
+	}
+
+	if (dests.empty()) {
+		return;
+	}
+
+	// Multi-dest FIDEDUPERANGE in batches of MAX_DESTS_PER_IOCTL
+	size_t total_consolidated = 0;
+	for (size_t i = 0; i < dests.size(); i += MAX_DESTS_PER_IOCTL) {
+		size_t batch_end = min(i + MAX_DESTS_PER_IOCTL, dests.size());
+
+		BtrfsExtentSame bes(brp.first.fd(), brp.first.begin(), brp.first.size());
+		for (size_t j = i; j < batch_end; j++) {
+			bes.add(dests[j].fd, dests[j].offset);
+		}
+
+		try {
+			bes.do_ioctl();
+			for (size_t j = 0; j < bes.m_info.size(); j++) {
+				if (bes.m_info[j].status == 0 && bes.m_info[j].bytes_deduped > 0) {
+					total_consolidated++;
+					BEESCOUNTADD(dedup_bytes, bes.m_info[j].bytes_deduped);
+				}
+			}
+		} catch (const exception &e) {
+			BEESLOGDEBUG("consolidate batch failed: " << e.what());
+		}
+	}
+
+	if (total_consolidated > 0) {
+		BEESLOGINFO("snapshot consolidation: " << total_consolidated
+			<< " additional refs deduped for extent " << to_hex(old_physical));
+		BEESCOUNTADD(dedup_hit, total_consolidated);
+	}
+}
+
 bool
 BeesContext::dedup(const BeesRangePair &brp_in)
 {
@@ -259,6 +350,16 @@ BeesContext::dedup(const BeesRangePair &brp_in)
 			if (rv) {
 				BEESCOUNT(dedup_hit);
 				BEESCOUNTADD(dedup_bytes, brp.first.size());
+
+				// Snapshot consolidation: find all other references
+				// to dst's OLD extent and dedup them too
+				if (second_gpoz) {
+					try {
+						consolidate_snapshot_refs(brp, second_gpoz);
+					} catch (const exception &e) {
+						BEESLOGDEBUG("snapshot consolidation failed: " << e.what());
+					}
+				}
 			} else {
 				BEESCOUNT(dedup_miss);
 				BEESLOGINFO("NO Dedup! " << brp);
