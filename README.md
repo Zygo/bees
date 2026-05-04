@@ -57,6 +57,7 @@ More Information
  * [How scan_one matches extents](docs/scan-one-algorithm.md)
  * [Missing bees features](docs/missing.md)
  * [Event counter descriptions](docs/event-counters.md)
+ * [beestop feature roadmap](docs/beestop-roadmap.md)
 
 Bug Reports and Contributions
 -----------------------------
