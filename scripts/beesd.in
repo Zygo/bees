@@ -27,12 +27,6 @@ readonly bees_bin=$(realpath @LIBEXEC_PREFIX@/bees)
 
 command -v "$bees_bin" &> /dev/null || ERRO "Missing 'bees' agent"
 
-uuid_valid(){
-    if uuidparse -n -o VARIANT $1 | grep -i -q invalid; then
-        false
-    fi
-}
-
 help(){
     echo "Usage: beesd [options] <btrfs_uuid>"
     echo "- - -"
@@ -70,9 +64,13 @@ for arg in "${ARGUMENTS[@]}"; do
 done
 
 for arg in "${NOT_SUPPORTED_ARGS[@]}"; do
-    if uuid_valid $arg; then
-        [ ! -z "$UUID" ] && help
-        UUID=$arg
+    if [ ! -z "$(blkid --uuid $arg -o value | head -1)" ]; then
+        UUID="$arg"
+        INFO "Using UUID $arg"
+    fi
+    if [ ! -z "$(blkid /dev/mapper/$arg -o value | head -1)" ]; then
+        UUID="$(blkid /dev/mapper/$arg -o value | head -1)"
+        INFO "Found $UUID for $arg"
     fi
 done
 

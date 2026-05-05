@@ -1,7 +1,8 @@
 [Unit]
 Description=Bees (%i)
 Documentation=https://github.com/Zygo/bees
-After=sysinit.target
+#After=sysinit.target
+After=local-fs.target
 
 [Service]
 Type=simple
@@ -56,4 +57,4 @@ AmbientCapabilities=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_SYS_ADMI
 NoNewPrivileges=true
 
 [Install]
-WantedBy=basic.target
+WantedBy=multi-user.target
