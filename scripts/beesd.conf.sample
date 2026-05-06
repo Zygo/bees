@@ -1,11 +1,12 @@
 ## Config for Bees: /etc/bees/beesd.conf.sample
 ## https://github.com/Zygo/bees
-## It's a default values, change it, if needed
+## It's the default values, change them if needed.
 
 # How to use?
-# Copy this file to a new file name and adjust the UUID below
+# Copy this file to a new file name and adjust the UUID below.
+# Note: To find the UUID of the btrfs disks: `lsblk -f`
 
-# Which FS will be used
+# Which file system will be used?
 UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 ## System Vars
@@ -15,8 +16,28 @@ UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # BEESHOME="$MNT_DIR/.beeshome"
 # BEESSTATUS="$WORK_DIR/$UUID.status"
 
-## Options to apply, see `beesd --help` for details
-# OPTIONS="--strip-paths --no-timestamps"
+## Options to apply, see also `beesd --help`
+## Load management options:
+#   -c, --thread-count    Worker thread count (default CPU count * factor)
+#   -C, --thread-factor   Worker thread factor (default 1)
+#   -G, --thread-min      Minimum worker thread count (default 0)
+#   -g, --loadavg-target  Target load average for worker threads (default none)
+#       --throttle-factor Idle time between operations (default 1.0)
+## Filesystem tree traversal options:
+#   -m, --scan-mode       Scanning mode (0..4, default 4)
+## Workarounds (the workaround-btrfs-send was needed < 5.4.4 Linux kernel)
+#   -a, --workaround-btrfs-send   Workaround for btrfs send
+#                                 (ignore RO snapshots)
+## Logging options:
+#   -t, --timestamps      Show timestamps in log output (default)
+#   -T, --no-timestamps   Omit timestamps in log output
+#   -p, --absolute-paths  Show absolute paths (default)
+#   -P, --strip-paths     Strip $CWD from beginning of all paths in the log
+#   -v, --verbose         Set maximum log level (0..8, default 7)
+# Use these options to reduce journal entries:
+# OPTIONS="--strip-paths --no-timestamps --verbose 7"
+# For more debugging messages and as a first approach:
+OPTIONS="--verbose 8"
 
 ## Bees DB size
 # Hash Table Sizing
