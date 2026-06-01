@@ -151,24 +151,37 @@ fully scanned the origin subvol, bees can avoid scanning most of the
 data in the snapshot subvol, as it will be provably identical to the
 origin subvol that was already scanned.
 
-If a subvol is deduped _after_ a snapshot is created, the origin and
-snapshot subvols must be deduplicated separately.  In the worst case, this
-will double the amount of reading the bees scanner must perform, and will
-also double the amount of btrfs metadata used for the snapshot; however,
-the "worst case" is a dedupe hit rate of 1% or more, so a doubling of
-metadata size is certain for all but the most unique data sets.  Also,
-bees will not be able to free any space until the last snapshot has been
-scanned and deduped, so payoff in data space savings is deferred until
-the metadata has almost finished expanding.
+If a subvol is deduped _after_ a snapshot is created, there is
+additional work to do in every snapshot that shares the affected extents.
+How much additional work depends on the scan mode:
 
-If a subvol is deduped after _many_ snapshots have been created, all
-subvols must be deduplicated individually.  In the worst case, this will
-multiply the scanning work and metadata size by the number of snapshots.
-For 100 snapshots this can mean a 100x growth in metadata size and
-bees scanning time, which typically exceeds the possible savings from
-reducing the data size by dedupe.  In such cases using bees will result
-in a net increase in disk space usage that persists until the snapshots
-are deleted.
+In older scan modes (subvol scan, before v0.11), the origin and snapshot
+subvols had to be deduplicated separately.  Each snapshot was scanned
+and deduped independently, with no coordination between them.  This
+could multiply scanning work by the number of snapshots, and bees could
+not free any space until the last snapshot had been scanned and deduped.
+
+Starting with v0.11, the extent scan mode (the default) substantially
+improves this situation.  The extent scanner walks the extent tree
+directly, then uses `LOGICAL_INO` to find _all_ references to each
+extent -- including references in snapshots.  This means all copies of
+a duplicated extent are discovered and deduped together in one pass,
+while the data is still in RAM cache and the hash is still in the hash
+table.  The scanning work is no longer multiplied by the number of
+snapshots, and the per-snapshot cost is much lower.
+
+The upcoming v0.12 tightens this loop even further: one planning
+operation is followed by all necessary dedupes back-to-back, reducing
+the per-snapshot overhead to roughly 1/10th of the time for each
+additional snapshot on NVMe (so 3 snapshots dedupe at about the same
+speed as one).
+
+Note that the _metadata size_ increase is intrinsic to how btrfs works
+and applies regardless of scan mode.  When bees dedupes an extent, every
+snapshot containing that extent must CoW its metadata page.  With many
+snapshots, this still results in metadata growth proportional to the
+number of snapshots.  The improvement in extent scan mode is in _scanning
+time_ and _coordination_, not in the fundamental metadata cost.
 
 Snapshot case studies
 ---------------------
@@ -189,6 +202,7 @@ Snapshot case studies
       (it may even shrink because there are fewer csums).
 
  * bees installed on a non-empty filesystem with snapshots
+   (subvol scan mode, before v0.11)
    * filesystem is mkfsed
    * data is written to the filesystem
    * multiple snapshots are made of the data
@@ -198,6 +212,20 @@ Snapshot case studies
       substantial growth of metadata usage.
       * Disk space savings do not occur until bees processes the
       last snapshot reference to data.
+
+ * bees installed on a non-empty filesystem with snapshots
+   (extent scan mode, v0.11+)
+   * filesystem is mkfsed
+   * data is written to the filesystem
+   * multiple snapshots are made of the data
+   * bees is installed and starts running with extent scan mode (default)
+   * bees scans extents and discovers all references (including snapshots)
+     via LOGICAL_INO in a single pass
+      * Snapshot references are deduped together with the origin while
+      data is still cached, so the scanning cost does not multiply
+      with the number of snapshots.
+      * Metadata growth still occurs (proportional to snapshot count),
+      but the scanning time is comparable to a single subvolume.
 
 
 Other Gotchas
