@@ -1,7 +1,9 @@
 [Unit]
 Description=Bees (%i)
 Documentation=https://github.com/Zygo/bees
-After=sysinit.target
+# Prevents bees from still running while scanned FS is being unmounted
+After=local-fs.target
+Before=umount.target
 
 [Service]
 Type=simple
@@ -20,6 +22,9 @@ RuntimeDirectoryMode=0700
 RuntimeDirectory=bees
 StartupCPUWeight=25
 StartupIOWeight=25
+
+# Give beesd some time to flush everything before shutting down
+TimeoutStopSec=300
 
 # Hide other users' process in /proc/
 ProtectProc=invisible
@@ -41,7 +46,7 @@ PrivateNetwork=true
 PrivateIPC=true
 ProtectHostname=true
 
-# Disable write access to kernel variables throug /proc
+# Disable write access to kernel variables through /proc
 ProtectKernelTunables=true
 
 # Disable access to control groups
@@ -56,4 +61,4 @@ AmbientCapabilities=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_SYS_ADMI
 NoNewPrivileges=true
 
 [Install]
-WantedBy=basic.target
+WantedBy=multi-user.target
