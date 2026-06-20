@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_configure:
+	echo 'ETC_PREFIX=/etc' > localconf
+	echo 'PREFIX=/usr' >> localconf
+	echo 'SYSTEMD_SYSTEM_UNIT_DIR=/usr/lib/systemd/system' >> localconf
+	echo 'DEFAULT_MAKE_TARGET=all' >> localconf
+	sed -i 's/ -Werror//' makeflags
+
+override_dh_auto_build:
+	$(MAKE) all
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/bees
+	sed -i 's/"//g' $(CURDIR)/debian/bees/usr/lib/systemd/system/beesd@.service

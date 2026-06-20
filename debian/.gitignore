@@ -1,0 +1,5 @@
+.debhelper/
+bees/
+bees.substvars
+debhelper-build-stamp
+files

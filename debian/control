@@ -1,0 +1,13 @@
+Source: bees
+Section: admin
+Priority: optional
+Maintainer: Zygo Blaxell <bees@furryterror.org>
+Build-Depends: debhelper-compat (= 13), libbtrfs-dev, markdown
+Standards-Version: 4.6.0
+
+Package: bees
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, btrfs-progs, util-linux
+Description: Best-Effort Extent-Same, a btrfs dedup agent
+ bees is a btrfs deduplication daemon that works on live btrfs
+ filesystems without requiring freezes or snapshots.

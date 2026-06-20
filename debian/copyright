@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: bees
+Upstream-Contact: Zygo Blaxell <bees@furryterror.org>
+Source: https://github.com/Zygo/bees
+
+Files: *
+Copyright: Zygo Blaxell <bees@furryterror.org>
+License: GPL-3+

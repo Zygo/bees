@@ -70,3 +70,7 @@ help: ## Show help
 
 bees: reallyall
 fly: install
+
+deb: ## Build deb package
+deb: all
+	dpkg-buildpackage -us -uc -b
