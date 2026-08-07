@@ -13,7 +13,10 @@
 extern "C" {
 	pid_t
 	__attribute__((weak))
-	gettid() throw()
+	gettid()
+#ifdef __THROW
+	__THROW
+#endif
 	{
 		return syscall(SYS_gettid);
 	}
