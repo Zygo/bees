@@ -11,7 +11,11 @@
 #include <unistd.h>
 
 extern "C" {
-	pid_t gettid() throw();
+	pid_t gettid()
+#ifdef __THROW
+	__THROW
+#endif
+	;
 };
 
 namespace crucible {
